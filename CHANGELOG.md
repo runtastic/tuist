@@ -1,5 +1,7 @@
 # Changelog
 
+- MOD changed the install script to install tuist binaries from local build folder by [@MohgaNabil](https://github.com/MohgaNabil) 
+
 ## 3.17.0 - 2023-03-12
 
 ### Added
