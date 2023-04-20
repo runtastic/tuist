@@ -24,10 +24,10 @@ jobs:
       commit_hash: ${{ steps.auto-commit-action.outputs.commit_hash }}
     steps:
     - uses: actions/checkout@v3
-#       with:
-#         ref: ${{ github.head_ref }}
-#         fetch-depth: 0
-#         token: ${{ secrets.GH_RELEASE_TOKEN }}
+      with:
+        ref: ${{ github.head_ref }}
+        fetch-depth: 0
+        token: ${{ secrets.GITHUB_TOKEN }}
     - name: 'Get Previous tag'
       id: previoustag
       uses: "WyriHaximus/github-action-get-previous-tag@v1"
@@ -44,19 +44,19 @@ jobs:
       # This step updates the version in the Constants.swift file by replacing the current tag in Constants.swift with the tagged release.
       run: |
         sed -i -e "s/version = \".*\"/version = \"${{ steps.semvers.outputs.version }}\"/g" Sources/TuistSupport/Constants.swift
-#     - name: "Build Changelog"
-#       id: changelog
-#       uses: mikepenz/release-changelog-builder-action@v2
-#       with:
-#         configuration: ".github/workflows/changelog-configuration.json"
-#         toTag: "main"
-#       env:
-#         GITHUB_TOKEN: ${{ secrets.GH_RELEASE_TOKEN }}
-#     - name: Update Changelog
-#       uses: stefanzweifel/changelog-updater-action@v1
-#       with:
-#         latest-version: ${{ steps.semvers.outputs.version }}
-#         release-notes: ${{ steps.changelog.outputs.changelog }}
+    - name: "Build Changelog"
+      id: changelog
+      uses: mikepenz/release-changelog-builder-action@v2
+      with:
+        configuration: ".github/workflows/changelog-configuration.json"
+        toTag: "main"
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+    - name: Update Changelog
+      uses: stefanzweifel/changelog-updater-action@v1
+      with:
+        latest-version: ${{ steps.semvers.outputs.version }}
+        release-notes: ${{ steps.changelog.outputs.changelog }}
     - name: Commit
       id: auto-commit-action
       uses: stefanzweifel/git-auto-commit-action@v4
@@ -90,7 +90,7 @@ jobs:
       if: ${{ github.event.inputs.publish == 'true' }}
       uses: softprops/action-gh-release@v1
       with:
-        token: ${{ secrets.GH_RELEASE_TOKEN }}
+        token: ${{ secrets.GITHUB_TOKEN }}
         files: build/*
         name: ${{ needs.prepare-release.outputs.version }}
         tag_name: ${{ needs.prepare-release.outputs.version }}
