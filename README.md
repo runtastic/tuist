@@ -48,7 +48,7 @@ You can use our [contribution docs](https://docs.tuist.io/contributors/get-start
 
 The financial sustainability of the project is possible thanks to the ongoing contributions from our [GitHub Sponsors](https://github.com/sponsors/tuist) and [Open Collective Backers](https://opencollective.com/tuistapp). From them, we'd like to give a special mention to the following sponsors:
 
-### Silver sponsor: [stream](https://getstream.io/chat/sdk/ios/?utm_source=github&utm_medium=github_repo_content_ad&utm_content=Developer&utm_campaign=Github_Nov2021_iOSChatSDK)
+### Silver sponsors: [stream](https://getstream.io/chat/sdk/ios/?utm_source=github&utm_medium=github_repo_content_ad&utm_content=Developer&utm_campaign=Github_Nov2021_iOSChatSDK) & [Bitrise](https://bitrise.io)
 
 [Stream](https://getstream.io/chat/sdk/ios/?utm_source=Github&utm_medium=Github_Repo_Content_Ad&utm_content=Developer&utm_campaign=Github_Jan2022_SwiftSDK&utm_term=tuist) helps build scalable in-app chat or activity feeds in days. Product teams trust Stream to launch faster, iterate more often, and ship a better user experience.
 
@@ -59,6 +59,21 @@ The financial sustainability of the project is possible thanks to the ongoing co
       srcset="assets/companies/stream-white.png" 
       media="(prefers-color-scheme: dark)">
       <img src="assets/companies/stream.png"/>
+    </picture>
+  </a>
+</div>
+
+<br/>
+
+[Bitrise](https://bitrise.io?utm_source=Github&utm_medium=Github_Repo_Content_Ad&utm_content=Developer&utm_term=tuist) is a mobile DevOps platform built to adress mobile's challenges, empowering mobile teams to deliver their best work.
+
+<div >
+  <a href="[https://getstream.io/chat/sdk/ios/?utm_source=Github&utm_medium=Github_Repo_Content_Ad&utm_content=Developer&utm_campaign=Github_Jan2022_SwiftSDK&utm_term=tuist](https://bitrise.io?utm_source=Github&utm_medium=Github_Repo_Content_Ad&utm_content=Developer&utm_term=tuist)" target="_blank">
+    <picture>
+      <source 
+      srcset="[assets/companies/stream-white.png](https://assets-global.website-files.com/5db35de024bb983af1b4e151/5e6f9ccda4e7ff12841abe18_Bitrise%20Logo%20-%20White%20Bg.png)" 
+      media="(prefers-color-scheme: dark)">
+      <img width="170" src="https://assets-global.website-files.com/5db35de024bb983af1b4e151/5e6f9ccda4e7ff12841abe18_Bitrise%20Logo%20-%20White%20Bg.png"/>
     </picture>
   </a>
 </div>
@@ -173,7 +188,6 @@ If you are interested in contributing to the project, our documentation has a se
     <td align="center"><a href="https://github.com/fortmarek"><img src="https://avatars0.githubusercontent.com/u/9371695?v=4" width="100px;" alt=""/><br /><sub><b>Marek Fořt</b></sub></a><br /></td>
     <td align="center"><a href="http://www.matrixprojects.net"><img src="https://avatars3.githubusercontent.com/u/11914919?v=4" width="100px;" alt=""/><br /><sub><b>Kas</b></sub></a><br /></td>
     <td align="center"><a href="https://github.com/danyf90"><img src="https://avatars.githubusercontent.com/u/2794031?v=4" width="100px;" alt=""/><br /><sub><b>Daniele Formichelli</b></sub></a><br /></td>
-    <td align="center"><a href="https://github.com/adellibovi"><img src="https://avatars3.githubusercontent.com/u/67916?v=4" width="100px;" alt=""/><br /><sub><b>Alfredo Delli Bovi</b></sub></a><br /></td>
   </tr>
 </table>
 
@@ -189,6 +203,7 @@ The following people were once core contributors helping steer the project in th
     <td align="center"><a href="https://github.com/RomainBoulay"><img src="https://avatars1.githubusercontent.com/u/169323?v=4" width="100px;" alt=""/><br /><sub><b>Romain Boulay</b></sub></a><br /></td>
     <td align="center"><a href="https://github.com/laxmorek"><img src="https://avatars1.githubusercontent.com/u/4774319?v=4" width="100px;" alt=""/><br /><sub><b>Kamil Harasimowicz</b></sub></a><br /></td>
     <td align="center"><a href="http://www.luispadron.com"><img src="https://avatars3.githubusercontent.com/u/13840545?v=4" width="100px;" alt=""/><br /><sub><b>Luis Padron</b></sub></a></td>
+    <td align="center"><a href="https://github.com/adellibovi"><img src="https://avatars3.githubusercontent.com/u/67916?v=4" width="100px;" alt=""/><br /><sub><b>Alfredo Delli Bovi</b></sub></a><br /></td>
   </tr>
 </table>
 
@@ -351,6 +366,8 @@ Thanks goes to these wonderful people:
       <td align="center" valign="top" width="14.28%"><a href="https://github.com/serejahh"><img src="https://avatars.githubusercontent.com/u/2575555?v=4" width="100px;" alt=""/><br /><sub><b>Serhii Butenko</b></sub></a></td>
       <td align="center" valign="top" width="14.28%"><a href="https://github.com/petrukha-ivan"><img src="https://avatars.githubusercontent.com/u/93926277?v=4" width="100px;" alt=""/><br /><sub><b>Petrukha Ivan</b></sub></a></td>
       <td align="center" valign="top" width="14.28%"><a href="https://github.com/lo1tuma"><img src="https://avatars.githubusercontent.com/u/169170?v=4" width="100px;" alt=""/><br /><sub><b>Mathias Schreck</b></sub></a></td>
+      <td align="center" valign="top" width="14.28%"><a href="https://github.com/Buju77"><img src="https://avatars.githubusercontent.com/u/266349?v=4" width="100px;" alt=""/><br /><sub><b>Yen-Chia Lin</b></sub></a></td>
+      <td align="center" valign="top" width="14.28%"><a href="https://coolmathgames.tech"><img src="https://avatars.githubusercontent.com/u/6877780?v=4" width="100px;" alt=""/><br /><sub><b>Mary </b></sub></a></td>
     </tr>
   </tbody>
 </table>

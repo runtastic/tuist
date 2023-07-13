@@ -9,9 +9,35 @@
 - Fixed a "Template.swift" file not found error when executing `tuist init -t <git url>` by [@Buju77](https://github.com/Buju77)
 - Fixed wrong http regex for repo url used in `TemplateLocationParsing` (old regex wrongfully matched with ssh urls that included username) by [@MohgaNabil](https://github.com/MohgaNabil)
 
-## 3.20.1-runtastic - 2023-06-15
+## Unreleased
 
-- no changes
+## 3.21.1 - 2023-07-13
+
+### Changed
+
+- Update `TEST_HOST` to use BUNDLE_EXECUTABLE_FOLDER_PATH from Xcode 14 [#5289](https://github.com/tuist/tuist/pull/5289) by [@waltflanagan](https://github.com/waltflanagan)
+
+### Fixed
+
+- Fix plist code generation for single file case [#5292](https://github.com/tuist/tuist/pull/5292) by [@waltflanagan](https://github.com/waltflanagan).
+
+## 3.21.0 - 2023-07-11
+
+### Changed
+
+- Set BuildIndependentTargetsInParallel setting to true by default [#5225](https://github.com/tuist/tuist/pull/5225) by [@thedavidharris](https://github.com/thedavidharris)
+- Update Stencil to 0.15.1 [#5250](https://github.com/tuist/tuist/pull/5250) by [@waltflanagan](https://github.com/waltflanagan)
+
+### Added
+
+- Add support for ExtensionKit extensions [#5005](https://github.com/tuist/tuist/pull/5005) by [@tovkal](https://github.com/tovkal)
+- Added support for visionOS [#5251](https://github.com/tuist/tuist/pull/5251) by [@Mstrodl](https://github.com/Mstrodl).
+
+### Fixed
+
+- Mark bundle product type doesn't support sources for all platforms [#5229](https://github.com/tuist/tuist/pull/5229) by [@serejahh](https://github.com/serejahh)
+- Fixed a bug where turning on and off the rendering of markdown files in Workspace config wouldn't turn off rendering properly and would stay in read-only mode [#5261](https://github.com/tuist/tuist/pull/5261) by [@Buju77](https://github.com/Buju77).
+- Fixed code generation when target name starts with non alphanumeric character [#5256](https://github.com/tuist/tuist/pull/5256) by [@dankinsoid](https://github.com/dankinsoid)
 
 ## 3.20.0 - 2023-05-31
 

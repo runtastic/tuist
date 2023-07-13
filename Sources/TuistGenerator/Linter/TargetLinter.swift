@@ -96,6 +96,11 @@ class TargetLinter: TargetLinting {
         let hasNoDependencies = target.dependencies.isEmpty
         let hasNoScripts = target.scripts.isEmpty
 
+        // macOS bundle targets can have source code, but it's optional
+        if target.platform == .macOS, target.product == .bundle, hasNoSources {
+            return []
+        }
+
         if hasNoSources, hasNoDependencies, hasNoScripts {
             return [LintingIssue(reason: "The target \(target.name) doesn't contain source files.", severity: .warning)]
         } else if !supportsSources, !sources.isEmpty {
@@ -213,6 +218,7 @@ class TargetLinter: TargetLinting {
         case .macOS: if platform != .macOS { return [inconsistentPlatformIssue] }
         case .watchOS: if platform != .watchOS { return [inconsistentPlatformIssue] }
         case .tvOS: if platform != .tvOS { return [inconsistentPlatformIssue] }
+        case .visionOS: if platform != .visionOS { return [inconsistentPlatformIssue] }
         }
 
         return []
