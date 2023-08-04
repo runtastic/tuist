@@ -1,5 +1,9 @@
 # Changelog
 
+## 3.21.2-runtastic - 2023-08-04
+
+- no changes
+
 ## Unreleased
 
 ## 3.22.0 - 2023-07-31
