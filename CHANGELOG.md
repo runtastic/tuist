@@ -1,5 +1,9 @@
 # Changelog
 
+## 3.32.1-runtastic - 2023-11-07
+
+- no changes
+
 ## 3.32.0 - 2023-11-06
 
 ### Added
