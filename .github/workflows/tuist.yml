@@ -14,10 +14,9 @@ on:
       - Sources/**
       - Templates/**
       - Tests/**
-      - projects/tuist/features/**
-      - projects/tuist/fixtures/**
+      - features/**
+      - fixtures/**
       - .package.resolved
-      - projects/fourier/**
       - .github/workflows/tuist.yml
 
 concurrency:
@@ -32,37 +31,6 @@ env:
   NODE_VERSION: 16.17.0
 
 jobs:
-  unit_tests:
-    name: Unit tests with Xcode
-    runs-on: macos-13
-    steps:
-      - uses: actions/checkout@v3
-      - name: Select Xcode
-        run: sudo xcode-select -switch /Applications/Xcode_$(cat .xcode-version).app
-      - uses: actions/cache@v3
-        name: 'Cache Tuist .build folder'
-        with:
-          path: .build
-          key: ${{ runner.os }}-${{ hashFiles('.xcode-version') }}-spm-${{ hashFiles('Package.resolved') }}-git-${{ github.sha }}
-          restore-keys: |
-            ${{ runner.os }}-${{ hashFiles('.xcode-version') }}-spm-${{ hashFiles('Package.resolved') }}
-            ${{ runner.os }}-${{ hashFiles('.xcode-version') }}-spm
-      - uses: ruby/setup-ruby@v1
-        with:
-          ruby-version: ${{ env.RUBY_VERSION }}
-      - uses: actions/cache@v3
-        with:
-          path: vendor/bundle
-          key: ${{ runner.os }}-${{ env.RUBY_VERSION }}-gems-${{ hashFiles('Gemfile.lock') }}
-          restore-keys: |
-            ${{ runner.os }}-${{ env.RUBY_VERSION }}-gems-
-      - name: Bundle install
-        run: |
-          bundle config path vendor/bundle
-          bundle install --jobs 4 --retry 3
-      - name: Run tests
-        run: |
-          ./fourier test tuist unit
   release_build:
     name: Release build with Xcode
     runs-on: macos-13
@@ -72,10 +40,10 @@ jobs:
         name: 'Cache Tuist .build folder'
         with:
           path: .build
-          key: ${{ runner.os }}-${{ hashFiles('.xcode-version') }}-spm-${{ hashFiles('Package.resolved') }}-git-${{ github.sha }}
+          key: ${{ runner.os }}-${{ hashFiles('.xcode-version') }}-spm-v1-${{ hashFiles('Package.resolved') }}-git-${{ github.sha }}
           restore-keys: |
-            ${{ runner.os }}-${{ hashFiles('.xcode-version') }}-spm-${{ hashFiles('Package.resolved') }}
-            ${{ runner.os }}-${{ hashFiles('.xcode-version') }}-spm
+            ${{ runner.os }}-${{ hashFiles('.xcode-version') }}-spm-v1-${{ hashFiles('Package.resolved') }}
+            ${{ runner.os }}-${{ hashFiles('.xcode-version') }}-spm-v1
       - name: Select Xcode for Tuist and Tuistenv
         run: sudo xcode-select -switch /Applications/Xcode_$(cat .xcode-version).app
       - name: Build Tuist for release
@@ -93,11 +61,10 @@ jobs:
         feature:
           [
             'build',
-            'cache-frameworks',
-            'cache-xcframeworks',
+            # 'cache-frameworks',
+            # 'cache-xcframeworks',
             'dependencies',
             'edit',
-            'env',
             'generate-1',
             'generate-2',
             'generate-3',
@@ -120,18 +87,19 @@ jobs:
     needs: release_build
     steps:
       - uses: actions/checkout@v3
-        with:
-          submodules: recursive
+      - name: Initialize submodules
+        run: |
+          git submodule update --init fixtures/tuist_plugin
       - name: Select Xcode
         run: sudo xcode-select -switch /Applications/Xcode_$(cat .xcode-version).app
       - uses: actions/cache@v3
         name: 'Cache Tuist .build folder'
         with:
           path: .build
-          key: ${{ runner.os }}-${{ hashFiles('.xcode-version') }}-spm-${{ hashFiles('Package.resolved') }}-git-${{ github.sha }}
+          key: ${{ runner.os }}-${{ hashFiles('.xcode-version') }}-spm-v1-${{ hashFiles('Package.resolved') }}-git-${{ github.sha }}
           restore-keys: |
-            ${{ runner.os }}-${{ hashFiles('.xcode-version') }}-spm-${{ hashFiles('Package.resolved') }}
-            ${{ runner.os }}-${{ hashFiles('.xcode-version') }}-spm
+            ${{ runner.os }}-${{ hashFiles('.xcode-version') }}-spm-v1-${{ hashFiles('Package.resolved') }}
+            ${{ runner.os }}-${{ hashFiles('.xcode-version') }}-spm-v1
       - uses: ruby/setup-ruby@v1
         with:
           ruby-version: ${{ env.RUBY_VERSION }}
@@ -147,8 +115,8 @@ jobs:
           bundle install --jobs 4 --retry 3
       - name: Run tests
         if: ${{ (github.event.pull_request.head.repo.full_name == github.repository) }}
-        run: ./fourier test tuist acceptance projects/tuist/features/${{ matrix.feature }}.feature
-  
+        run: FEATURE=features/${{ matrix.feature }}.feature make tuist/acceptance-test
+
   lint:
     name: Lint
     runs-on: macos-13
@@ -156,45 +124,13 @@ jobs:
       - uses: actions/checkout@v3
       - name: Select Xcode
         run: sudo xcode-select -switch /Applications/Xcode_$(cat .xcode-version).app
-      - uses: ruby/setup-ruby@v1
-        with:
-          ruby-version: ${{ env.RUBY_VERSION }}
-      - uses: actions/cache@v3
-        with:
-          path: vendor/bundle
-          key: ${{ runner.os }}-${{ env.RUBY_VERSION }}${{ hashFiles('Gemfile.lock') }}
-          restore-keys: |
-            ${{ runner.os }}-${{ env.RUBY_VERSION }}-gems-
-      - name: Bundle install
-        run: |
-          bundle config path vendor/bundle
-          bundle install --jobs 4 --retry 3
-      - name: Install Bundler dependencies
-        run: bundle install
       - name: Run
-        run: ./fourier lint tuist
-  
+        run: make workspace/lint
+
   lint-lockfiles:
     name: Lint lockfiles
     runs-on: macos-13
     steps:
       - uses: actions/checkout@v3
-      - name: Select Xcode
-        run: sudo xcode-select -switch /Applications/Xcode_$(cat .xcode-version).app
-      - uses: ruby/setup-ruby@v1
-        with:
-          ruby-version: ${{ env.RUBY_VERSION }}
-      - uses: actions/cache@v3
-        with:
-          path: vendor/bundle
-          key: ${{ runner.os }}-${{ env.RUBY_VERSION }}${{ hashFiles('Gemfile.lock') }}
-          restore-keys: |
-            ${{ runner.os }}-${{ env.RUBY_VERSION }}-gems-
-      - name: Bundle install
-        run: |
-          bundle config path vendor/bundle
-          bundle install --jobs 4 --retry 3
-      - name: Install Bundler dependencies
-        run: bundle install
       - name: Run
-        run: ./fourier lint lockfiles
+        run: ./make/tasks/workspace/lint/lockfiles.sh

@@ -138,17 +138,21 @@ class StaticProductsGraphLinter: StaticProductsGraphLinting {
 
     private func isStaticProduct(_ dependency: GraphDependency, graphTraverser: GraphTraversing) -> Bool {
         switch dependency {
-        case let .xcframework(_, _, _, linking):
+        case let .xcframework(_, _, _, linking, _, _):
             return linking == .static
-        case let .framework(_, _, _, _, linking, _, _):
+        case let .framework(_, _, _, _, linking, _, _, _):
             return linking == .static
         case let .library(_, _, linking, _, _):
             return linking == .static
         case .bundle:
             return true
-        case .packageProduct:
+        case let .packageProduct(_, _, type):
+            switch type {
             // Swift package products are currently assumed to be static
-            return true
+            case .sources: return true
+            case .macro: return false
+            case .plugin: return false
+            }
         case let .target(name, path):
             guard let target = graphTraverser.target(path: path, name: name) else { return false }
             return target.target.product.isStatic

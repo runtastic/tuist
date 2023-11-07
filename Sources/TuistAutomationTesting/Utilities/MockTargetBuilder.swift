@@ -16,11 +16,13 @@ public final class MockTargetBuilder: TargetBuilding {
         AbsolutePath?,
         String?,
         Version?,
+        Bool,
         GraphTraversing
     ) throws -> Void)?
 
     public func buildTarget(
         _ target: GraphTarget,
+        platform _: TuistGraph.Platform,
         workspacePath: AbsolutePath,
         scheme: Scheme,
         clean: Bool,
@@ -28,6 +30,7 @@ public final class MockTargetBuilder: TargetBuilding {
         buildOutputPath: AbsolutePath?,
         device: String?,
         osVersion: Version?,
+        rosetta: Bool,
         graphTraverser: GraphTraversing
     ) throws {
         try buildTargetStub?(
@@ -39,6 +42,7 @@ public final class MockTargetBuilder: TargetBuilding {
             buildOutputPath,
             device,
             osVersion,
+            rosetta,
             graphTraverser
         )
     }

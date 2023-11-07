@@ -1,5 +1,6 @@
 import Foundation
 import TSCBasic
+import TuistSupport
 @testable import TuistGraph
 
 extension RunAction {
@@ -13,7 +14,9 @@ extension RunAction {
         filePath: AbsolutePath? = nil,
         arguments: Arguments? = Arguments.test(),
         options: RunActionOptions = .init(),
-        diagnosticsOptions: Set<SchemeDiagnosticsOption> = [.mainThreadChecker, .performanceAntipatternChecker]
+        diagnosticsOptions: Set<SchemeDiagnosticsOption> = [.mainThreadChecker, .performanceAntipatternChecker],
+        expandVariableFromTarget: TargetReference? = nil,
+        launchStyle: LaunchStyle = .automatically
     ) -> RunAction {
         RunAction(
             configurationName: configurationName,
@@ -25,7 +28,9 @@ extension RunAction {
             filePath: filePath,
             arguments: arguments,
             options: options,
-            diagnosticsOptions: diagnosticsOptions
+            diagnosticsOptions: diagnosticsOptions,
+            expandVariableFromTarget: expandVariableFromTarget,
+            launchStyle: launchStyle
         )
     }
 }

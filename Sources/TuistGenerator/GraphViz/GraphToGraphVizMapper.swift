@@ -77,14 +77,17 @@ extension GraphDependency {
             bcsymbolmapPaths: _,
             linking: _,
             architectures: _,
-            isCarthage: _
+            isCarthage: _,
+            status: _
         ):
             return path.basenameWithoutExt
         case let .xcframework(
             path: path,
             infoPlist: _,
             primaryBinaryPath: _,
-            linking: _
+            linking: _,
+            mergeable: _,
+            status: _
         ):
             return path.basenameWithoutExt
         case let .library(
@@ -97,7 +100,7 @@ extension GraphDependency {
             return path.basenameWithoutExt
         case let .bundle(path):
             return path.basenameWithoutExt
-        case let .packageProduct(path: _, product: product):
+        case let .packageProduct(path: _, product: product, type: _):
             return product
         case let .sdk(
             name: name,

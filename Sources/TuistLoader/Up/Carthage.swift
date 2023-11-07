@@ -19,7 +19,8 @@ protocol Carthaging {
     ///   - path: Directory where the Carthage dependencies are defined.
     ///   - platforms: Platforms the dependencies will be bootstraped for.
     ///   - useXCFrameworks: Indicates whether Carthage produces XCFrameworks or regular frameworks.
-    ///   - noUseBinaries: Indicates whether Carthage rebuilds the dependency from source instead of using downloaded binaries when possible.
+    ///   - noUseBinaries: Indicates whether Carthage rebuilds the dependency from source instead of using downloaded binaries
+    /// when possible.
     ///   - dependencies: Dependencies to bootstrap
     /// - Throws: An error if the dependencies bootstrap fails.
     func bootstrap(
@@ -38,9 +39,10 @@ protocol Carthaging {
 }
 
 final class Carthage: Carthaging {
+    // swiftlint:disable force_try
     /// Regex used to match and extract information from the lines in the Cartfile.resolved file.
-    // swiftlint:disable:next force_try
     static let resolvedLineRegex = try! NSRegularExpression(pattern: "(github|git|binary) \"([^\"]+)\" \"([^\"]+)\"", options: [])
+    // swiftlint:enable force_try
 
     /// Bootstraps the dependencies in the given directory.
     ///
@@ -48,7 +50,8 @@ final class Carthage: Carthaging {
     ///   - path: Directory where the Carthage dependencies are defined.
     ///   - platforms: Platforms the dependencies will be bootstraped for.
     ///   - useXCFrameworks: Indicates whether Carthage produces XCFrameworks or regular frameworks.
-    ///   - noUseBinaries: Indicates whether Carthage rebuilds the dependency from source instead of using downloaded binaries when possible.
+    ///   - noUseBinaries: Indicates whether Carthage rebuilds the dependency from source instead of using downloaded binaries
+    /// when possible.
     ///   - dependencies: Dependencies to bootstrap
     /// - Throws: An error if the dependencies bootstrap fails.
     func bootstrap(
@@ -120,7 +123,8 @@ final class Carthage: Carthaging {
             let dependencyRevisionRange = match.range(at: 3)
             let dependencyRevision = cartfileResolvedNSString.substring(with: dependencyRevisionRange)
 
-            let dependencyVersionFilePath = path.appending(RelativePath("Carthage/Build/.\(dependencyName).version"))
+            let dependencyVersionFilePath = path
+                .appending(try RelativePath(validating: "Carthage/Build/.\(dependencyName).version"))
 
             // We consider missing dependencies outdated
             if !FileHandler.shared.exists(dependencyVersionFilePath) {

@@ -173,7 +173,7 @@ extension ProjectAutomation.Graph {
         encoder.outputFormatting = [.sortedKeys, .prettyPrinted, .withoutEscapingSlashes]
         let jsonData = try encoder.encode(self)
         let jsonString = String(data: jsonData, encoding: .utf8)
-        guard let jsonString = jsonString else {
+        guard let jsonString else {
             throw GraphServiceError.encodingError(GraphFormat.json.rawValue)
         }
 
@@ -228,10 +228,24 @@ extension ProjectAutomation.Target {
             return .target(name: name)
         case let .project(target, path):
             return .project(target: target, path: path.pathString)
-        case let .framework(path):
-            return .framework(path: path.pathString)
-        case let .xcframework(path):
-            return .xcframework(path: path.pathString)
+        case let .framework(path, status):
+            let frameworkStatus: ProjectAutomation.FrameworkStatus
+            switch status {
+            case .optional:
+                frameworkStatus = .optional
+            case .required:
+                frameworkStatus = .required
+            }
+            return .framework(path: path.pathString, status: frameworkStatus)
+        case let .xcframework(path, status):
+            let frameworkStatus: ProjectAutomation.FrameworkStatus
+            switch status {
+            case .optional:
+                frameworkStatus = .optional
+            case .required:
+                frameworkStatus = .required
+            }
+            return .xcframework(path: path.pathString, status: frameworkStatus)
         case let .library(path, publicHeaders, swiftModuleMap):
             return .library(
                 path: path.pathString,
@@ -240,6 +254,10 @@ extension ProjectAutomation.Target {
             )
         case let .package(product):
             return .package(product: product)
+        case let .packagePlugin(product):
+            return .packagePlugin(product: product)
+        case let .packageMacro(product):
+            return .packageMacro(product: product)
         case let .sdk(name, status):
             let projectAutomationStatus: ProjectAutomation.SDKStatus
             switch status {

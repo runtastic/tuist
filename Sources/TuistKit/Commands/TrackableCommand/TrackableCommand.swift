@@ -36,7 +36,7 @@ public class TrackableCommand: TrackableParametersDelegate {
         self.asyncQueue = asyncQueue
     }
 
-    func run() async throws {
+    public func run() async throws {
         let timer = clock.startTimer()
         if let command = command as? HasTrackableParameters {
             type(of: command).analyticsDelegate = self
@@ -59,9 +59,10 @@ public class TrackableCommand: TrackableParametersDelegate {
         )
         let commandEvent = commandEventFactory.make(from: info)
         try asyncQueue.dispatch(event: commandEvent)
+        asyncQueue.waitIfCI()
     }
 
-    func addParameters(_ parameters: [String: AnyCodable]) {
+    public func addParameters(_ parameters: [String: AnyCodable]) {
         trackedParameters.merge(
             parameters,
             uniquingKeysWith: { _, newKey in newKey }

@@ -174,8 +174,8 @@ final class GraphLoaderTests: TuistUnitTestCase {
 
     func test_loadWorkspace_frameworkDependency() throws {
         // Given
-        let targetA = Target.test(name: "A", dependencies: [.framework(path: "/Frameworks/F1.framework")])
-        let targetB = Target.test(name: "B", dependencies: [.framework(path: "/Frameworks/F2.framework")])
+        let targetA = Target.test(name: "A", dependencies: [.framework(path: "/Frameworks/F1.framework", status: .required)])
+        let targetB = Target.test(name: "B", dependencies: [.framework(path: "/Frameworks/F2.framework", status: .required)])
         let projectA = Project.test(path: "/A", name: "A", targets: [targetA])
         let projectB = Project.test(path: "/B", name: "B", targets: [targetB])
         let workspace = Workspace.test(path: "/", name: "Workspace", projects: ["/A", "/B"])
@@ -216,7 +216,8 @@ final class GraphLoaderTests: TuistUnitTestCase {
                     bcsymbolmapPaths: [],
                     linking: .dynamic,
                     architectures: [.arm64],
-                    isCarthage: false
+                    isCarthage: false,
+                    status: .required
                 ),
             ]),
             .target(name: "B", path: "/B"): Set([
@@ -227,7 +228,8 @@ final class GraphLoaderTests: TuistUnitTestCase {
                     bcsymbolmapPaths: [],
                     linking: .static,
                     architectures: [.x8664],
-                    isCarthage: false
+                    isCarthage: false,
+                    status: .required
                 ),
             ]),
         ])
@@ -235,8 +237,8 @@ final class GraphLoaderTests: TuistUnitTestCase {
 
     func test_loadWorkspace_frameworkDependencyReferencedMultipleTimes() throws {
         // Given
-        let targetA = Target.test(name: "A", dependencies: [.framework(path: "/Frameworks/F.framework")])
-        let targetB = Target.test(name: "B", dependencies: [.framework(path: "/Frameworks/F.framework")])
+        let targetA = Target.test(name: "A", dependencies: [.framework(path: "/Frameworks/F.framework", status: .required)])
+        let targetB = Target.test(name: "B", dependencies: [.framework(path: "/Frameworks/F.framework", status: .required)])
         let projectA = Project.test(path: "/A", name: "A", targets: [targetA])
         let projectB = Project.test(path: "/B", name: "B", targets: [targetB])
         let workspace = Workspace.test(path: "/", name: "Workspace", projects: ["/A", "/B"])
@@ -268,7 +270,8 @@ final class GraphLoaderTests: TuistUnitTestCase {
             bcsymbolmapPaths: [],
             linking: .dynamic,
             architectures: [.arm64],
-            isCarthage: false
+            isCarthage: false,
+            status: .required
         )
         XCTAssertEqual(graph.dependencies, [
             .target(name: "A", path: "/A"): Set([
@@ -351,7 +354,10 @@ final class GraphLoaderTests: TuistUnitTestCase {
 
     func test_loadWorkspace_xcframeworkDependency() throws {
         // Given
-        let targetA = Target.test(name: "A", dependencies: [.xcframework(path: "/XCFrameworks/XF1.xcframework")])
+        let targetA = Target.test(
+            name: "A",
+            dependencies: [.xcframework(path: "/XCFrameworks/XF1.xcframework", status: .required)]
+        )
         let projectA = Project.test(path: "/A", name: "A", targets: [targetA])
         let workspace = Workspace.test(path: "/", name: "Workspace", projects: ["/A"])
 
@@ -360,7 +366,9 @@ final class GraphLoaderTests: TuistUnitTestCase {
                 path: "/XCFrameworks/XF1.xcframework",
                 infoPlist: .test(),
                 primaryBinaryPath: "/XCFrameworks/XF1.xcframework/ios-arm64/XF1",
-                linking: .dynamic
+                linking: .dynamic,
+                mergeable: false,
+                status: .required
             )
         )
 
@@ -381,7 +389,54 @@ final class GraphLoaderTests: TuistUnitTestCase {
                     path: "/XCFrameworks/XF1.xcframework",
                     infoPlist: .test(),
                     primaryBinaryPath: "/XCFrameworks/XF1.xcframework/ios-arm64/XF1",
-                    linking: .dynamic
+                    linking: .dynamic,
+                    mergeable: false,
+                    status: .required
+                ),
+            ]),
+        ])
+    }
+
+    func test_loadWorkspace_mergeableXCFrameworkDependency() throws {
+        // Given
+        let targetA = Target.test(
+            name: "A",
+            dependencies: [.xcframework(path: "/XCFrameworks/XF1.xcframework", status: .required)]
+        )
+        let projectA = Project.test(path: "/A", name: "A", targets: [targetA])
+        let workspace = Workspace.test(path: "/", name: "Workspace", projects: ["/A"])
+
+        stubXCFramework(
+            metadata: .init(
+                path: "/XCFrameworks/XF1.xcframework",
+                infoPlist: .test(),
+                primaryBinaryPath: "/XCFrameworks/XF1.xcframework/ios-arm64/XF1",
+                linking: .dynamic,
+                mergeable: true,
+                status: .required
+            )
+        )
+
+        let subject = makeSubject()
+
+        // When
+        let graph = try subject.loadWorkspace(
+            workspace: workspace,
+            projects: [
+                projectA,
+            ]
+        )
+
+        // Then
+        XCTAssertEqual(graph.dependencies, [
+            .target(name: "A", path: "/A"): Set([
+                .xcframework(
+                    path: "/XCFrameworks/XF1.xcframework",
+                    infoPlist: .test(),
+                    primaryBinaryPath: "/XCFrameworks/XF1.xcframework/ios-arm64/XF1",
+                    linking: .dynamic,
+                    mergeable: true,
+                    status: .required
                 ),
             ]),
         ])
@@ -486,13 +541,46 @@ final class GraphLoaderTests: TuistUnitTestCase {
         ])
         XCTAssertEqual(graph.dependencies, [
             .target(name: "A", path: "/A"): Set([
-                .packageProduct(path: "/A", product: "PackageLibraryA1"),
+                .packageProduct(path: "/A", product: "PackageLibraryA1", type: .sources),
             ]),
             .target(name: "B", path: "/B"): Set([
-                .packageProduct(path: "/B", product: "PackageLibraryA2"),
+                .packageProduct(path: "/B", product: "PackageLibraryA2", type: .sources),
             ]),
             .target(name: "C", path: "/C"): Set([
-                .packageProduct(path: "/C", product: "PackageLibraryB"),
+                .packageProduct(path: "/C", product: "PackageLibraryB", type: .sources),
+            ]),
+        ])
+    }
+
+    func test_loadWorkspace_package_plugin() throws {
+        // Given
+        let targetA = Target.test(name: "A", dependencies: [
+            .packagePlugin(product: "PackagePlugin"),
+        ])
+
+        let projectA = Project.test(path: "/A", name: "A", targets: [targetA], packages: [
+            .local(path: "/Packages/PackagePlugin"),
+        ])
+
+        let workspace = Workspace.test(path: "/", name: "Workspace", projects: ["/A"])
+
+        let subject = makeSubject()
+
+        // When
+        let graph = try subject.loadWorkspace(
+            workspace: workspace,
+            projects: [
+                projectA,
+            ]
+        )
+
+        // Then
+        XCTAssertEqual(graph.packages, [
+            "/A": ["/Packages/PackagePlugin": .local(path: "/Packages/PackagePlugin")],
+        ])
+        XCTAssertEqual(graph.dependencies, [
+            .target(name: "A", path: "/A"): Set([
+                .packageProduct(path: "/A", product: "PackagePlugin", type: .plugin),
             ]),
         ])
     }
@@ -600,7 +688,8 @@ final class GraphLoaderTests: TuistUnitTestCase {
                 bcsymbolmapPaths: [],
                 linking: metadata.linkage,
                 architectures: metadata.architectures,
-                isCarthage: false
+                isCarthage: false,
+                status: .required
             )
         }
         return provider

@@ -32,9 +32,9 @@ final class GraphLinterTests: TuistUnitTestCase {
 
     func test_lint_when_frameworks_are_missing() throws {
         // Given
-        let temporaryPath = try self.temporaryPath()
-        let frameworkAPath = temporaryPath.appending(RelativePath("Carthage/Build/iOS/A.framework"))
-        let frameworkBPath = temporaryPath.appending(RelativePath("Carthage/Build/iOS/B.framework"))
+        let temporaryPath = try temporaryPath()
+        let frameworkAPath = temporaryPath.appending(try RelativePath(validating: "Carthage/Build/iOS/A.framework"))
+        let frameworkBPath = temporaryPath.appending(try RelativePath(validating: "Carthage/Build/iOS/B.framework"))
         try FileHandler.shared.createFolder(frameworkAPath)
         let graph = Graph.test(dependencies: [
             GraphDependency.testFramework(path: frameworkAPath): Set(),
@@ -305,6 +305,51 @@ final class GraphLinterTests: TuistUnitTestCase {
         XCTAssertTrue(result.isEmpty)
     }
 
+    func test_lint_xpcCanDependOnAllTypesOfFrameworksAndLibraries() throws {
+        // Given
+        let path: AbsolutePath = "/project"
+        let dynamicFramework = Target.empty(name: "DynamicFramework", destinations: [.mac], product: .framework)
+        let dynamicLibrary = Target.empty(name: "DynamicLibrary", destinations: [.mac], product: .dynamicLibrary)
+        let staticFramework = Target.empty(name: "StaticFramework", destinations: [.mac], product: .staticFramework)
+        let staticLibrary = Target.empty(name: "StaticLibrary", destinations: [.mac], product: .staticLibrary)
+
+        let xpc = Target.empty(name: "xpc", destinations: [.mac], product: .xpc)
+        let project = Project.empty(path: path)
+
+        let dependencies: [GraphDependency: Set<GraphDependency>] = [
+            .target(name: dynamicFramework.name, path: path): Set([]),
+            .target(name: dynamicLibrary.name, path: path): Set([]),
+            .target(name: staticFramework.name, path: path): Set([]),
+            .target(name: staticLibrary.name, path: path): Set([]),
+            .target(name: xpc.name, path: path): Set([
+                .target(name: dynamicFramework.name, path: path),
+                .target(name: dynamicLibrary.name, path: path),
+                .target(name: staticFramework.name, path: path),
+                .target(name: staticLibrary.name, path: path),
+            ]),
+        ]
+
+        let graph = Graph.test(
+            path: path,
+            projects: [path: project],
+            targets: [path: [
+                xpc.name: xpc,
+                dynamicFramework.name: dynamicFramework,
+                dynamicLibrary.name: dynamicLibrary,
+                staticFramework.name: staticFramework,
+                staticLibrary.name: staticLibrary,
+            ]],
+            dependencies: dependencies
+        )
+        let graphTraverser = GraphTraverser(graph: graph)
+
+        // When
+        let result = subject.lint(graphTraverser: graphTraverser)
+
+        // Then
+        XCTAssertEqual(result, [])
+    }
+
     func test_lint_testTargetsDependsOnBundle() throws {
         // Given
         let path: AbsolutePath = "/project"
@@ -374,9 +419,9 @@ final class GraphLinterTests: TuistUnitTestCase {
     func test_lint_macStaticProductsCantDependOniOSStaticProducts() throws {
         // Given
         let path: AbsolutePath = "/project"
-        let macStaticFramework = Target.empty(name: "MacStaticFramework", platform: .macOS, product: .staticFramework)
-        let iosStaticFramework = Target.empty(name: "iOSStaticFramework", platform: .iOS, product: .staticFramework)
-        let iosStaticLibrary = Target.empty(name: "iOSStaticLibrary", platform: .iOS, product: .staticLibrary)
+        let macStaticFramework = Target.empty(name: "MacStaticFramework", destinations: .macOS, product: .staticFramework)
+        let iosStaticFramework = Target.empty(name: "iOSStaticFramework", destinations: .iOS, product: .staticFramework)
+        let iosStaticLibrary = Target.empty(name: "iOSStaticLibrary", destinations: .iOS, product: .staticLibrary)
         let project = Project.empty(path: path)
 
         let dependencies: [GraphDependency: Set<GraphDependency>] = [
@@ -413,8 +458,8 @@ final class GraphLinterTests: TuistUnitTestCase {
     func test_lint_watch_canDependOnWatchExtension() throws {
         // Given
         let path: AbsolutePath = "/project"
-        let watchExtension = Target.empty(name: "WatckExtension", platform: .watchOS, product: .watch2Extension)
-        let watchApp = Target.empty(name: "WatchApp", platform: .watchOS, product: .watch2App)
+        let watchExtension = Target.empty(name: "WatckExtension", destinations: .watchOS, product: .watch2Extension)
+        let watchApp = Target.empty(name: "WatchApp", destinations: .watchOS, product: .watch2App)
         let project = Project.empty(path: path)
 
         let dependencies: [GraphDependency: Set<GraphDependency>] = [
@@ -443,8 +488,8 @@ final class GraphLinterTests: TuistUnitTestCase {
     func test_lint_watch_canOnlyDependOnWatchExtension() throws {
         // Given
         let path: AbsolutePath = "/project"
-        let invalidDependency = Target.empty(name: "Framework", platform: .watchOS, product: .framework)
-        let watchApp = Target.empty(name: "WatchApp", platform: .watchOS, product: .watch2App)
+        let invalidDependency = Target.empty(name: "Framework", destinations: .watchOS, product: .framework)
+        let watchApp = Target.empty(name: "WatchApp", destinations: .watchOS, product: .watch2App)
         let project = Project.empty(path: path)
 
         let dependencies: [GraphDependency: Set<GraphDependency>] = [
@@ -475,12 +520,12 @@ final class GraphLinterTests: TuistUnitTestCase {
         let path: AbsolutePath = "/project"
         let watchApp = Target.empty(
             name: "WatchApp",
-            platform: .watchOS,
+            destinations: .watchOS,
             product: .watch2App
         )
         let watchAppTests = Target.empty(
             name: "WatchAppUITests",
-            platform: .watchOS,
+            destinations: .watchOS,
             product: .uiTests,
             dependencies: [.target(name: watchApp.name)]
         )
@@ -512,12 +557,12 @@ final class GraphLinterTests: TuistUnitTestCase {
         let path: AbsolutePath = "/project"
         let staticLibrary = Target.empty(
             name: "StaticLibrary",
-            platform: .watchOS,
+            destinations: .watchOS,
             product: .staticLibrary
         )
         let watchAppTests = Target.empty(
             name: "WatchAppUITests",
-            platform: .watchOS,
+            destinations: .watchOS,
             product: .uiTests,
             dependencies: [.target(name: staticLibrary.name)]
         )
@@ -549,12 +594,12 @@ final class GraphLinterTests: TuistUnitTestCase {
         let path: AbsolutePath = "/project"
         let framework = Target.empty(
             name: "Framework",
-            platform: .watchOS,
+            destinations: .watchOS,
             product: .framework
         )
         let watchAppTests = Target.empty(
             name: "WatchAppUITests",
-            platform: .watchOS,
+            destinations: .watchOS,
             product: .uiTests,
             dependencies: [.target(name: framework.name)]
         )
@@ -586,12 +631,12 @@ final class GraphLinterTests: TuistUnitTestCase {
         let path: AbsolutePath = "/project"
         let staticFramework = Target.empty(
             name: "StaticFramework",
-            platform: .watchOS,
+            destinations: .watchOS,
             product: .watch2App
         )
         let watchAppTests = Target.empty(
             name: "WatchAppUITests",
-            platform: .watchOS,
+            destinations: .watchOS,
             product: .uiTests,
             dependencies: [.target(name: staticFramework.name)]
         )
@@ -626,17 +671,17 @@ final class GraphLinterTests: TuistUnitTestCase {
         let path: AbsolutePath = "/project"
         let staticFramework = Target.empty(
             name: "StaticFramework",
-            platform: .watchOS,
+            destinations: .watchOS,
             product: .staticFramework
         )
         let dynamicFramework = Target.empty(
             name: "DynamicFramework",
-            platform: .watchOS,
+            destinations: .watchOS,
             product: .framework
         )
         let watchApplication = Target.empty(
             name: "WatchApp",
-            platform: .watchOS,
+            destinations: .watchOS,
             product: .app,
             dependencies: [
                 .target(name: staticFramework.name),
@@ -684,12 +729,12 @@ final class GraphLinterTests: TuistUnitTestCase {
         let path: AbsolutePath = "/project"
         let widgetExtension = Target.empty(
             name: "WidgetExtension",
-            platform: .watchOS,
+            destinations: .watchOS,
             product: .appExtension // WidgetKit extension targets are `.appExtension` targets with custom info plist key
         )
         let watchApplication = Target.empty(
             name: "WatchApp",
-            platform: .watchOS,
+            destinations: .watchOS,
             product: .app,
             dependencies: [
                 .target(name: widgetExtension.name),
@@ -730,7 +775,7 @@ final class GraphLinterTests: TuistUnitTestCase {
         let path: AbsolutePath = "/project"
         let app = Target.empty(
             name: "App",
-            platform: .iOS,
+            destinations: .iOS,
             product: .app,
             dependencies: [
                 .target(name: "WatchApp"),
@@ -738,7 +783,7 @@ final class GraphLinterTests: TuistUnitTestCase {
         )
         let watchApplication = Target.empty(
             name: "WatchApp",
-            platform: .watchOS,
+            destinations: .watchOS,
             product: .app
         )
         let project = Project.test(path: path, targets: [app, watchApplication])
@@ -1078,13 +1123,13 @@ final class GraphLinterTests: TuistUnitTestCase {
 
     func test_lint_valid_appClipTargetBundleIdentifiers() throws {
         // Given
-        let temporaryPath = try self.temporaryPath()
+        let temporaryPath = try temporaryPath()
 
         try createFiles([
             "entitlements/AppClip.entitlements",
         ])
 
-        let entitlementsPath = temporaryPath.appending(RelativePath("entitlements/AppClip.entitlements"))
+        let entitlementsPath = temporaryPath.appending(try RelativePath(validating: "entitlements/AppClip.entitlements"))
 
         let app = Target.test(
             name: "App",
@@ -1096,7 +1141,7 @@ final class GraphLinterTests: TuistUnitTestCase {
             platform: .iOS,
             product: .appClip,
             bundleId: "com.example.app.clip",
-            entitlements: entitlementsPath
+            entitlements: .file(path: entitlementsPath)
         )
         let project = Project.test(path: temporaryPath, targets: [app, appClip])
         let dependencies: [GraphDependency: Set<GraphDependency>] = [
@@ -1122,13 +1167,13 @@ final class GraphLinterTests: TuistUnitTestCase {
 
     func test_lint_invalid_appClipTargetBundleIdentifiers() throws {
         // Given
-        let temporaryPath = try self.temporaryPath()
+        let temporaryPath = try temporaryPath()
 
         try createFiles([
             "entitlements/AppClip.entitlements",
         ])
 
-        let entitlementsPath = temporaryPath.appending(RelativePath("entitlements/AppClip.entitlements"))
+        let entitlementsPath = temporaryPath.appending(try RelativePath(validating: "entitlements/AppClip.entitlements"))
 
         let app = Target.test(
             name: "TestApp",
@@ -1140,7 +1185,7 @@ final class GraphLinterTests: TuistUnitTestCase {
             platform: .iOS,
             product: .appClip,
             bundleId: "com.example1.app.clip",
-            entitlements: entitlementsPath
+            entitlements: .file(path: entitlementsPath)
         )
         let project = Project.test(targets: [app, appClip])
 
@@ -1257,13 +1302,13 @@ final class GraphLinterTests: TuistUnitTestCase {
 
     func test_lint_when_app_contains_more_than_one_appClip() throws {
         // Given
-        let temporaryPath = try self.temporaryPath()
+        let temporaryPath = try temporaryPath()
 
         try createFiles([
             "entitlements/AppClip.entitlements",
         ])
 
-        let entitlementsPath = temporaryPath.appending(RelativePath("entitlements/AppClip.entitlements"))
+        let entitlementsPath = temporaryPath.appending(try RelativePath(validating: "entitlements/AppClip.entitlements"))
 
         let app = Target.test(
             name: "App",
@@ -1275,7 +1320,7 @@ final class GraphLinterTests: TuistUnitTestCase {
             platform: .iOS,
             product: .appClip,
             bundleId: "com.example.app.clip1",
-            entitlements: entitlementsPath
+            entitlements: .file(path: entitlementsPath)
         )
 
         let appClip2 = Target.test(
@@ -1283,7 +1328,7 @@ final class GraphLinterTests: TuistUnitTestCase {
             platform: .iOS,
             product: .appClip,
             bundleId: "com.example.app.clip2",
-            entitlements: entitlementsPath
+            entitlements: .file(path: entitlementsPath)
         )
 
         let project = Project.test(path: temporaryPath, targets: [app, appClip1, appClip2])
@@ -1323,13 +1368,13 @@ final class GraphLinterTests: TuistUnitTestCase {
 
     func test_lint_when_appClip_has_a_framework_dependency() throws {
         // Given
-        let temporaryPath = try self.temporaryPath()
+        let temporaryPath = try temporaryPath()
 
         try createFiles([
             "entitlements/AppClip.entitlements",
         ])
 
-        let entitlementsPath = temporaryPath.appending(RelativePath("entitlements/AppClip.entitlements"))
+        let entitlementsPath = temporaryPath.appending(try RelativePath(validating: "entitlements/AppClip.entitlements"))
 
         let framework = Target.empty(name: "Framework", product: .framework)
 
@@ -1343,7 +1388,7 @@ final class GraphLinterTests: TuistUnitTestCase {
             platform: .iOS,
             product: .appClip,
             bundleId: "com.example.app.clip1",
-            entitlements: entitlementsPath
+            entitlements: .file(path: entitlementsPath)
         )
 
         let project = Project.test(path: temporaryPath, targets: [app, appClip, framework])
@@ -1616,7 +1661,7 @@ final class GraphLinterTests: TuistUnitTestCase {
 
     func test_lintCodeCoverage_relevant() throws {
         // Given
-        let temporaryPath = try self.temporaryPath()
+        let temporaryPath = try temporaryPath()
         let targetA = Target.test(name: "TargetA")
         let targetB = Target.test(name: "TargetB")
         let project = Project.test(
@@ -1685,7 +1730,7 @@ final class GraphLinterTests: TuistUnitTestCase {
 
     func test_lintCodeCoverage_targets() throws {
         // Given
-        let temporaryPath = try self.temporaryPath()
+        let temporaryPath = try temporaryPath()
         let project = Project.test(
             path: temporaryPath,
             targets: [
@@ -1746,7 +1791,7 @@ final class GraphLinterTests: TuistUnitTestCase {
 
     func test_lintCodeCoverage_targets_nonExisting() throws {
         // Given
-        let temporaryPath = try self.temporaryPath()
+        let temporaryPath = try temporaryPath()
         let project = Project.test(
             path: temporaryPath,
             targets: [
@@ -1786,5 +1831,79 @@ final class GraphLinterTests: TuistUnitTestCase {
                 ),
             ]
         )
+    }
+
+    func test_lint_multiDestinationTarget_validLinks() throws {
+        // Given
+        let path = try temporaryPath()
+        let iOSAndMacTarget = Target.test(name: "IOSAndMacTarget", destinations: [.iPhone, .mac], product: .framework)
+        let macOnlyTarget = Target.test(name: "MacOnlyTarget", destinations: [.mac], product: .framework)
+
+        let project = Project.test(
+            path: path,
+            targets: [
+                iOSAndMacTarget,
+                macOnlyTarget,
+            ]
+        )
+        let graph = Graph.test(
+            projects: [path: project],
+            targets: [
+                path: [
+                    iOSAndMacTarget.name: iOSAndMacTarget,
+                    macOnlyTarget.name: macOnlyTarget,
+                ],
+            ],
+            dependencies: [
+                .target(name: iOSAndMacTarget.name, path: path): [
+                    .target(name: macOnlyTarget.name, path: path),
+                ],
+                .target(name: macOnlyTarget.name, path: path): [],
+            ]
+        )
+        let graphTraverser = GraphTraverser(graph: graph)
+
+        // When
+        let results = subject.lint(graphTraverser: graphTraverser)
+
+        // Then
+        XCTAssertTrue(results.isEmpty)
+    }
+
+    func test_lint_multiDestinationTarget_invalidLinks() throws {
+        // Given
+        let path = try temporaryPath()
+        let iOSAndMacTarget = Target.test(name: "IOSAndMacTarget", destinations: [.iPhone, .mac], product: .framework)
+        let watchOnlyTarget = Target.test(name: "WatchOnlyTarget", destinations: [.appleWatch], product: .framework)
+
+        let project = Project.test(
+            path: path,
+            targets: [
+                iOSAndMacTarget,
+                watchOnlyTarget,
+            ]
+        )
+        let graph = Graph.test(
+            projects: [path: project],
+            targets: [
+                path: [
+                    iOSAndMacTarget.name: iOSAndMacTarget,
+                    watchOnlyTarget.name: watchOnlyTarget,
+                ],
+            ],
+            dependencies: [
+                .target(name: iOSAndMacTarget.name, path: path): [
+                    .target(name: watchOnlyTarget.name, path: path),
+                ],
+                .target(name: watchOnlyTarget.name, path: path): [],
+            ]
+        )
+        let graphTraverser = GraphTraverser(graph: graph)
+
+        // When
+        let results = subject.lint(graphTraverser: graphTraverser)
+
+        // Then
+        XCTAssertFalse(results.isEmpty)
     }
 }

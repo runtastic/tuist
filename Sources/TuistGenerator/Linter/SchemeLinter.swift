@@ -92,6 +92,21 @@ extension SchemeLinter {
                     issues.append(missingExpandVariablesTargetIssue(missingTargetName: target.name, schemaName: scheme.name))
                 }
             }
+            if let runAction = scheme.runAction,
+               let target = runAction.expandVariableFromTarget
+            {
+                if !targetNames.contains(target.name) {
+                    issues.append(missingExpandVariablesTargetIssue(missingTargetName: target.name, schemaName: scheme.name))
+                } else if let buildTargetNames = scheme.buildAction?.targets.map(\.name),
+                          !buildTargetNames.contains(target.name)
+                {
+                    issues
+                        .append(missingExpandVariablesTargetInBuildActionIssue(
+                            missingTargetName: target.name,
+                            schemaName: scheme.name
+                        ))
+                }
+            }
         }
         return issues
     }
@@ -101,10 +116,8 @@ extension SchemeLinter {
         var issues: [LintingIssue] = []
 
         for scheme in schemes {
-            for target in scheme.testAction?.codeCoverageTargets ?? [] {
-                if !targetNames.contains(target.name) {
-                    issues.append(missingCodeCoverageTargetIssue(missingTargetName: target.name, schemaName: scheme.name))
-                }
+            for target in scheme.testAction?.codeCoverageTargets ?? [] where !targetNames.contains(target.name) {
+                issues.append(missingCodeCoverageTargetIssue(missingTargetName: target.name, schemaName: scheme.name))
             }
         }
 
@@ -120,6 +133,12 @@ extension SchemeLinter {
     private func missingExpandVariablesTargetIssue(missingTargetName: String, schemaName: String) -> LintingIssue {
         let reason =
             "The target '\(missingTargetName)' specified in \(schemaName) expandVariableFromTarget isn't defined in the project."
+        return LintingIssue(reason: reason, severity: .error)
+    }
+
+    private func missingExpandVariablesTargetInBuildActionIssue(missingTargetName: String, schemaName: String) -> LintingIssue {
+        let reason =
+            "The target '\(missingTargetName)' specified in \(schemaName) expandVariableFromTarget isn't defined in the scheme's build action."
         return LintingIssue(reason: reason, severity: .error)
     }
 

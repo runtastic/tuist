@@ -2,6 +2,8 @@ import Foundation
 import TSCBasic
 import TuistCore
 import TuistGraph
+import TuistGraphTesting
+import TuistSupport
 
 extension GraphDependencyReference {
     public static func testFramework(
@@ -12,7 +14,8 @@ extension GraphDependencyReference {
         bcsymbolmapPaths: [AbsolutePath] = [],
         linking: BinaryLinking = .dynamic,
         architectures: [BinaryArchitecture] = [.arm64],
-        product: Product = .framework
+        product: Product = .framework,
+        status: FrameworkStatus = .required
     ) -> GraphDependencyReference {
         GraphDependencyReference.framework(
             path: path,
@@ -22,7 +25,8 @@ extension GraphDependencyReference {
             bcsymbolmapPaths: bcsymbolmapPaths,
             linking: linking,
             architectures: architectures,
-            product: product
+            product: product,
+            status: status
         )
     }
 
@@ -31,13 +35,15 @@ extension GraphDependencyReference {
         infoPlist: XCFrameworkInfoPlist = .test(),
         primaryBinaryPath: AbsolutePath = "/frameworks/tuist.xcframework/ios-arm64/tuist",
         binaryPath: AbsolutePath = "/frameworks/tuist.xcframework/ios-arm64/tuist",
-        linking _: BinaryLinking = .dynamic
+        linking _: BinaryLinking = .dynamic,
+        status: FrameworkStatus = .required
     ) -> GraphDependencyReference {
         GraphDependencyReference.xcframework(
             path: path,
             infoPlist: infoPlist,
             primaryBinaryPath: primaryBinaryPath,
-            binaryPath: binaryPath
+            binaryPath: binaryPath,
+            status: status
         )
     }
 
@@ -70,12 +76,12 @@ extension GraphDependencyReference {
     public static func testProduct(
         target: String = "Target",
         productName: String = "Target.framework",
-        platformFilter: BuildFilePlatformFilter = .ios
+        platformFilters: PlatformFilters = [.ios]
     ) -> GraphDependencyReference {
         GraphDependencyReference.product(
             target: target,
             productName: productName,
-            platformFilter: platformFilter
+            platformFilters: platformFilters
         )
     }
 }

@@ -33,7 +33,8 @@ extension TuistCore.DependenciesGraph {
 
     public static func testXCFramework(
         name: String = "Test",
-        path: Path = Path(AbsolutePath.root.appending(RelativePath("Test.xcframework")).pathString),
+        // swiftlint:disable:next force_try
+        path: Path = Path(AbsolutePath.root.appending(try! RelativePath(validating: "Test.xcframework")).pathString),
         platforms: Set<Platform>
     ) -> Self {
         let externalDependencies: [Platform: [String: [TargetDependency]]] = platforms.reduce(into: [:]) { result, platform in
@@ -255,6 +256,7 @@ extension TuistCore.DependenciesGraph {
         )
     }
 
+    // swiftlint:disable:next function_body_length
     public static func anotherDependency(
         spmFolder: Path,
         platforms: Set<Platform>
@@ -765,7 +767,7 @@ extension DependenciesGraph {
         ]
         var settingsDictionary = customSettings.merging(defaultSpmSettings, uniquingKeysWith: { custom, _ in custom })
 
-        if let moduleMap = moduleMap {
+        if let moduleMap {
             settingsDictionary["MODULEMAP_FILE"] = .string(moduleMap)
         }
 
@@ -823,7 +825,7 @@ extension DependenciesGraph {
     fileprivate static func resolveDeploymentTarget(for platform: Platform) -> DeploymentTarget {
         switch platform {
         case .iOS:
-            return .iOS(targetVersion: PLATFORM_TEST_VERSION[.iOS]!, devices: [.iphone, .ipad])
+            return .iOS(targetVersion: PLATFORM_TEST_VERSION[.iOS]!, devices: [.iphone, .ipad, .mac])
         case .watchOS:
             return .watchOS(targetVersion: PLATFORM_TEST_VERSION[.watchOS]!)
         case .macOS:

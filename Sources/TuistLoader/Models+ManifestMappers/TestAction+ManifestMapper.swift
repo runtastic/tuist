@@ -3,6 +3,7 @@ import ProjectDescription
 import TSCBasic
 import TuistCore
 import TuistGraph
+import TuistSupport
 
 extension TuistGraph.TestAction {
     // swiftlint:disable function_body_length
@@ -21,10 +22,13 @@ extension TuistGraph.TestAction {
         let diagnosticsOptions: Set<TuistGraph.SchemeDiagnosticsOption>
         let language: SchemeLanguage?
         let region: String?
+        let preferredScreenCaptureFormat: TuistGraph.ScreenCaptureFormat?
 
         if let plans = manifest.testPlans {
-            testPlans = try plans.enumerated().map { index, path in
-                try TestPlan(path: generatorPaths.resolve(path: path), isDefault: index == 0)
+            testPlans = try plans.enumerated().compactMap { index, path in
+                let resolvedPath = try generatorPaths.resolve(path: path)
+                guard FileHandler.shared.exists(resolvedPath) else { return nil }
+                return try TestPlan(path: resolvedPath, isDefault: index == 0, generatorPaths: generatorPaths)
             }
 
             // not used when using test plans
@@ -36,6 +40,7 @@ extension TuistGraph.TestAction {
             diagnosticsOptions = []
             language = nil
             region = nil
+            preferredScreenCaptureFormat = nil
         } else {
             targets = try manifest.targets
                 .map { try TuistGraph.TestableTarget.from(manifest: $0, generatorPaths: generatorPaths) }
@@ -57,6 +62,8 @@ extension TuistGraph.TestAction {
             diagnosticsOptions = Set(manifest.diagnosticsOptions.map { TuistGraph.SchemeDiagnosticsOption.from(manifest: $0) })
             language = manifest.options.language
             region = manifest.options.region
+            preferredScreenCaptureFormat = manifest.options.preferredScreenCaptureFormat
+                .map { .from(manifest: $0) }
 
             // not used when using targets
             testPlans = nil
@@ -85,6 +92,7 @@ extension TuistGraph.TestAction {
             diagnosticsOptions: diagnosticsOptions,
             language: language?.identifier,
             region: region,
+            preferredScreenCaptureFormat: preferredScreenCaptureFormat,
             testPlans: testPlans
         )
     }

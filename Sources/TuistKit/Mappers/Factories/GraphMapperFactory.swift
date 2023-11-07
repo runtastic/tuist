@@ -1,7 +1,5 @@
 import Foundation
 import TSCBasic
-import TuistCache
-import TuistCloud
 import TuistCore
 import TuistGenerator
 import TuistGraph
@@ -12,82 +10,40 @@ import TuistSigning
 protocol GraphMapperFactorying {
     ///  Returns the graph mapper that should be used for automation tasks such as build and test.
     /// - Returns: A graph mapper.
-    func automation(config: Config, testsCacheDirectory: AbsolutePath) -> [GraphMapping]
-
-    /// Returns the graph mapper for generating focused projects where some targets are pruned from the graph
-    /// and others are replaced with their binary counterparts.
-    /// - Returns: A graph mapper.
-    func focus(
+    func automation(
         config: Config,
-        cache: Bool,
-        cacheSources: Set<String>,
-        cacheProfile: TuistGraph.Cache.Profile,
-        cacheOutputType: CacheOutputType,
-        targetsToSkipCache: Set<String>
+        testsCacheDirectory: AbsolutePath,
+        testPlan: String?,
+        includedTargets: Set<String>,
+        excludedTargets: Set<String>
     ) -> [GraphMapping]
-
-    /// Returns the graph mapper whose output project is a cacheable graph.
-    /// - Returns: A graph mapper.
-    func cache(includedTargets: Set<String>) -> [GraphMapping]
 
     /// Returns the default graph mapper that should be used from all the commands that require loading and processing the graph.
     /// - Returns: The default mapper.
     func `default`() -> [GraphMapping]
 }
 
-final class GraphMapperFactory: GraphMapperFactorying {
-    fileprivate let contentHasher: ContentHashing
+public final class GraphMapperFactory: GraphMapperFactorying {
+    public init() {}
 
-    init(contentHasher: ContentHashing) {
-        self.contentHasher = contentHasher
-    }
-
-    func automation(config: Config, testsCacheDirectory: AbsolutePath) -> [GraphMapping] {
-        var mappers: [GraphMapping] = []
-        mappers.append(
-            TestsCacheGraphMapper(hashesCacheDirectory: testsCacheDirectory, config: config)
-        )
-        mappers.append(FocusTargetsGraphMappers(includedTargets: []))
-        mappers.append(TreeShakePrunedTargetsGraphMapper())
-        mappers.append(contentsOf: self.default())
-        return mappers
-    }
-
-    func focus(
-        config: Config,
-        cache: Bool,
-        cacheSources: Set<String>,
-        cacheProfile: TuistGraph.Cache.Profile,
-        cacheOutputType: CacheOutputType,
-        targetsToSkipCache: Set<String>
+    public func automation(
+        config _: Config,
+        testsCacheDirectory _: AbsolutePath,
+        testPlan: String?,
+        includedTargets: Set<String>,
+        excludedTargets: Set<String>
     ) -> [GraphMapping] {
         var mappers: [GraphMapping] = []
-        mappers.append(FocusTargetsGraphMappers(includedTargets: cacheSources))
-        mappers.append(TreeShakePrunedTargetsGraphMapper())
-        if cache {
-            let focusTargetsGraphMapper = TargetsToCacheBinariesGraphMapper(
-                config: config,
-                cacheStorageProvider: CacheStorageProvider(config: config),
-                sources: cacheSources,
-                cacheProfile: cacheProfile,
-                cacheOutputType: cacheOutputType,
-                excludedSources: targetsToSkipCache
+        mappers.append(
+            FocusTargetsGraphMappers(
+                testPlan: testPlan,
+                includedTargets: includedTargets,
+                excludedTargets: excludedTargets
             )
-            mappers.append(focusTargetsGraphMapper)
-            mappers.append(TreeShakePrunedTargetsGraphMapper())
-        }
-
-        // The default mapper is executed at the end because it ensures that the workspace is in sync with the content in the graph.
+        )
+        mappers.append(TreeShakePrunedTargetsGraphMapper())
         mappers.append(contentsOf: self.default())
-        return mappers
-    }
 
-    func cache(includedTargets: Set<String>) -> [GraphMapping] {
-        var mappers: [GraphMapping] = [
-            FocusTargetsGraphMappers(includedTargets: includedTargets),
-            TreeShakePrunedTargetsGraphMapper(),
-        ]
-        mappers += self.default()
         return mappers
     }
 

@@ -284,7 +284,7 @@ class ManifestModelConverterTests: TuistUnitTestCase {
         // Then
         XCTAssertEqual(model.name, "SomeWorkspace")
         XCTAssertEqual(model.additionalFiles, [
-            .folderReference(path: temporaryPath.appending(RelativePath("Documentation"))),
+            .folderReference(path: temporaryPath.appending(try RelativePath(validating: "Documentation"))),
         ])
     }
 
@@ -369,7 +369,7 @@ class ManifestModelConverterTests: TuistUnitTestCase {
         defaultPath: AbsolutePath,
         generatorPaths: GeneratorPaths
     ) throws -> AbsolutePath {
-        if let projectPath = projectPath { return try generatorPaths.resolve(path: projectPath) }
+        if let projectPath { return try generatorPaths.resolve(path: projectPath) }
         return defaultPath
     }
 }

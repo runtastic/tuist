@@ -3,15 +3,18 @@ import TSCBasic
 
 @testable import TuistGraph
 
+// swiftlint:disable force_try
+
 extension GraphDependency {
     public static func testFramework(
         path: AbsolutePath = AbsolutePath.root.appending(component: "Test.framework"),
-        binaryPath: AbsolutePath = AbsolutePath.root.appending(RelativePath("Test.framework/Test")),
+        binaryPath: AbsolutePath = AbsolutePath.root.appending(try! RelativePath(validating: "Test.framework/Test")),
         dsymPath: AbsolutePath? = nil,
         bcsymbolmapPaths: [AbsolutePath] = [],
         linking: BinaryLinking = .dynamic,
         architectures: [BinaryArchitecture] = [.armv7],
-        isCarthage: Bool = false
+        isCarthage: Bool = false,
+        status: FrameworkStatus = .required
     ) -> GraphDependency {
         GraphDependency.framework(
             path: path,
@@ -20,22 +23,26 @@ extension GraphDependency {
             bcsymbolmapPaths: bcsymbolmapPaths,
             linking: linking,
             architectures: architectures,
-            isCarthage: isCarthage
+            isCarthage: isCarthage,
+            status: status
         )
     }
 
     public static func testXCFramework(
-        path: AbsolutePath = AbsolutePath.root.appending(RelativePath("Test.xcframework")),
+        path: AbsolutePath = AbsolutePath.root.appending(try! RelativePath(validating: "Test.xcframework")),
         infoPlist: XCFrameworkInfoPlist = .test(),
         primaryBinaryPath: AbsolutePath = AbsolutePath.root
-            .appending(RelativePath("Test.xcframework/Test")),
-        linking: BinaryLinking = .dynamic
+            .appending(try! RelativePath(validating: "Test.xcframework/Test")),
+        linking: BinaryLinking = .dynamic,
+        status: FrameworkStatus = .required
     ) -> GraphDependency {
         .xcframework(
             path: path,
             infoPlist: infoPlist,
             primaryBinaryPath: primaryBinaryPath,
-            linking: linking
+            linking: linking,
+            mergeable: false,
+            status: status
         )
     }
 
@@ -51,7 +58,7 @@ extension GraphDependency {
 
     public static func testSDK(
         name: String = "XCTest",
-        path: AbsolutePath = AbsolutePath.root.appending(RelativePath("XCTest.framework")),
+        path: AbsolutePath = AbsolutePath.root.appending(try! RelativePath(validating: "XCTest.framework")),
         status: SDKStatus = .required,
         source: SDKSource = .system
     ) -> GraphDependency {
@@ -64,8 +71,8 @@ extension GraphDependency {
     }
 
     public static func testLibrary(
-        path: AbsolutePath = AbsolutePath.root.appending(RelativePath("libTuist.a")),
-        publicHeaders: AbsolutePath = AbsolutePath.root.appending(RelativePath("headers")),
+        path: AbsolutePath = AbsolutePath.root.appending(try! RelativePath(validating: "libTuist.a")),
+        publicHeaders: AbsolutePath = AbsolutePath.root.appending(try! RelativePath(validating: "headers")),
         linking: BinaryLinking = .dynamic,
         architectures: [BinaryArchitecture] = [.armv7],
         swiftModuleMap: AbsolutePath? = nil
@@ -85,7 +92,10 @@ extension GraphDependency {
     ) -> GraphDependency {
         .packageProduct(
             path: path,
-            product: product
+            product: product,
+            type: .sources
         )
     }
 }
+
+// swiftlint:enable force_try

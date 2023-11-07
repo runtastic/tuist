@@ -33,6 +33,7 @@ struct EmbedScript {
 }
 
 final class EmbedScriptGenerator: EmbedScriptGenerating {
+    // swiftlint:disable:next large_tuple
     typealias FrameworkScript = (script: String, inputPaths: [RelativePath], outputPaths: [String])
 
     func script(
@@ -78,7 +79,7 @@ final class EmbedScriptGenerator: EmbedScriptGenerating {
 
         for frameworkReference in frameworkReferences {
             guard case let GraphDependencyReference
-                .framework(path, _, _, dsymPath, bcsymbolmapPaths, _, _, _) = frameworkReference
+                .framework(path, _, _, dsymPath, bcsymbolmapPaths, _, _, _, _) = frameworkReference
             else {
                 preconditionFailure("references need to be of type framework")
                 break
@@ -94,7 +95,7 @@ final class EmbedScriptGenerator: EmbedScriptGenerating {
             outputPaths.append("${TARGET_BUILD_DIR}/${FRAMEWORKS_FOLDER_PATH}/\(relativeFrameworkPath.basename)")
 
             // .dSYM
-            if let dsymPath = dsymPath {
+            if let dsymPath {
                 let relativeDsymPath = dsymPath.relative(to: sourceRootPath)
                 script.append("install_dsym \"$SRCROOT/\(relativeDsymPath.pathString)\"\n")
             }
@@ -112,7 +113,7 @@ final class EmbedScriptGenerator: EmbedScriptGenerating {
     fileprivate func baseScript() -> String {
         """
         #!/bin/sh
-        set -e
+        set -euo pipefail
         set -u
         set -o pipefail
 
@@ -130,7 +131,7 @@ final class EmbedScriptGenerator: EmbedScriptGenerating {
         echo "mkdir -p ${CONFIGURATION_BUILD_DIR}/${FRAMEWORKS_FOLDER_PATH}"
         mkdir -p "${CONFIGURATION_BUILD_DIR}/${FRAMEWORKS_FOLDER_PATH}"
 
-        SWIFT_STDLIB_PATH="${DT_TOOLCHAIN_DIR}/usr/lib/swift/${PLATFORM_NAME}"
+        SWIFT_STDLIB_PATH="${TOOLCHAIN_DIR}/usr/lib/swift/${PLATFORM_NAME}"
         # Used as a return value for each invocation of `strip_invalid_archs` function.
         STRIP_BINARY_RETVAL=0
         # This protects against multiple targets copying the same framework dependency at the same time. The solution

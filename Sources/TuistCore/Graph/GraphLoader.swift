@@ -104,11 +104,11 @@ public final class GraphLoader: GraphLoading {
         }
 
         cache.add(target: target, path: path)
-        let dependencies = try target.dependencies.map {
+        let dependencies = try target.dependencies.compactMap { dependency in
             try loadDependency(
                 path: path,
-                fromPlatform: target.platform,
-                dependency: $0,
+                forPlatforms: target.supportedPlatforms,
+                dependency: dependency,
                 cache: cache
             )
         }
@@ -120,10 +120,10 @@ public final class GraphLoader: GraphLoading {
 
     private func loadDependency(
         path: AbsolutePath,
-        fromPlatform: Platform,
+        forPlatforms platforms: Set<Platform>,
         dependency: TargetDependency,
         cache: Cache
-    ) throws -> GraphDependency {
+    ) throws -> GraphDependency? {
         switch dependency {
         case let .target(toTarget):
             // A target within the same project.
@@ -144,8 +144,12 @@ public final class GraphLoader: GraphLoading {
             )
             return .target(name: toTarget, path: projectPath)
 
-        case let .framework(frameworkPath):
-            return try loadFramework(path: frameworkPath, cache: cache)
+        case let .framework(frameworkPath, status):
+            return try loadFramework(
+                path: frameworkPath,
+                cache: cache,
+                status: status
+            )
 
         case let .library(libraryPath, publicHeaders, swiftModuleMap):
             return try loadLibrary(
@@ -155,26 +159,51 @@ public final class GraphLoader: GraphLoading {
                 cache: cache
             )
 
-        case let .xcframework(frameworkPath):
-            return try loadXCFramework(path: frameworkPath, cache: cache)
+        case let .xcframework(frameworkPath, status):
+            return try loadXCFramework(
+                path: frameworkPath,
+                cache: cache,
+                status: status
+            )
 
         case let .sdk(name, status):
-            return try loadSDK(name: name, platform: fromPlatform, status: status, source: .system)
-
+            return try platforms.sorted().first.map { platform in
+                try loadSDK(
+                    name: name,
+                    platform: platform,
+                    status: status,
+                    source: .system
+                )
+            }
         case let .package(product):
-            return try loadPackage(fromPath: path, productName: product)
+            return try loadPackage(fromPath: path, productName: product, type: .sources)
+
+        case let .packagePlugin(product):
+            return try loadPackage(fromPath: path, productName: product, type: .plugin)
+
+        case let .packageMacro(product):
+            return try loadPackage(fromPath: path, productName: product, type: .macro)
 
         case .xctest:
-            return try loadXCTestSDK(platform: fromPlatform)
+            return try platforms.map { platform in
+                try loadXCTestSDK(platform: platform)
+            }.first
         }
     }
 
-    private func loadFramework(path: AbsolutePath, cache: Cache) throws -> GraphDependency {
+    private func loadFramework(
+        path: AbsolutePath,
+        cache: Cache,
+        status: FrameworkStatus
+    ) throws -> GraphDependency {
         if let loaded = cache.frameworks[path] {
             return loaded
         }
 
-        let metadata = try frameworkMetadataProvider.loadMetadata(at: path)
+        let metadata = try frameworkMetadataProvider.loadMetadata(
+            at: path,
+            status: status
+        )
         let framework: GraphDependency = .framework(
             path: metadata.path,
             binaryPath: metadata.binaryPath,
@@ -182,7 +211,8 @@ public final class GraphLoader: GraphLoading {
             bcsymbolmapPaths: metadata.bcsymbolmapPaths,
             linking: metadata.linking,
             architectures: metadata.architectures,
-            isCarthage: metadata.isCarthage
+            isCarthage: metadata.isCarthage,
+            status: metadata.status
         )
         cache.add(framework: framework, at: path)
         return framework
@@ -214,17 +244,26 @@ public final class GraphLoader: GraphLoading {
         return library
     }
 
-    private func loadXCFramework(path: AbsolutePath, cache: Cache) throws -> GraphDependency {
+    private func loadXCFramework(
+        path: AbsolutePath,
+        cache: Cache,
+        status: FrameworkStatus
+    ) throws -> GraphDependency {
         if let loaded = cache.xcframeworks[path] {
             return loaded
         }
 
-        let metadata = try xcframeworkMetadataProvider.loadMetadata(at: path)
+        let metadata = try xcframeworkMetadataProvider.loadMetadata(
+            at: path,
+            status: status
+        )
         let xcframework: GraphDependency = .xcframework(
             path: metadata.path,
             infoPlist: metadata.infoPlist,
             primaryBinaryPath: metadata.primaryBinaryPath,
-            linking: metadata.linking
+            linking: metadata.linking,
+            mergeable: metadata.mergeable,
+            status: metadata.status
         )
         cache.add(xcframework: xcframework, at: path)
         return xcframework
@@ -250,13 +289,18 @@ public final class GraphLoader: GraphLoading {
         return .sdk(name: metadata.name, path: metadata.path, status: metadata.status, source: metadata.source)
     }
 
-    private func loadPackage(fromPath: AbsolutePath, productName: String) throws -> GraphDependency {
+    private func loadPackage(
+        fromPath: AbsolutePath,
+        productName: String,
+        type: GraphDependency.PackageProductType
+    ) throws -> GraphDependency {
         // TODO: `fromPath` isn't quite correct as it reflects the path where the dependency was declared
         // and doesn't uniquely identify it. It's been copied from the previous implementation to maintain
         // existing behaviour and should be fixed separately
         .packageProduct(
             path: fromPath,
-            product: productName
+            product: productName,
+            type: type
         )
     }
 

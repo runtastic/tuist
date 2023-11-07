@@ -1,6 +1,6 @@
 import Foundation
 import TSCBasic
-
+import TuistSupport
 @testable import TuistGraph
 
 extension XCFrameworkMetadata {
@@ -8,13 +8,17 @@ extension XCFrameworkMetadata {
         path: AbsolutePath = "/XCFrameworks/XCFramework.xcframework",
         infoPlist: XCFrameworkInfoPlist = .test(),
         primaryBinaryPath: AbsolutePath = "/XCFrameworks/XCFramework.xcframework/ios-arm64/XCFramework",
-        linking: BinaryLinking = .dynamic
+        linking: BinaryLinking = .dynamic,
+        mergeable: Bool = false,
+        status: FrameworkStatus = .required
     ) -> XCFrameworkMetadata {
         XCFrameworkMetadata(
             path: path,
             infoPlist: infoPlist,
             primaryBinaryPath: primaryBinaryPath,
-            linking: linking
+            linking: linking,
+            mergeable: mergeable,
+            status: status
         )
     }
 }

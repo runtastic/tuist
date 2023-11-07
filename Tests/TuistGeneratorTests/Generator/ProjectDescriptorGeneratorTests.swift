@@ -27,7 +27,7 @@ final class ProjectDescriptorGeneratorTests: TuistUnitTestCase {
 
     func test_generate_testTargetIdentity() throws {
         // Given
-        let temporaryPath = try self.temporaryPath()
+        let temporaryPath = try temporaryPath()
         let app = Target.test(
             name: "App",
             platform: .iOS,
@@ -92,7 +92,7 @@ final class ProjectDescriptorGeneratorTests: TuistUnitTestCase {
         xcodeController.selectedVersionStub = .success(Version(11, 0, 0))
 
         // Given
-        let temporaryPath = try self.temporaryPath()
+        let temporaryPath = try temporaryPath()
         let project = Project.test(
             path: temporaryPath,
             name: "Project",
@@ -116,7 +116,7 @@ final class ProjectDescriptorGeneratorTests: TuistUnitTestCase {
             ],
             dependencies: [
                 .target(name: graphTarget.target.name, path: graphTarget.path): [
-                    .packageProduct(path: project.path, product: "A"),
+                    .packageProduct(path: project.path, product: "A", type: .sources),
                 ],
             ]
         )
@@ -135,7 +135,7 @@ final class ProjectDescriptorGeneratorTests: TuistUnitTestCase {
         xcodeController.selectedVersionStub = .success(Version(11, 0, 0))
 
         // Given
-        let temporaryPath = try self.temporaryPath()
+        let temporaryPath = try temporaryPath()
         let project = Project.test(
             path: temporaryPath,
             name: "Project",
@@ -159,7 +159,7 @@ final class ProjectDescriptorGeneratorTests: TuistUnitTestCase {
         xcodeController.selectedVersionStub = .success(Version(10, 2, 1))
 
         // Given
-        let temporaryPath = try self.temporaryPath()
+        let temporaryPath = try temporaryPath()
         let project = Project.test(
             path: temporaryPath,
             name: "Project",
@@ -195,8 +195,8 @@ final class ProjectDescriptorGeneratorTests: TuistUnitTestCase {
         let project = Project.test(
             path: path,
             targets: [
-                .test(resources: resources.map {
-                    .file(path: path.appending(RelativePath($0)))
+                .test(resources: try resources.map {
+                    .file(path: path.appending(try RelativePath(validating: $0)))
                 }),
             ]
         )
@@ -363,7 +363,7 @@ final class ProjectDescriptorGeneratorTests: TuistUnitTestCase {
             ],
             dependencies: [
                 .target(name: graphTarget.target.name, path: graphTarget.path): [
-                    .packageProduct(path: project.path, product: "A"),
+                    .packageProduct(path: project.path, product: "A", type: .sources),
                 ],
             ]
         )

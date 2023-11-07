@@ -38,11 +38,11 @@ public class ResourcesProjectMapper: ProjectMapping {
         if !target.supportsResources {
             let resourcesTarget = Target(
                 name: bundleName,
-                platform: target.platform,
+                destinations: target.destinations,
                 product: .bundle,
                 productName: nil,
                 bundleId: "\(target.bundleId).resources",
-                deploymentTarget: target.deploymentTarget,
+                deploymentTargets: target.deploymentTargets,
                 infoPlist: .extendingDefault(with: [:]),
                 settings: Settings(
                     base: [
@@ -78,7 +78,7 @@ public class ResourcesProjectMapper: ProjectMapping {
         let filePath = project.path
             .appending(component: Constants.DerivedDirectory.name)
             .appending(component: Constants.DerivedDirectory.sources)
-            .appending(component: "TuistBundle+\(target.name.camelized.uppercasingFirst).swift")
+            .appending(component: "TuistBundle+\(target.name.toValidSwiftIdentifier()).swift")
 
         let content: String = ResourcesProjectMapper.fileContent(
             targetName: target.name,
@@ -102,34 +102,36 @@ public class ResourcesProjectMapper: ProjectMapping {
             private class BundleFinder {}
 
             extension Foundation.Bundle {
-                /// Since \(targetName) is a \(target
-                .product), the bundle containing the resources is copied into the final product.
-                static let module: Bundle = {
-                    let bundleName = "\(bundleName)"
+            /// Since \(targetName) is a \(
+                target
+                    .product
+            ), the bundle containing the resources is copied into the final product.
+            static let module: Bundle = {
+                let bundleName = "\(bundleName)"
 
-                    let candidates = [
-                        Bundle.main.resourceURL,
-                        Bundle(for: BundleFinder.self).resourceURL,
-                        Bundle.main.bundleURL,
-                    ]
+                let candidates = [
+                    Bundle.main.resourceURL,
+                    Bundle(for: BundleFinder.self).resourceURL,
+                    Bundle.main.bundleURL,
+                ]
 
-                    for candidate in candidates {
-                        let bundlePath = candidate?.appendingPathComponent(bundleName + ".bundle")
-                        if let bundle = bundlePath.flatMap(Bundle.init(url:)) {
-                            return bundle
-                        }
+                for candidate in candidates {
+                    let bundlePath = candidate?.appendingPathComponent(bundleName + ".bundle")
+                    if let bundle = bundlePath.flatMap(Bundle.init(url:)) {
+                        return bundle
                     }
-                    fatalError("unable to find bundle named \(bundleName)")
-                }()
+                }
+                fatalError("unable to find bundle named \(bundleName)")
+            }()
             }
 
             // MARK: - Objective-C Bundle Accessor
 
             @objc
-            public class \(target.productName.camelized.uppercasingFirst)Resources: NSObject {
-                @objc public class var bundle: Bundle {
-                    return .module
-                }
+            public class \(target.productName.toValidSwiftIdentifier())Resources: NSObject {
+            @objc public class var bundle: Bundle {
+                return .module
+            }
             }
             // swiftlint:enable all
             // swiftformat:enable all
@@ -147,18 +149,20 @@ public class ResourcesProjectMapper: ProjectMapping {
             private class BundleFinder {}
 
             extension Foundation.Bundle {
-                /// Since \(targetName) is a \(target
-                .product), the bundle for classes within this module can be used directly.
-                static let module = Bundle(for: BundleFinder.self)
+            /// Since \(targetName) is a \(
+                target
+                    .product
+            ), the bundle for classes within this module can be used directly.
+            static let module = Bundle(for: BundleFinder.self)
             }
 
             // MARK: - Objective-C Bundle Accessor
 
             @objc
-            public class \(target.productName.camelized.uppercasingFirst)Resources: NSObject {
-                @objc public class var bundle: Bundle {
-                    return .module
-                }
+            public class \(target.productName.toValidSwiftIdentifier())Resources: NSObject {
+            @objc public class var bundle: Bundle {
+                return .module
+            }
             }
             // swiftlint:enable all
             // swiftformat:enable all

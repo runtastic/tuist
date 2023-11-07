@@ -126,16 +126,14 @@ final class BuildPhaseGenerator: BuildPhaseGenerating {
             )
         }
 
-        if target.canEmbedXPCServices() {
-            try generateEmbedXPCServicesBuildPhase(
-                path: path,
-                target: target,
-                graphTraverser: graphTraverser,
-                pbxTarget: pbxTarget,
-                fileElements: fileElements,
-                pbxproj: pbxproj
-            )
-        }
+        try generateEmbedXPCServicesBuildPhase(
+            path: path,
+            target: target,
+            graphTraverser: graphTraverser,
+            pbxTarget: pbxTarget,
+            fileElements: fileElements,
+            pbxproj: pbxproj
+        )
 
         if target.canEmbedSystemExtensions() {
             try generateEmbedSystemExtensionBuildPhase(
@@ -216,7 +214,6 @@ final class BuildPhaseGenerator: BuildPhaseGenerating {
         }
     }
 
-    // swiftlint:disable:next function_body_length
     func generateSourcesBuildPhase(
         files: [SourceFile],
         coreDataModels: [CoreDataModel],
@@ -432,7 +429,7 @@ final class BuildPhaseGenerator: BuildPhaseGenerating {
                 }
                 element = (fileReference, buildFilePath)
             }
-            if let element = element, buildFilesCache.contains(element.path) == false {
+            if let element, buildFilesCache.contains(element.path) == false {
                 let tags = resource.tags.sorted()
                 let settings: [String: Any]? = !tags.isEmpty ? ["ASSET_TAGS": tags] : nil
 
@@ -616,6 +613,9 @@ final class BuildPhaseGenerator: BuildPhaseGenerating {
 
         refs.forEach {
             let pbxBuildFile = PBXBuildFile(file: $0, settings: ["ATTRIBUTES": ["RemoveHeadersOnCopy"]])
+            if !target.isExclusiveTo(.macOS) {
+                pbxBuildFile.applyPlatformFilters([.macos])
+            }
             pbxBuildFiles.append(pbxBuildFile)
         }
         pbxBuildFiles.forEach { pbxproj.add(object: $0) }

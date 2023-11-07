@@ -33,7 +33,7 @@ extension String {
             return String(self[startIndex ..< e])
         }
 
-        if let separator = separator {
+        if let separator {
             return scrub(separator)
         } else if hasSuffix("\r\n") {
             return scrub("\r\n")
@@ -103,7 +103,7 @@ extension String {
     }
 
     public var isGitURL: Bool {
-        self.matches(pattern: String.httpRegularExpression) || self.matches(pattern: String.sshRegularExpression)
+        matches(pattern: String.httpRegularExpression) || matches(pattern: String.sshRegularExpression)
     }
 
     /// A collection of all the words in the string by separating out any punctuation and spaces.
@@ -123,6 +123,22 @@ extension String {
         let rest = parts.dropFirst().map { String($0).uppercasingFirst }
 
         return ([first] + rest).joined(separator: "")
+    }
+
+    /// Make the string a valid Swift identifier (class name)
+    public func toValidSwiftIdentifier() -> String {
+        // Step 1: Start with a capital letter
+        let capitalized = camelized.uppercasingFirst
+
+        // Step 2: Remove invalid characters
+        let sanitized = capitalized.replacingOccurrences(of: "[^A-Za-z0-9_]", with: "", options: .regularExpression)
+
+        // Step 3: Add underscore prefix if the string starts with a number
+        if sanitized.first?.isNumber == true {
+            return "_" + sanitized
+        }
+
+        return sanitized
     }
 
     public func camelCaseToKebabCase() -> String {
@@ -156,7 +172,7 @@ extension String {
     /// hello -> hello, hello$world -> 'hello$world', input A -> 'input A'
     ///
     /// - Returns: Shell escaped string.
-    internal func shellEscaped() -> String {
+    func shellEscaped() -> String {
         // If all the characters in the string are in whitelist then no need to escape.
         guard let pos = utf8.firstIndex(where: { mustBeEscaped($0) }) else {
             return self
@@ -184,7 +200,7 @@ extension String {
     }
 
     /// Shell escapes the current string. This method is mutating version of shellEscaped().
-    internal mutating func shellEscape() {
+    mutating func shellEscape() {
         self = shellEscaped()
     }
 

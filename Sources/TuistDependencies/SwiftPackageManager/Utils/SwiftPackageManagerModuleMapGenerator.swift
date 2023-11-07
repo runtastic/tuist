@@ -29,7 +29,8 @@ public enum ModuleMap: Equatable {
 
 /// Protocol that allows to generate a modulemap for an SPM target.
 /// It implements the Swift Package Manager logic
-/// [documented here](https://github.com/apple/swift-package-manager/blob/main/Documentation/Usage.md#creating-c-language-targets) and
+/// [documented here](https://github.com/apple/swift-package-manager/blob/main/Documentation/Usage.md#creating-c-language-targets)
+/// and
 /// [implemented here](https://github.com/apple/swift-package-manager/blob/main/Sources/PackageLoading/ModuleMapGenerator.swift).
 public protocol SwiftPackageManagerModuleMapGenerating {
     func generate(moduleName: String, publicHeadersPath: AbsolutePath) throws -> ModuleMap
@@ -77,7 +78,7 @@ public final class SwiftPackageManagerModuleMapGenerator: SwiftPackageManagerMod
     static func customModuleMapPath(publicHeadersPath: AbsolutePath) throws -> AbsolutePath? {
         guard FileHandler.shared.exists(publicHeadersPath) else { return nil }
 
-        let moduleMapPath = RelativePath(ModuleMap.filename)
+        let moduleMapPath = try RelativePath(validating: ModuleMap.filename)
         let publicHeadersFolderContent = try FileHandler.shared.contentsOfDirectory(publicHeadersPath)
 
         if publicHeadersFolderContent.contains(publicHeadersPath.appending(moduleMapPath)) {

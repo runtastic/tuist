@@ -1,5 +1,15 @@
 import Foundation
 
+/// Dependency status used by `.framework` and `.xcframework` target
+/// dependencies
+public enum FrameworkStatus: String, Codable, Hashable {
+    /// Required dependency
+    case required
+
+    /// Optional dependency (weakly linked)
+    case optional
+}
+
 /// Dependency status used by `.sdk` target dependencies
 public enum SDKStatus: String, Codable, Hashable {
     /// Required dependency
@@ -37,7 +47,8 @@ public enum TargetDependency: Codable, Hashable {
     ///
     /// - Parameters:
     ///   - path: Relative path to the prebuilt framework
-    case framework(path: Path)
+    ///   - status: The dependency status (optional dependencies are weakly linked)
+    case framework(path: Path, status: FrameworkStatus = .required)
 
     /// Dependency on prebuilt library
     ///
@@ -55,6 +66,21 @@ public enum TargetDependency: Codable, Hashable {
     ///              e.g. RxSwift
     case package(product: String)
 
+    /// Dependency on a swift package manager plugin product using Xcode native integration.
+    ///
+    /// - Parameters:
+    ///   - product: The name of the output product. ${PRODUCT_NAME} inside Xcode.
+    ///              e.g. RxSwift
+    case packagePlugin(product: String)
+
+    /// Dependency on a Swift Package Manager Swift Macro using Xcode native integration.
+    ///
+    /// - Parameters:
+    ///   - product: The name of the output product. ${PRODUCT_NAME} inside Xcode.
+    ///              e.g. StructBuilder
+    ///
+    case packageMacro(product: String)
+
     /// Dependency on system library or framework
     ///
     /// - Parameters:
@@ -68,7 +94,8 @@ public enum TargetDependency: Codable, Hashable {
     ///
     /// - Parameters:
     ///   - path: Relative path to the xcframework
-    case xcframework(path: Path)
+    ///   - status: The dependency status (optional dependencies are weakly linked)
+    case xcframework(path: Path, status: FrameworkStatus = .required)
 
     /// Dependency on XCTest.
     case xctest
@@ -107,6 +134,10 @@ public enum TargetDependency: Codable, Hashable {
             return "library"
         case .package:
             return "package"
+        case .packagePlugin:
+            return "packagePlugin"
+        case .packageMacro:
+            return "packageMacro"
         case .sdk:
             return "sdk"
         case .xcframework:

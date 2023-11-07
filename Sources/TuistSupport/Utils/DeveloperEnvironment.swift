@@ -26,11 +26,12 @@ public final class DeveloperEnvironment: DeveloperEnvironmenting {
         self.fileHandler = fileHandler
     }
 
-    /// https://pewpewthespells.com/blog/xcode_build_locations.html/// https://pewpewthespells.com/blog/xcode_build_locations.html
     // swiftlint:disable identifier_name
+
+    /// https://pewpewthespells.com/blog/xcode_build_locations.html/// https://pewpewthespells.com/blog/xcode_build_locations.html
     @Atomic private var _derivedDataDirectory: AbsolutePath?
     public var derivedDataDirectory: AbsolutePath {
-        if let _derivedDataDirectory = _derivedDataDirectory {
+        if let _derivedDataDirectory {
             return _derivedDataDirectory
         }
         let location: AbsolutePath
@@ -42,7 +43,8 @@ public final class DeveloperEnvironment: DeveloperEnvironmenting {
             location = try! AbsolutePath(validating: customLocation.chomp()) // swiftlint:disable:this force_try
         } else {
             // Default location
-            location = fileHandler.homeDirectory.appending(RelativePath("Library/Developer/Xcode/DerivedData/"))
+            // swiftlint:disable:next force_try
+            location = fileHandler.homeDirectory.appending(try! RelativePath(validating: "Library/Developer/Xcode/DerivedData/"))
         }
         _derivedDataDirectory = location
         return location
@@ -50,12 +52,12 @@ public final class DeveloperEnvironment: DeveloperEnvironmenting {
 
     @Atomic private var _architecture: MacArchitecture?
     public var architecture: MacArchitecture {
-        if let _architecture = _architecture {
+        if let _architecture {
             return _architecture
         }
         // swiftlint:disable:next force_try
         let output = try! System.shared.capture(["/usr/bin/uname", "-m"]).chomp()
         _architecture = MacArchitecture(rawValue: output)
         return _architecture!
-    }
+    } // swiftlint:enable identifier_name
 }

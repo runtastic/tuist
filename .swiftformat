@@ -1,7 +1,11 @@
 # file options
 
 --symlinks ignore
---exclude Tests/XCTestManifests.swift,projects/tuist/features,Sources/TuistSupport/Vendored,projects/tuist/fixtures/Targets/SlothCreator,Sources/TuistCloud/OpenAPI
+--exclude Tests/XCTestManifests.swift,features,Sources/TuistSupport/Vendored,fixtures/Targets/SlothCreator,Sources/TuistAutomation/XcodeBuild/XcodeBuildController.swift
+--exclude fixtures/tuist_plugin
+--disable hoistAwait
+--disable hoistTry
+--swiftversion 5.7
 
 # format options
 
