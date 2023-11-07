@@ -25,23 +25,23 @@ public final class MockFileHandler: FileHandler {
 
     public var stubContentsOfDirectory: ((AbsolutePath) throws -> [AbsolutePath])?
     override public func contentsOfDirectory(_ path: AbsolutePath) throws -> [AbsolutePath] {
-        guard let stubContentsOfDirectory = stubContentsOfDirectory else {
+        guard let stubContentsOfDirectory else {
             return try super.contentsOfDirectory(path)
         }
         return try stubContentsOfDirectory(path)
     }
 
     public var stubFilesAndDirectoriesContained: ((AbsolutePath) -> [AbsolutePath]?)?
-    override public func filesAndDirectoriesContained(in path: AbsolutePath) -> [AbsolutePath]? {
-        guard let stubFilesAndDirectoriesContained = stubFilesAndDirectoriesContained else {
-            return super.filesAndDirectoriesContained(in: path)
+    override public func filesAndDirectoriesContained(in path: AbsolutePath) throws -> [AbsolutePath]? {
+        guard let stubFilesAndDirectoriesContained else {
+            return try super.filesAndDirectoriesContained(in: path)
         }
         return stubFilesAndDirectoriesContained(path)
     }
 
     public var stubExists: ((AbsolutePath) -> Bool)?
     override public func exists(_ path: AbsolutePath) -> Bool {
-        guard let stubExists = stubExists else {
+        guard let stubExists else {
             return super.exists(path)
         }
         return stubExists(path)
@@ -49,7 +49,7 @@ public final class MockFileHandler: FileHandler {
 
     public var stubReadFile: ((AbsolutePath) throws -> Data)?
     override public func readFile(_ path: AbsolutePath) throws -> Data {
-        guard let stubReadFile = stubReadFile else {
+        guard let stubReadFile else {
             return try super.readFile(path)
         }
         return try stubReadFile(path)
@@ -57,7 +57,7 @@ public final class MockFileHandler: FileHandler {
 
     public var stubWrite: ((String, AbsolutePath, Bool) throws -> Void)?
     override public func write(_ content: String, path: AbsolutePath, atomically: Bool) throws {
-        guard let stubWrite = stubWrite else {
+        guard let stubWrite else {
             return try super.write(content, path: path, atomically: atomically)
         }
         return try stubWrite(content, path, atomically)
@@ -65,7 +65,7 @@ public final class MockFileHandler: FileHandler {
 
     public var stubIsFolder: ((AbsolutePath) -> Bool)?
     override public func isFolder(_ path: AbsolutePath) -> Bool {
-        guard let stubIsFolder = stubIsFolder else {
+        guard let stubIsFolder else {
             return super.isFolder(path)
         }
         return stubIsFolder(path)
@@ -92,7 +92,7 @@ public final class MockFileHandler: FileHandler {
 
     public var stubGlob: ((AbsolutePath, String) -> [AbsolutePath])?
     override public func glob(_ path: AbsolutePath, glob: String) -> [AbsolutePath] {
-        guard let stubGlob = stubGlob else {
+        guard let stubGlob else {
             return super.glob(path, glob: glob)
         }
         return stubGlob(path, glob)
@@ -145,11 +145,11 @@ open class TuistTestCase: XCTestCase {
     public func createFiles(_ files: [String], content: String? = nil) throws -> [AbsolutePath] {
         let temporaryPath = try temporaryPath()
         let fileHandler = FileHandler()
-        let paths = files.map { temporaryPath.appending(RelativePath($0)) }
+        let paths = try files.map { temporaryPath.appending(try RelativePath(validating: $0)) }
 
         try paths.forEach {
             try fileHandler.touch($0)
-            if let content = content {
+            if let content {
                 try fileHandler.write(content, path: $0, atomically: true)
             }
         }
@@ -160,7 +160,7 @@ open class TuistTestCase: XCTestCase {
     public func createFolders(_ folders: [String]) throws -> [AbsolutePath] {
         let temporaryPath = try temporaryPath()
         let fileHandler = FileHandler.shared
-        let paths = folders.map { temporaryPath.appending(RelativePath($0)) }
+        let paths = try folders.map { temporaryPath.appending(try RelativePath(validating: $0)) }
         try paths.forEach {
             try fileHandler.createFolder($0)
         }
@@ -239,8 +239,8 @@ open class TuistTestCase: XCTestCase {
             .map(\.pathString)
             .sorted()
 
-        let expectedContent = expected
-            .map { directory.appending(RelativePath($0)) }
+        let expectedContent = try expected
+            .map { directory.appending(try RelativePath(validating: $0)) }
             .map(\.pathString)
             .sorted()
 
@@ -258,7 +258,7 @@ open class TuistTestCase: XCTestCase {
     }
 
     public func temporaryFixture(_ pathString: String) throws -> AbsolutePath {
-        let path = RelativePath(pathString)
+        let path = try RelativePath(validating: pathString)
         let fixturePath = fixturePath(path: path)
         let destinationPath = (try temporaryPath()).appending(component: path.basename)
         try FileHandler.shared.copy(from: fixturePath, to: destinationPath)

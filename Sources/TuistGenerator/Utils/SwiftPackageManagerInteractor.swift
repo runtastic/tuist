@@ -54,7 +54,8 @@ public class SwiftPackageManagerInteractor: SwiftPackageManagerInteracting {
         }
 
         let rootPackageResolvedPath = path.appending(component: ".package.resolved")
-        let workspacePackageResolvedFolderPath = path.appending(RelativePath("\(workspaceName)/xcshareddata/swiftpm"))
+        let workspacePackageResolvedFolderPath = path
+            .appending(try RelativePath(validating: "\(workspaceName)/xcshareddata/swiftpm"))
         let workspacePackageResolvedPath = workspacePackageResolvedFolderPath.appending(component: "Package.resolved")
 
         if fileHandler.exists(rootPackageResolvedPath) {
@@ -73,6 +74,13 @@ public class SwiftPackageManagerInteractor: SwiftPackageManagerInteracting {
         // This allows using the system-defined git credentials instead of using Xcode's accounts permissions
         if config.generationOptions.resolveDependenciesWithSystemScm {
             arguments.append(contentsOf: ["-scmProvider", "system"])
+        }
+
+        // Set specific clone directory for Xcode managed SPM dependencies
+        if let clonedSourcePackagesDirPath = config.generationOptions.clonedSourcePackagesDirPath {
+            let workspace = (workspaceName as NSString).deletingPathExtension
+            let path = "\(clonedSourcePackagesDirPath.pathString)/\(workspace)"
+            arguments.append(contentsOf: ["-clonedSourcePackagesDirPath", path])
         }
 
         arguments.append(contentsOf: ["-workspace", workspacePath.pathString, "-list"])

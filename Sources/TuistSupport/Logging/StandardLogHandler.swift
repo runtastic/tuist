@@ -21,11 +21,12 @@ public struct StandardLogHandler: LogHandler {
         metadata: Logger.Metadata?,
         file _: String, function _: String, line _: UInt
     ) {
-        if let metadata = metadata, metadata[Logger.Metadata.tuist] == .string(Logger.Metadata.prettyKey) {
+        if let metadata, metadata[Logger.Metadata.tuist] == .string(Logger.Metadata.prettyKey) {
             return
         }
 
         let string: String
+
         if Environment.shared.shouldOutputBeColoured {
             switch metadata?[Logger.Metadata.tuist] {
             case Logger.Metadata.successKey?:
@@ -41,7 +42,8 @@ public struct StandardLogHandler: LogHandler {
                 case .error:
                     string = message.description.red()
                 case .warning:
-                    string = message.description.yellow()
+                    WarningController.shared.append(warning: message.description)
+                    return
                 case .notice, .info, .debug, .trace:
                     string = message.description
                 }

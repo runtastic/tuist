@@ -103,30 +103,4 @@ final class WorkspaceMapperFactoryTests: TuistUnitTestCase {
         // Then
         XCTAssertContainsElementOfType(got, LastUpgradeVersionWorkspaceMapper.self)
     }
-
-    func test_automation_contains_the_path_workspace_mapper() throws {
-        // Given
-        let workspaceDirectory = try temporaryPath()
-        subject = WorkspaceMapperFactory(projectMapper: SequentialProjectMapper(mappers: projectMapperFactory.default()))
-
-        // When
-        let got = subject.automation(workspaceDirectory: workspaceDirectory)
-
-        // Then
-        let mapper = XCTAssertContainsElementOfType(got, AutomationPathWorkspaceMapper.self)
-        XCTAssertEqual(mapper?.workspaceDirectory, workspaceDirectory)
-    }
-
-    func test_cache_contains_the_generate_cacheable_schemes_workspace_mapper() throws {
-        // Given
-        let includedTargets = Set(arrayLiteral: "MyTarget")
-        subject = WorkspaceMapperFactory(projectMapper: SequentialProjectMapper(mappers: projectMapperFactory.default()))
-
-        // When
-        let got = subject.cache(includedTargets: includedTargets)
-
-        // Then
-        let mapper = XCTAssertContainsElementOfType(got, GenerateCacheableSchemesWorkspaceMapper.self)
-        XCTAssertEqual(mapper?.includedTargets, includedTargets)
-    }
 }

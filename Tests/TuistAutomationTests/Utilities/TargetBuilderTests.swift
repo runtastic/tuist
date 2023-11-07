@@ -69,6 +69,7 @@ final class TargetBuilderTests: TuistUnitTestCase {
         ]
         let destination = XcodeBuildDestination.device("this_is_a_udid")
         let version = "15.2".version()
+        let rosetta = true
         let device = "iPhone 13 Pro"
 
         simulatorController.findAvailableDeviceStub = { _, _version, _, _deviceName in
@@ -81,10 +82,11 @@ final class TargetBuilderTests: TuistUnitTestCase {
             buildArguments
         }
 
-        xcodeBuildController.buildStub = { _workspace, _scheme, _destination, _clean, _buildArguments in
+        xcodeBuildController.buildStub = { _workspace, _scheme, _destination, _rosetta, _clean, _buildArguments in
             XCTAssertEqual(_workspace.path, workspacePath)
             XCTAssertEqual(_scheme, scheme.name)
             XCTAssertEqual(_destination, destination)
+            XCTAssertEqual(_rosetta, rosetta)
             XCTAssertEqual(_clean, clean)
             XCTAssertEqual(_buildArguments, buildArguments)
             return [.standardOutput(.init(raw: "success"))]
@@ -93,6 +95,7 @@ final class TargetBuilderTests: TuistUnitTestCase {
         // When
         try await subject.buildTarget(
             .test(),
+            platform: .iOS,
             workspacePath: workspacePath,
             scheme: scheme,
             clean: clean,
@@ -100,6 +103,7 @@ final class TargetBuilderTests: TuistUnitTestCase {
             buildOutputPath: nil,
             device: device,
             osVersion: version,
+            rosetta: rosetta,
             graphTraverser: MockGraphTraverser()
         )
     }
@@ -112,7 +116,7 @@ final class TargetBuilderTests: TuistUnitTestCase {
         let workspacePath = try AbsolutePath(validating: "/path/to/project.xcworkspace")
         let graphTraverser = MockGraphTraverser()
 
-        xcodeBuildController.buildStub = { _, _, _, _, _ in
+        xcodeBuildController.buildStub = { _, _, _, _, _, _ in
             [.standardOutput(.init(raw: "success"))]
         }
 
@@ -126,6 +130,7 @@ final class TargetBuilderTests: TuistUnitTestCase {
         // When
         try await subject.buildTarget(
             .test(),
+            platform: .iOS,
             workspacePath: workspacePath,
             scheme: scheme,
             clean: false,
@@ -133,6 +138,7 @@ final class TargetBuilderTests: TuistUnitTestCase {
             buildOutputPath: buildOutputPath,
             device: nil,
             osVersion: nil,
+            rosetta: false,
             graphTraverser: graphTraverser
         )
 
@@ -160,7 +166,7 @@ final class TargetBuilderTests: TuistUnitTestCase {
         let workspacePath = try AbsolutePath(validating: "/path/to/project.xcworkspace")
         let graphTraverser = MockGraphTraverser()
 
-        xcodeBuildController.buildStub = { _, _, _, _, _ in
+        xcodeBuildController.buildStub = { _, _, _, _, _, _ in
             [.standardOutput(.init(raw: "success"))]
         }
 
@@ -174,6 +180,7 @@ final class TargetBuilderTests: TuistUnitTestCase {
         // When
         try await subject.buildTarget(
             .test(),
+            platform: .iOS,
             workspacePath: workspacePath,
             scheme: scheme,
             clean: false,
@@ -181,6 +188,7 @@ final class TargetBuilderTests: TuistUnitTestCase {
             buildOutputPath: buildOutputPath,
             device: nil,
             osVersion: nil,
+            rosetta: false,
             graphTraverser: graphTraverser
         )
 

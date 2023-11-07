@@ -38,7 +38,8 @@ enum SwiftPackageManagerGraphGeneratorError: FatalError, Equatable {
 /// A protocol that defines an interface to generate the `DependenciesGraph` for the `SwiftPackageManager` dependencies.
 public protocol SwiftPackageManagerGraphGenerating {
     /// Generates the `DependenciesGraph` for the `SwiftPackageManager` dependencies.
-    /// - Parameter path: The path to the directory that contains the `checkouts` directory where `SwiftPackageManager` installed dependencies.
+    /// - Parameter path: The path to the directory that contains the `checkouts` directory where `SwiftPackageManager` installed
+    /// dependencies.
     /// - Parameter productTypes: The custom `Product` types to be used for SPM targets.
     /// - Parameter platforms: The supported platforms.
     /// - Parameter baseSettings: base `Settings` for targets.
@@ -84,6 +85,7 @@ public final class SwiftPackageManagerGraphGenerator: SwiftPackageManagerGraphGe
         let workspaceState = try JSONDecoder()
             .decode(SwiftPackageManagerWorkspaceState.self, from: try FileHandler.shared.readFile(workspacePath))
         let packageInfos: [
+            // swiftlint:disable:next large_tuple
             (id: String, name: String, folder: AbsolutePath, targetToArtifactPaths: [String: AbsolutePath], info: PackageInfo)
         ]
         packageInfos = try workspaceState.object.dependencies.map(context: .concurrent) { dependency in
@@ -149,6 +151,7 @@ public final class SwiftPackageManagerGraphGenerator: SwiftPackageManagerGraphGe
                 targetToProducts: preprocessInfo.targetToProducts,
                 targetToResolvedDependencies: preprocessInfo.targetToResolvedDependencies,
                 targetToModuleMap: preprocessInfo.targetToModuleMap,
+                macOSTargets: preprocessInfo.macOSTargets,
                 packageToProject: packageToProject,
                 swiftToolsVersion: swiftToolsVersion
             )

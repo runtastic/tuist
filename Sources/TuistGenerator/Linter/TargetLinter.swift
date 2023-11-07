@@ -39,6 +39,7 @@ class TargetLinter: TargetLinting {
         issues.append(contentsOf: lintValidSourceFileCodeGenAttributes(target: target))
         issues.append(contentsOf: validateCoreDataModelsExist(target: target))
         issues.append(contentsOf: validateCoreDataModelVersionsExist(target: target))
+        issues.append(contentsOf: lintMergeableLibrariesOnlyAppliesToDynamicTargets(target: target))
         target.scripts.forEach { script in
             issues.append(contentsOf: targetScriptLinter.lint(script))
         }
@@ -97,7 +98,7 @@ class TargetLinter: TargetLinting {
         let hasNoScripts = target.scripts.isEmpty
 
         // macOS bundle targets can have source code, but it's optional
-        if target.platform == .macOS, target.product == .bundle, hasNoSources {
+        if target.isExclusiveTo(.macOS), target.product == .bundle, hasNoSources {
             return []
         }
 
@@ -105,7 +106,7 @@ class TargetLinter: TargetLinting {
             return [LintingIssue(reason: "The target \(target.name) doesn't contain source files.", severity: .warning)]
         } else if !supportsSources, !sources.isEmpty {
             return [LintingIssue(
-                reason: "Target \(target.name) cannot contain sources. \(target.platform) \(target.product) targets don't support source files",
+                reason: "Target \(target.name) cannot contain sources. \(target.product) targets in one of these destinations doesn't support source files: \(target.destinations.map(\.rawValue).sorted().joined(separator: ", "))",
                 severity: .error
             )]
         }
@@ -174,8 +175,15 @@ class TargetLinter: TargetLinting {
 
     private func lintEntitlementsExist(target: Target) -> [LintingIssue] {
         var issues: [LintingIssue] = []
-        if let path = target.entitlements, !FileHandler.shared.exists(path) {
-            issues.append(LintingIssue(reason: "Entitlements file not found at path \(path.pathString)", severity: .error))
+        if let entitlements = target.entitlements,
+           case let Entitlements.file(path: path) = entitlements,
+           !FileHandler.shared.exists(path)
+        {
+            issues
+                .append(LintingIssue(
+                    reason: "Entitlements file not found at path \(entitlements.path!.pathString)",
+                    severity: .error
+                ))
         }
         return issues
     }
@@ -198,30 +206,27 @@ class TargetLinter: TargetLinting {
     }
 
     private func lintDeploymentTarget(target: Target) -> [LintingIssue] {
-        guard let deploymentTarget = target.deploymentTarget else {
+        target.deploymentTargets.configuredVersions.flatMap { platform, version in
+            let versionFormatIssue = LintingIssue(reason: "The version of deployment target is incorrect", severity: .error)
+
+            let osVersionRegex = "\\b[0-9]+\\.[0-9]+(?:\\.[0-9]+)?\\b"
+            if !version.matches(pattern: osVersionRegex) { return [versionFormatIssue] }
+
+            let destinations = target.destinations
+            let inconsistentPlatformIssue = LintingIssue(
+                reason: "Found an inconsistency between target destinations `\(destinations)` and deployment target `\(platform.caseValue)`",
+                severity: .error
+            )
+
+            switch platform {
+            case .iOS: if !target.supports(.iOS) { return [inconsistentPlatformIssue] }
+            case .macOS: if !target.supports(.macOS) { return [inconsistentPlatformIssue] }
+            case .watchOS: if !target.supports(.watchOS) { return [inconsistentPlatformIssue] }
+            case .tvOS: if !target.supports(.tvOS) { return [inconsistentPlatformIssue] }
+            case .visionOS: if !target.supports(.visionOS) { return [inconsistentPlatformIssue] }
+            }
             return []
         }
-
-        let versionFormatIssue = LintingIssue(reason: "The version of deployment target is incorrect", severity: .error)
-
-        let osVersionRegex = "\\b[0-9]+\\.[0-9]+(?:\\.[0-9]+)?\\b"
-        if !deploymentTarget.version.matches(pattern: osVersionRegex) { return [versionFormatIssue] }
-
-        let platform = target.platform
-        let inconsistentPlatformIssue = LintingIssue(
-            reason: "Found an inconsistency between a platform `\(platform.caseValue)` and deployment target `\(deploymentTarget.platform)`",
-            severity: .error
-        )
-
-        switch deploymentTarget {
-        case .iOS: if platform != .iOS { return [inconsistentPlatformIssue] }
-        case .macOS: if platform != .macOS { return [inconsistentPlatformIssue] }
-        case .watchOS: if platform != .watchOS { return [inconsistentPlatformIssue] }
-        case .tvOS: if platform != .tvOS { return [inconsistentPlatformIssue] }
-        case .visionOS: if platform != .visionOS { return [inconsistentPlatformIssue] }
-        }
-
-        return []
     }
 
     private func lintValidPlatformProductCombinations(target: Target) -> [LintingIssue] {
@@ -229,15 +234,17 @@ class TargetLinter: TargetLinting {
             .iOS: [.watch2App, .watch2Extension, .tvTopShelfExtension],
         ]
 
-        if let invalidProducts = invalidProductsForPlatforms[target.platform],
-           invalidProducts.contains(target.product)
-        {
-            return [
-                LintingIssue(
-                    reason: "'\(target.name)' for platform '\(target.platform)' can't have a product type '\(target.product)'",
-                    severity: .error
-                ),
-            ]
+        for platform in target.destinations.platforms {
+            if let invalidProducts = invalidProductsForPlatforms[platform],
+               invalidProducts.contains(target.product)
+            {
+                return [
+                    LintingIssue(
+                        reason: "'\(target.name)' for platform '\(platform)' can't have a product type '\(target.product)'",
+                        severity: .error
+                    ),
+                ]
+            }
         }
 
         return []
@@ -272,6 +279,16 @@ class TargetLinter: TargetLinting {
             )
         }
     }
+
+    private func lintMergeableLibrariesOnlyAppliesToDynamicTargets(target: Target) -> [LintingIssue] {
+        if target.mergeable, target.product != .framework {
+            return [LintingIssue(
+                reason: "Target \(target.name) can't be marked as mergeable because it is not a dynamic target",
+                severity: .error
+            )]
+        }
+        return []
+    }
 }
 
 extension TargetDependency {
@@ -287,6 +304,10 @@ extension TargetDependency {
             return "library"
         case .package:
             return "package"
+        case .packagePlugin:
+            return "packagePlugin"
+        case .packageMacro:
+            return "packageMacro"
         case .sdk:
             return "sdk"
         case .xcframework:
@@ -302,13 +323,17 @@ extension TargetDependency {
             return name
         case let .project(target, _):
             return target
-        case let .framework(path):
+        case let .framework(path, _):
             return path.basename
-        case let .xcframework(path):
+        case let .xcframework(path, _):
             return path.basename
         case let .library(path, _, _):
             return path.basename
         case let .package(product):
+            return product
+        case let .packagePlugin(product):
+            return product
+        case let .packageMacro(product):
             return product
         case let .sdk(name, _):
             return name

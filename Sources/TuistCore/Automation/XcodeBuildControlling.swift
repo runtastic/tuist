@@ -20,9 +20,10 @@ public protocol XcodeBuildControlling {
         _ target: XcodeBuildTarget,
         scheme: String,
         destination: XcodeBuildDestination?,
+        rosetta: Bool,
         clean: Bool,
         arguments: [XcodeBuildArgument]
-    ) -> AsyncThrowingStream<SystemEvent<XcodeBuildOutput>, Error>
+    ) throws -> AsyncThrowingStream<SystemEvent<XcodeBuildOutput>, Error>
 
     /// Returns an observable to test the given project using xcodebuild.
     /// - Parameters:
@@ -33,17 +34,23 @@ public protocol XcodeBuildControlling {
     ///   - derivedDataPath: Custom location for derived data. Use `xcodebuild`'s default if `nil`
     ///   - resultBundlePath: Path where test result bundle will be saved.
     ///   - arguments: Extra xcodebuild arguments.
-    ///   - retryCount: Number of times to retry the test on failure
+    ///   - testTargets: A list of test identifiers indicating which tests to run
+    ///   - skipTestTargets: A list of test identifiers indicating which tests to skip
+    ///   - testPlanConfiguration: A configuration object indicating which test plan to use and its configurations
     func test(
         _ target: XcodeBuildTarget,
         scheme: String,
         clean: Bool,
         destination: XcodeBuildDestination,
+        rosetta: Bool,
         derivedDataPath: AbsolutePath?,
         resultBundlePath: AbsolutePath?,
         arguments: [XcodeBuildArgument],
-        retryCount: Int
-    ) -> AsyncThrowingStream<SystemEvent<XcodeBuildOutput>, Error>
+        retryCount: Int,
+        testTargets: [TestIdentifier],
+        skipTestTargets: [TestIdentifier],
+        testPlanConfiguration: TestPlanConfiguration?
+    ) throws -> AsyncThrowingStream<SystemEvent<XcodeBuildOutput>, Error>
 
     /// Returns an observable that archives the given project using xcodebuild.
     /// - Parameters:
@@ -58,14 +65,14 @@ public protocol XcodeBuildControlling {
         clean: Bool,
         archivePath: AbsolutePath,
         arguments: [XcodeBuildArgument]
-    ) -> AsyncThrowingStream<SystemEvent<XcodeBuildOutput>, Error>
+    ) throws -> AsyncThrowingStream<SystemEvent<XcodeBuildOutput>, Error>
 
     /// Creates an .xcframework combining the list of given frameworks.
     /// - Parameters:
     ///   - frameworks: Frameworks to be combined.
     ///   - output: Path to the output .xcframework.
     func createXCFramework(frameworks: [AbsolutePath], output: AbsolutePath)
-        -> AsyncThrowingStream<SystemEvent<XcodeBuildOutput>, Error>
+        throws -> AsyncThrowingStream<SystemEvent<XcodeBuildOutput>, Error>
 
     /// Gets the build settings of a scheme targets.
     /// - Parameters:

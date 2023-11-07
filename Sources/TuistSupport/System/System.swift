@@ -70,13 +70,16 @@ public final class System: Systeming {
     /// Shared system instance.
     public static var shared: Systeming = System()
 
+    // swiftlint:disable force_try
+
     /// Regex expression used to get the Swift version (for example, 5.7) from the output of the 'swift --version' command.
-    // swiftlint:disable:next force_try
     private static var swiftVersionRegex = try! NSRegularExpression(pattern: "Apple Swift version\\s(.+)\\s\\(.+\\)", options: [])
 
-    /// Regex expression used to get the Swiftlang version (for example, 5.7.0.127.4) from the output of the 'swift --version' command.
-    // swiftlint:disable:next force_try
+    /// Regex expression used to get the Swiftlang version (for example, 5.7.0.127.4) from the output of the 'swift --version'
+    /// command.
     private static var swiftlangVersion = try! NSRegularExpression(pattern: "swiftlang-(.+)\\sclang", options: [])
+
+    // swiftlint:enable force_try
 
     /// Convenience shortcut to the environment.
     public var env: [String: String] {
@@ -109,10 +112,7 @@ public final class System: Systeming {
             environment: environment,
             outputRedirection: .collect,
             startNewProcessGroup: false,
-            loggingHandler: verbose ? { message in
-                stdoutStream <<< message <<< "\n"
-                stdoutStream.flush()
-            } : nil
+            loggingHandler: verbose ? { stdoutStream.send($0).send("\n").flush() } : nil
         )
 
         logger.debug("\(escaped(arguments: arguments))")
@@ -173,7 +173,7 @@ public final class System: Systeming {
     var cachedSwiftlangVersion: String?
 
     public func swiftVersion() throws -> String {
-        if let cachedSwiftVersion = cachedSwiftVersion {
+        if let cachedSwiftVersion {
             return cachedSwiftVersion
         }
         let output = try capture(["/usr/bin/xcrun", "swift", "--version"])
@@ -186,7 +186,7 @@ public final class System: Systeming {
     }
 
     public func swiftlangVersion() throws -> String {
-        if let cachedSwiftlangVersion = cachedSwiftlangVersion {
+        if let cachedSwiftlangVersion {
             return cachedSwiftlangVersion
         }
         let output = try capture(["/usr/bin/xcrun", "swift", "--version"])
@@ -277,10 +277,7 @@ public final class System: Systeming {
                 redirection.outputClosures?.stderrClosure(bytes)
             }),
             startNewProcessGroup: false,
-            loggingHandler: verbose ? { message in
-                stdoutStream <<< message <<< "\n"
-                stdoutStream.flush()
-            } : nil
+            loggingHandler: verbose ? { stdoutStream.send($0).send("\n").flush() } : nil
         )
 
         logger.debug("\(escaped(arguments: arguments))")
@@ -316,10 +313,7 @@ public final class System: Systeming {
                     }
                 }),
                 startNewProcessGroup: false,
-                loggingHandler: verbose ? { message in
-                    stdoutStream <<< message <<< "\n"
-                    stdoutStream.flush()
-                } : nil
+                loggingHandler: verbose ? { stdoutStream.send($0).send("\n").flush() } : nil
             )
             DispatchQueue.global().async {
                 do {

@@ -46,9 +46,19 @@ public final class ResourceLocator: ResourceLocating {
         let paths = [
             bundlePath,
             bundlePath.parentDirectory,
+            /**
+                == Homebrew directory structure ==
+                x.y.z/
+                   bin/
+                       tuist
+                   lib/
+                       ProjectDescription.framework
+                       ProjectDescription.framework.dSYM
+                */
+            bundlePath.parentDirectory.appending(component: "lib"),
         ]
-        let candidates = paths.flatMap { path in
-            frameworkNames.map { path.appending(RelativePath($0)) }
+        let candidates = try paths.flatMap { path in
+            try frameworkNames.map { path.appending(try RelativePath(validating: $0)) }
         }
         guard let frameworkPath = candidates.first(where: { FileHandler.shared.exists($0) }) else {
             throw ResourceLocatingError.notFound(name)

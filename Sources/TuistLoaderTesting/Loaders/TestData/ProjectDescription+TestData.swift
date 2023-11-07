@@ -69,7 +69,7 @@ extension Target {
         sources: SourceFilesList = "Sources/**",
         resources: ResourceFileElements = "Resources/**",
         headers: Headers? = nil,
-        entitlements: Path? = Path("app.entitlements"),
+        entitlements: Entitlements = .file(path: "Entitlements.entitlements"),
         scripts: [TargetScript] = [],
         dependencies: [TargetDependency] = [],
         settings: Settings? = nil,
@@ -91,7 +91,7 @@ extension Target {
             dependencies: dependencies,
             settings: settings,
             coreDataModels: coreDataModels,
-            environment: environment
+            environmentVariables: environment.mapValues { .init(stringLiteral: $0) }
         )
     }
 }
@@ -102,7 +102,7 @@ extension TargetScript {
         tool: String = "",
         order: Order = .pre,
         arguments: [String] = [],
-        inputPaths: [Path] = [],
+        inputPaths: [FileListGlob] = [],
         inputFileListPaths: [Path] = [],
         outputPaths: [Path] = [],
         outputFileListPaths: [Path] = [],
@@ -201,7 +201,7 @@ extension Arguments {
         launchArguments: [LaunchArgument] = []
     ) -> Arguments {
         Arguments(
-            environment: environment,
+            environmentVariables: environment.mapValues { .init(stringLiteral: $0) },
             launchArguments: launchArguments
         )
     }

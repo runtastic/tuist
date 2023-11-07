@@ -1,7 +1,6 @@
 import Foundation
 import TSCBasic
 import TuistAutomation
-import TuistCache
 import TuistCore
 import TuistGraph
 import TuistLoader
@@ -58,7 +57,8 @@ final class BuildService {
         buildOutputPath: AbsolutePath?,
         path: AbsolutePath,
         device: String?,
-        osVersion: String?
+        osVersion: String?,
+        rosetta: Bool
     ) async throws {
         let graph: Graph
         let generator = generatorFactory.default()
@@ -80,7 +80,7 @@ final class BuildService {
             "Found the following buildable schemes: \(buildableSchemes.map(\.name).joined(separator: ", "))"
         )
 
-        if let schemeName = schemeName {
+        if let schemeName {
             guard let scheme = buildableSchemes.first(where: { $0.name == schemeName }) else {
                 throw BuildServiceError.schemeNotFound(scheme: schemeName, existing: buildableSchemes.map(\.name))
             }
@@ -91,6 +91,7 @@ final class BuildService {
 
             try await targetBuilder.buildTarget(
                 graphTarget,
+                platform: try graphTarget.target.servicePlatform,
                 workspacePath: workspacePath,
                 scheme: scheme,
                 clean: clean,
@@ -98,6 +99,7 @@ final class BuildService {
                 buildOutputPath: buildOutputPath,
                 device: device,
                 osVersion: osVersion?.version(),
+                rosetta: rosetta,
                 graphTraverser: graphTraverser
             )
         } else {
@@ -111,6 +113,7 @@ final class BuildService {
 
                 try await targetBuilder.buildTarget(
                     graphTarget,
+                    platform: try graphTarget.target.servicePlatform,
                     workspacePath: workspacePath,
                     scheme: scheme,
                     clean: !cleaned && clean,
@@ -118,6 +121,7 @@ final class BuildService {
                     buildOutputPath: buildOutputPath,
                     device: device,
                     osVersion: osVersion?.version(),
+                    rosetta: rosetta,
                     graphTraverser: graphTraverser
                 )
                 cleaned = true

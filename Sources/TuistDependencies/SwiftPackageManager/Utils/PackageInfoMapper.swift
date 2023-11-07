@@ -140,11 +140,13 @@ public protocol PackageInfoMapping {
         targetToProducts: [String: Set<PackageInfo.Product>],
         targetToResolvedDependencies: [String: [PackageInfoMapper.ResolvedDependency]],
         targetToModuleMap: [String: ModuleMap],
+        macOSTargets: Set<String>,
         packageToProject: [String: AbsolutePath],
         swiftToolsVersion: TSCUtility.Version?
     ) throws -> ProjectDescription.Project?
 }
 
+// swiftlint:disable:next type_body_length
 public final class PackageInfoMapper: PackageInfoMapping {
     public struct PreprocessInfo {
         let platformToMinDeploymentTarget: [ProjectDescription.Platform: ProjectDescription.DeploymentTarget]
@@ -153,6 +155,7 @@ public final class PackageInfoMapper: PackageInfoMapping {
         let targetToProducts: [String: Set<PackageInfo.Product>]
         let targetToResolvedDependencies: [String: [PackageInfoMapper.ResolvedDependency]]
         let targetToModuleMap: [String: ModuleMap]
+        let macOSTargets: Set<String>
     }
 
     // Predefined source directories, in order of preference.
@@ -184,7 +187,10 @@ public final class PackageInfoMapper: PackageInfoMapping {
                 guard target.type == .binary else { return }
                 if let path = target.path {
                     // local binary
-                    result[target.name] = Path(packageToFolder[packageInfo.key]!.appending(RelativePath(path)).pathString)
+                    result[target.name] = Path(
+                        packageToFolder[packageInfo.key]!.appending(try RelativePath(validating: path))
+                            .pathString
+                    )
                 } else {
                     // remote binaries are checked out by SPM in artifacts/<Package.name>/<Target>.xcframework
                     // or in artifacts/<Package.identity>/<Target>.xcframework when using SPM 5.6 and later
@@ -224,7 +230,9 @@ public final class PackageInfoMapper: PackageInfoMapping {
         let resolvedDependencies: [String: [ResolvedDependency]] = try packageInfos.values
             .reduce(into: [:]) { result, packageInfo in
                 try packageInfo.targets
-                    .filter { targetToProducts[$0.name] != nil }
+                    .filter {
+                        targetToProducts[$0.name] != nil
+                    }
                     .forEach { target in
                         guard result[target.name] == nil else { return }
                         result[target.name] = try ResolvedDependency.from(
@@ -236,6 +244,8 @@ public final class PackageInfoMapper: PackageInfoMapping {
                         )
                     }
             }
+
+        let macOSTargets: Set<String> = macOSTargets(resolvedDependencies, packageInfos: packageInfos)
 
         var externalDependencies: [ProjectDescription.Platform: [String: [ProjectDescription.TargetDependency]]] = .init()
 
@@ -254,6 +264,10 @@ public final class PackageInfoMapper: PackageInfoMapping {
                                 case let .xcframework(path, _):
                                     return .xcframework(path: path)
                                 case let .target(name, _):
+                                    var platforms = platforms
+                                    if macOSTargets.contains(product.name) {
+                                        platforms.insert(.macOS)
+                                    }
                                     // When multiple platforms are supported, add the platform name as a suffix to the target
                                     let targetName = platforms.count == 1 ? name : "\(name)_\(platform.rawValue)"
                                     return .project(target: targetName, path: Path(packageToFolder[packageInfo.key]!.pathString))
@@ -271,12 +285,12 @@ public final class PackageInfoMapper: PackageInfoMapping {
         }
 
         let version = try Version(versionString: try System.shared.swiftVersion(), usesLenientParsing: true)
-        let minDeploymentTargets = Platform.oldestVersions(isLegacy: version < TSCUtility.Version(5, 7, 0)).reduce(
+        let minDeploymentTargets = Platform.oldestVersions(for: version).reduce(
             into: [ProjectDescription.Platform: ProjectDescription.DeploymentTarget]()
         ) { acc, next in
             switch next.key {
             case .iOS:
-                acc[.iOS] = .iOS(targetVersion: next.value, devices: [.ipad, .iphone])
+                acc[.iOS] = .iOS(targetVersion: next.value, devices: [.ipad, .iphone, .mac])
             case .macOS:
                 acc[.macOS] = .macOS(targetVersion: next.value)
             case .tvOS:
@@ -324,8 +338,58 @@ public final class PackageInfoMapper: PackageInfoMapping {
             platforms: Set(platforms.map { ProjectDescription.Platform.from(graph: $0) }),
             targetToProducts: targetToProducts,
             targetToResolvedDependencies: resolvedDependencies,
-            targetToModuleMap: targetToModuleMap
+            targetToModuleMap: targetToModuleMap,
+            macOSTargets: macOSTargets
         )
+    }
+
+    /**
+     There are certain Swift Package targets that need to run on macOS. Examples of these are Swift Macros.
+     It's important that we take that into account when generating and serializing the graph, which contains information
+     about targets' macros, into disk.  It's important to note that these targets require its dependencies, direct or transitive,
+     to compile for macOS too. This function traverses the graph and returns all the targets that need to compile for macOS
+     in a set. The set is then used in the serialization logic when:
+
+     - Unfolding the target into platform-specific targets.
+     - Declaring dependencies.
+
+     All the complexity associated to this might go away once we have support for multi-platform targets.
+     */
+    private func macOSTargets(
+        _ resolvedDependencies: [String: [ResolvedDependency]],
+        packageInfos: [String: PackageInfo]
+    ) -> Set<String> {
+        let targetTypes = packageInfos.reduce(into: [String: PackageInfo.Target.TargetType]()) { partialResult, item in
+            item.value.targets.forEach { target in
+                partialResult[target.name] = target.type
+            }
+        }
+
+        var targets = Set<String>()
+
+        func visit(target: String, parentMacOS: Bool) {
+            let isMacOS = targetTypes[target] == .macro || parentMacOS
+            if isMacOS {
+                targets.insert(target)
+            }
+            let dependencies = resolvedDependencies[target] ?? []
+            for dependency in dependencies {
+                switch dependency {
+                case let .target(name, _):
+                    visit(target: name, parentMacOS: isMacOS)
+                case let .externalTarget(_, name, _):
+                    visit(target: name, parentMacOS: isMacOS)
+                case .xcframework:
+                    break
+                }
+            }
+        }
+
+        for target in resolvedDependencies.keys.sorted() {
+            visit(target: target, parentMacOS: false)
+        }
+
+        return targets
     }
 
     // swiftlint:disable:next function_body_length
@@ -343,6 +407,7 @@ public final class PackageInfoMapper: PackageInfoMapping {
         targetToProducts: [String: Set<PackageInfo.Product>],
         targetToResolvedDependencies: [String: [PackageInfoMapper.ResolvedDependency]],
         targetToModuleMap: [String: ModuleMap],
+        macOSTargets _: Set<String>,
         packageToProject: [String: AbsolutePath],
         swiftToolsVersion: TSCUtility.Version?
     ) throws -> ProjectDescription.Project? {
@@ -385,6 +450,7 @@ public final class PackageInfoMapper: PackageInfoMapping {
         let targets: [ProjectDescription.Target] = try packageInfo.targets
             .flatMap { target -> [ProjectDescription.Target] in
                 guard let products = targetToProducts[target.name] else { return [] }
+                let addPlatformSuffix = platforms.count != 1
 
                 return try platforms.compactMap { platform in
                     try ProjectDescription.Target.from(
@@ -402,7 +468,7 @@ public final class PackageInfoMapper: PackageInfoMapping {
                         minDeploymentTargets: minDeploymentTargets,
                         targetToResolvedDependencies: targetToResolvedDependencies,
                         targetToModuleMap: targetToModuleMap,
-                        addPlatformSuffix: platforms.count != 1
+                        addPlatformSuffix: addPlatformSuffix
                     )
                 }
             }
@@ -412,7 +478,7 @@ public final class PackageInfoMapper: PackageInfoMapping {
         }
 
         let options: ProjectDescription.Project.Options
-        if let projectOptions = projectOptions {
+        if let projectOptions {
             options = .from(manifest: projectOptions)
         } else {
             options = .options(
@@ -462,7 +528,12 @@ extension ProjectDescription.Target {
             return nil
         }
 
-        guard let product = ProjectDescription.Product.from(name: target.name, products: products, productTypes: productTypes)
+        guard let product = ProjectDescription.Product.from(
+            name: target.name,
+            type: target.type,
+            products: products,
+            productTypes: productTypes
+        )
         else {
             logger.debug("Target \(target.name) ignored by product type")
             return nil
@@ -470,9 +541,10 @@ extension ProjectDescription.Target {
 
         let path = try target.basePath(packageFolder: packageFolder)
 
-        let moduleMap = targetToModuleMap[target.name]!
+        let moduleMap = targetToModuleMap[target.name]
 
         let deploymentTarget = try ProjectDescription.DeploymentTarget.from(
+            type: target.type,
             platform: platform,
             minDeploymentTargets: minDeploymentTargets,
             package: packageInfo.platforms,
@@ -490,11 +562,11 @@ extension ProjectDescription.Target {
         }
 
         if target.type.supportsSources {
-            sources = SourceFilesList.from(sources: target.sources, path: path, excluding: target.exclude)
+            sources = try SourceFilesList.from(sources: target.sources, path: path, excluding: target.exclude)
         }
 
         if target.type.supportsResources {
-            resources = ResourceFileElements.from(
+            resources = try ResourceFileElements.from(
                 sources: target.sources,
                 resources: target.resources,
                 path: path,
@@ -554,21 +626,28 @@ extension ProjectDescription.Target {
 
 extension ProjectDescription.DeploymentTarget {
     fileprivate static func from(
+        type: PackageInfo.Target.TargetType,
         platform: ProjectDescription.Platform,
         minDeploymentTargets: [ProjectDescription.Platform: ProjectDescription.DeploymentTarget],
         package: [PackageInfo.Platform],
         packageName _: String
     ) throws -> Self {
+        if type == .macro {
+            return .macOS(
+                targetVersion: minDeploymentTargets[.macOS]?.targetVersion ?? TuistGraph.Platform
+                    .oldestVersions(for: Version(5, 9, 0))[.macOS]!
+            )
+        }
+
         if let packagePlatform = package.first(where: { $0.tuistPlatformName == platform.rawValue }) {
             // Deployment targets below the minimum one raises warnings
             let targetVersion = try Self.max(packagePlatform.version, minDeploymentTargets[platform]?.targetVersion)
 
             switch platform {
             case .iOS:
-                let hasMacCatalyst = package.contains(where: { $0.platformName == "maccatalyst" })
                 return .iOS(
                     targetVersion: targetVersion,
-                    devices: hasMacCatalyst ? [.iphone, .ipad, .mac] : [.iphone, .ipad]
+                    devices: [.iphone, .ipad, .mac]
                 )
             case .macOS:
                 return .macOS(targetVersion: targetVersion)
@@ -585,7 +664,7 @@ extension ProjectDescription.DeploymentTarget {
     }
 
     fileprivate static func max(_ lVersionString: String, _ rVersionString: String?) throws -> String {
-        guard let rVersionString = rVersionString else { return lVersionString }
+        guard let rVersionString else { return lVersionString }
         let lVersion = try Version(versionString: lVersionString, usesLenientParsing: true)
         let rVersion = try Version(versionString: rVersionString, usesLenientParsing: true)
         return lVersion > rVersion ? lVersionString : rVersionString
@@ -595,9 +674,15 @@ extension ProjectDescription.DeploymentTarget {
 extension ProjectDescription.Product {
     fileprivate static func from(
         name: String,
+        type: PackageInfo.Target.TargetType,
         products: Set<PackageInfo.Product>,
         productTypes: [String: TuistGraph.Product]
     ) -> Self? {
+        // Swift Macros are command line tools that run in the host (macOS) at compilation time.
+        if type == .macro {
+            return .macro
+        }
+
         if let productType = productTypes[name] {
             return ProjectDescription.Product.from(product: productType)
         }
@@ -638,11 +723,11 @@ extension ProjectDescription.Product {
 }
 
 extension SourceFilesList {
-    fileprivate static func from(sources: [String]?, path: AbsolutePath, excluding: [String]) -> Self? {
+    fileprivate static func from(sources: [String]?, path: AbsolutePath, excluding: [String]) throws -> Self? {
         let sourcesPaths: [AbsolutePath]
         if let customSources = sources {
-            sourcesPaths = customSources.map { source in
-                let absolutePath = path.appending(RelativePath(source))
+            sourcesPaths = try customSources.map { source in
+                let absolutePath = path.appending(try RelativePath(validating: source))
                 if absolutePath.extension == nil {
                     return absolutePath.appending(component: "**")
                 }
@@ -653,11 +738,11 @@ extension SourceFilesList {
         }
         guard !sourcesPaths.isEmpty else { return nil }
         return .init(
-            globs: sourcesPaths.map { absolutePath -> ProjectDescription.SourceFileGlob in
+            globs: try sourcesPaths.map { absolutePath -> ProjectDescription.SourceFileGlob in
                 .glob(
                     Path(absolutePath.pathString),
-                    excluding: excluding.map {
-                        let excludePath = path.appending(RelativePath($0))
+                    excluding: try excluding.map {
+                        let excludePath = path.appending(try RelativePath(validating: $0))
                         let excludeGlob = excludePath.extension != nil ? excludePath : excludePath.appending(component: "**")
                         return Path(excludeGlob.pathString)
                     }
@@ -673,7 +758,7 @@ extension ResourceFileElements {
         resources: [PackageInfo.Target.Resource],
         path: AbsolutePath,
         excluding: [String]
-    ) -> Self? {
+    ) throws -> Self? {
         /// Handles the conversion of a `.copy` resource rule of SPM
         ///
         /// - Parameters:
@@ -688,39 +773,40 @@ extension ResourceFileElements {
         /// - Parameters:
         ///   - resourceAbsolutePath: The absolute path of that resource
         /// - Returns: A ProjectDescription.ResourceFileElement mapped from a `.process` resource rule of SPM
-        func handleProcessResource(resourceAbsolutePath: AbsolutePath) -> ProjectDescription.ResourceFileElement {
+        func handleProcessResource(resourceAbsolutePath: AbsolutePath) throws -> ProjectDescription.ResourceFileElement {
             let absolutePathGlob = resourceAbsolutePath.extension != nil ? resourceAbsolutePath : resourceAbsolutePath
                 .appending(component: "**")
             return .glob(
                 pattern: Path(absolutePathGlob.pathString),
-                excluding: excluding.map {
-                    let excludePath = path.appending(RelativePath($0))
+                excluding: try excluding.map {
+                    let excludePath = path.appending(try RelativePath(validating: $0))
                     let excludeGlob = excludePath.extension != nil ? excludePath : excludePath.appending(component: "**")
                     return Path(excludeGlob.pathString)
                 }
             )
         }
 
-        var resourceFileElements: [ProjectDescription.ResourceFileElement] = resources.map {
-            let resourceAbsolutePath = path.appending(RelativePath($0.path))
+        var resourceFileElements: [ProjectDescription.ResourceFileElement] = try resources.map {
+            let resourceAbsolutePath = path.appending(try RelativePath(validating: $0.path))
 
             switch $0.rule {
             case .copy:
                 // Single files or opaque directories are handled like a .process rule
                 if !FileHandler.shared.isFolder(resourceAbsolutePath) || resourceAbsolutePath.isOpaqueDirectory {
-                    return handleProcessResource(resourceAbsolutePath: resourceAbsolutePath)
+                    return try handleProcessResource(resourceAbsolutePath: resourceAbsolutePath)
                 } else {
                     return handleCopyResource(resourceAbsolutePath: resourceAbsolutePath)
                 }
             case .process:
-                return handleProcessResource(resourceAbsolutePath: resourceAbsolutePath)
+                return try handleProcessResource(resourceAbsolutePath: resourceAbsolutePath)
             }
         }
 
         // Add default resources path if necessary
         // They are handled like a `.process` rule
         if sources == nil {
-            resourceFileElements += defaultResourcePaths(from: path).map { handleProcessResource(resourceAbsolutePath: $0) }
+            resourceFileElements += try defaultResourcePaths(from: path)
+                .map { try handleProcessResource(resourceAbsolutePath: $0) }
         }
 
         // Check for empty resource files
@@ -784,7 +870,8 @@ extension ProjectDescription.TargetDependency {
                 return .sdk(name: setting.value[0], type: .framework, status: .required)
             case (.linker, .linkedLibrary):
                 return .sdk(name: setting.value[0], type: .library, status: .required)
-            case (.c, _), (.cxx, _), (.swift, _), (.linker, .headerSearchPath), (.linker, .define), (.linker, .unsafeFlags):
+            case (.c, _), (.cxx, _), (_, .enableUpcomingFeature), (.swift, _), (.linker, .headerSearchPath),
+                 (.linker, .define), (.linker, .unsafeFlags), (_, .enableExperimentalFeature):
                 return nil
             }
         }
@@ -794,12 +881,13 @@ extension ProjectDescription.TargetDependency {
 }
 
 extension ProjectDescription.Headers {
-    fileprivate static func from(moduleMap: ModuleMap, publicHeadersPath: AbsolutePath) throws -> Self? {
+    fileprivate static func from(moduleMap: ModuleMap?, publicHeadersPath: AbsolutePath) throws -> Self? {
+        guard let moduleMap else { return nil }
         // As per SPM logic, headers should be added only when using the umbrella header without modulemap:
         // https://github.com/apple/swift-package-manager/blob/9b9bed7eaf0f38eeccd0d8ca06ae08f6689d1c3f/Sources/Xcodeproj/pbxproj.swift#L588-L609
         switch moduleMap {
         case .header, .nestedHeader:
-            let publicHeaders = FileHandler.shared.filesAndDirectoriesContained(in: publicHeadersPath)!
+            let publicHeaders = try FileHandler.shared.filesAndDirectoriesContained(in: publicHeadersPath)!
                 .filter { $0.extension == "h" }
             let list: [FileListGlob] = publicHeaders.map { .glob(Path($0.pathString)) }
             return .headers(public: .list(list))
@@ -835,11 +923,13 @@ extension ProjectDescription.Settings {
         let mainPath = try target.basePath(packageFolder: packageFolder)
         let mainRelativePath = mainPath.relative(to: packageFolder)
 
-        let moduleMap = targetToModuleMap[target.name]!
-        if moduleMap != .none, target.type != .system {
-            let publicHeadersPath = try target.publicHeadersPath(packageFolder: packageFolder)
-            let publicHeadersRelativePath = publicHeadersPath.relative(to: packageFolder)
-            headerSearchPaths.append("$(SRCROOT)/\(publicHeadersRelativePath.pathString)")
+        let moduleMap = targetToModuleMap[target.name]
+        if let moduleMap {
+            if moduleMap != .none, target.type != .system {
+                let publicHeadersPath = try target.publicHeadersPath(packageFolder: packageFolder)
+                let publicHeadersRelativePath = publicHeadersPath.relative(to: packageFolder)
+                headerSearchPaths.append("$(SRCROOT)/\(publicHeadersRelativePath.pathString)")
+            }
         }
 
         let allDependencies = Self.recursiveTargetDependencies(
@@ -854,7 +944,9 @@ extension ProjectDescription.Settings {
                 // Add dependencies search paths if they require a modulemap
                 guard let packagePath = packageToProject[dependency.package] else { return nil }
                 let headersPath = try dependency.target.publicHeadersPath(packageFolder: packagePath)
-                let moduleMap = targetToModuleMap[dependency.target.name]!
+                // Not all the targets have module maps. For example, Swift Macro packages do not.
+                guard let moduleMap = targetToModuleMap[dependency.target.name] else { return nil }
+
                 switch moduleMap {
                 case .none, .header, .nestedHeader:
                     return nil
@@ -886,16 +978,20 @@ extension ProjectDescription.Settings {
                     swiftDefines.append(" \(setting.value[0])")
                 case (.swift, .unsafeFlags):
                     swiftFlags.append(contentsOf: setting.value)
+                case (.swift, .enableUpcomingFeature):
+                    swiftFlags.append("-enable-upcoming-feature \(setting.value[0])")
+                case (.swift, .enableExperimentalFeature):
+                    swiftFlags.append("-enable-experimental-feature \(setting.value[0])")
                 case (.linker, .unsafeFlags):
                     linkerFlags.append(contentsOf: setting.value)
-
                 case (.linker, .linkedFramework), (.linker, .linkedLibrary):
                     // Handled as dependency
                     return
 
                 case (.c, .linkedFramework), (.c, .linkedLibrary), (.cxx, .linkedFramework), (.cxx, .linkedLibrary),
                      (.swift, .headerSearchPath), (.swift, .linkedFramework), (.swift, .linkedLibrary),
-                     (.linker, .headerSearchPath), (.linker, .define):
+                     (.linker, .headerSearchPath), (.linker, .define), (_, .enableUpcomingFeature),
+                     (_, .enableExperimentalFeature):
                     throw PackageInfoMapperError.unsupportedSetting(setting.tool, setting.name)
                 }
             }
@@ -915,7 +1011,7 @@ extension ProjectDescription.Settings {
             "SWIFT_SUPPRESS_WARNINGS": "YES",
         ]
 
-        if let moduleMapPath = moduleMap.path {
+        if let moduleMapPath = moduleMap?.path {
             settingsDictionary["MODULEMAP_FILE"] = .string("$(SRCROOT)/\(moduleMapPath.relative(to: packageFolder))")
         }
 
@@ -1089,6 +1185,8 @@ extension ProjectDescription.Product {
             return .systemExtension
         case .extensionKitExtension:
             return .extensionKitExtension
+        case .macro:
+            return .macro
         }
     }
 }
@@ -1155,27 +1253,6 @@ extension ProjectDescription.DefaultSettings {
     }
 }
 
-extension ProjectDescription.DeploymentTarget {
-    fileprivate static func from(deploymentTarget: TuistGraph.DeploymentTarget) -> Self {
-        switch deploymentTarget {
-        case let .iOS(version, devices, supportsMacDesignedForIOS):
-            return .iOS(
-                targetVersion: version,
-                devices: .from(devices: devices),
-                supportsMacDesignedForIOS: supportsMacDesignedForIOS
-            )
-        case let .macOS(version):
-            return .macOS(targetVersion: version)
-        case let .tvOS(version):
-            return .tvOS(targetVersion: version)
-        case let .watchOS(version):
-            return .watchOS(targetVersion: version)
-        case let .visionOS(version):
-            return .visionOS(targetVersion: version)
-        }
-    }
-}
-
 extension ProjectDescription.DeploymentDevice {
     fileprivate static func from(devices: TuistGraph.DeploymentDevice) -> Self {
         .init(rawValue: devices.rawValue)
@@ -1189,11 +1266,11 @@ extension PackageInfo {
     ) -> ProjectDescription.Settings? {
         var settingsDictionary: ProjectDescription.SettingsDictionary = [:]
 
-        if let cLanguageStandard = cLanguageStandard {
+        if let cLanguageStandard {
             settingsDictionary["GCC_C_LANGUAGE_STANDARD"] = .string(cLanguageStandard)
         }
 
-        if let cxxLanguageStandard = cxxLanguageStandard {
+        if let cxxLanguageStandard {
             settingsDictionary["CLANG_CXX_LANGUAGE_STANDARD"] = .string(cxxLanguageStandard)
         }
 
@@ -1201,7 +1278,7 @@ extension PackageInfo {
             settingsDictionary["SWIFT_VERSION"] = .string(swiftLanguageVersion)
         }
 
-        if let buildConfigs = buildConfigs {
+        if let buildConfigs {
             let configs = buildConfigs
                 .sorted()
                 .map { config -> ProjectDescription.Configuration in
@@ -1222,7 +1299,7 @@ extension PackageInfo {
         /// Take the latest swift version compatible with the configured one
         let maxAllowedSwiftLanguageVersion = swiftLanguageVersions?
             .filter {
-                guard let configuredSwiftVersion = configuredSwiftVersion else {
+                guard let configuredSwiftVersion else {
                     return true
                 }
                 return $0 <= configuredSwiftVersion
@@ -1237,8 +1314,8 @@ extension PackageInfo {
 extension PackageInfo.Target {
     /// The path used as base for all the relative paths of the package (e.g. sources, resources, headers)
     func basePath(packageFolder: AbsolutePath) throws -> AbsolutePath {
-        if let path = path {
-            return packageFolder.appending(RelativePath(path))
+        if let path {
+            return packageFolder.appending(try RelativePath(validating: path))
         } else {
             let firstMatchingPath = PackageInfoMapper.predefinedSourceDirectories
                 .map { packageFolder.appending(components: [$0, name]) }
@@ -1252,15 +1329,33 @@ extension PackageInfo.Target {
 
     func publicHeadersPath(packageFolder: AbsolutePath) throws -> AbsolutePath {
         let mainPath = try basePath(packageFolder: packageFolder)
-        return mainPath.appending(RelativePath(publicHeadersPath ?? "include"))
+        return mainPath.appending(try RelativePath(validating: publicHeadersPath ?? "include"))
     }
 }
 
 extension PackageInfoMapper {
-    public enum ResolvedDependency: Equatable {
+    public enum ResolvedDependency: Equatable, Hashable {
         case target(name: String, condition: Condition?)
         case xcframework(path: Path, condition: Condition?)
         case externalTarget(package: String, target: String, condition: Condition?)
+
+        public func hash(into hasher: inout Hasher) {
+            switch self {
+            case let .target(name, condition):
+                hasher.combine("target")
+                hasher.combine(name)
+                hasher.combine(condition)
+            case let .xcframework(path, condition):
+                hasher.combine("package")
+                hasher.combine(path)
+                hasher.combine(condition)
+            case let .externalTarget(package, target, condition):
+                hasher.combine("externalTarget")
+                hasher.combine(package)
+                hasher.combine(target)
+                hasher.combine(condition)
+            }
+        }
 
         fileprivate var condition: Condition? {
             switch self {
@@ -1364,11 +1459,15 @@ extension PackageInfoMapper {
 }
 
 extension PackageInfoMapper.ResolvedDependency {
-    public struct Condition: Equatable {
+    public struct Condition: Equatable, Hashable {
         public let platforms: [ProjectDescription.Platform]
 
         public init(platforms: [ProjectDescription.Platform]) {
             self.platforms = platforms
+        }
+
+        public func hash(into hasher: inout Hasher) {
+            hasher.combine(platforms)
         }
 
         fileprivate static func from(

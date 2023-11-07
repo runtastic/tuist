@@ -115,12 +115,13 @@ final class SchemeDescriptorsGenerator: SchemeDescriptorsGenerating {
     /// - Parameter at: Path to the workspace or project.
     func wipeSchemes(at path: AbsolutePath) throws {
         let fileHandler = FileHandler.shared
-        let userPath = schemeDirectory(path: path, shared: false)
-        let sharedPath = schemeDirectory(path: path, shared: true)
+        let userPath = try schemeDirectory(path: path, shared: false)
+        let sharedPath = try schemeDirectory(path: path, shared: true)
         if fileHandler.exists(userPath) { try fileHandler.delete(userPath) }
         if fileHandler.exists(sharedPath) { try fileHandler.delete(sharedPath) }
     }
 
+    // swiftlint:disable function_body_length
     /// Generate schemes for a project or workspace.
     ///
     /// - Parameters:
@@ -129,7 +130,6 @@ final class SchemeDescriptorsGenerator: SchemeDescriptorsGenerating {
     ///     - path: Path to workspace or project folder.
     ///     - graphTraverser: Graph traverser.
     ///     - generatedProjects: Project paths mapped to generated projects.
-    // swiftlint:disable:next function_body_length
     private func generateScheme(
         scheme: Scheme,
         path: AbsolutePath,
@@ -192,7 +192,7 @@ final class SchemeDescriptorsGenerator: SchemeDescriptorsGenerating {
         )
 
         return SchemeDescriptor(xcScheme: xcscheme, shared: scheme.shared, hidden: scheme.hidden)
-    }
+    } // swiftlint:enable function_body_length
 
     /// Generates the scheme build action.
     ///
@@ -263,6 +263,7 @@ final class SchemeDescriptorsGenerator: SchemeDescriptorsGenerating {
         )
     }
 
+    // swiftlint:disable function_body_length
     /// Generates the scheme test action.
     ///
     /// - Parameters:
@@ -271,7 +272,6 @@ final class SchemeDescriptorsGenerator: SchemeDescriptorsGenerating {
     ///   - rootPath: Root path to either project or workspace.
     ///   - generatedProjects: Project paths mapped to generated projects.
     /// - Returns: Scheme test action.
-    // swiftlint:disable:next function_body_length
     func schemeTestAction(
         scheme: Scheme,
         graphTraverser: GraphTraversing,
@@ -335,7 +335,7 @@ final class SchemeDescriptorsGenerator: SchemeDescriptorsGenerating {
 
         if let arguments = testAction.arguments {
             args = XCScheme.CommandLineArguments(arguments: getCommandlineArguments(arguments.launchArguments))
-            environments = environmentVariables(arguments.environment)
+            environments = environmentVariables(arguments.environmentVariables)
         }
 
         let codeCoverageTargets = try testAction.codeCoverageTargets
@@ -368,10 +368,25 @@ final class SchemeDescriptorsGenerator: SchemeDescriptorsGenerating {
 
         let onlyGenerateCoverageForSpecifiedTargets = codeCoverageTargets.count > 0 ? true : nil
 
+        let enableAddressSanitizer = testAction.diagnosticsOptions.contains(.enableAddressSanitizer)
+        var enableASanStackUseAfterReturn = false
+        if enableAddressSanitizer {
+            enableASanStackUseAfterReturn = testAction.diagnosticsOptions.contains(.enableASanStackUseAfterReturn)
+        }
+        let enableThreadSanitizer = testAction.diagnosticsOptions.contains(.enableThreadSanitizer)
         let disableMainThreadChecker = !testAction.diagnosticsOptions.contains(.mainThreadChecker)
         let shouldUseLaunchSchemeArgsEnv: Bool = args == nil && environments == nil
         let language = testAction.language
         let region = testAction.region
+        let preferredScreenCaptureFormat: XCScheme.TestAction.ScreenCaptureFormat? =
+            testAction.preferredScreenCaptureFormat.flatMap { format in
+                switch format {
+                case .screenshots:
+                    return .screenshots
+                case .screenRecording:
+                    return .screenRecording
+                }
+            }
 
         return XCScheme.TestAction(
             buildConfiguration: testAction.configurationName,
@@ -386,14 +401,19 @@ final class SchemeDescriptorsGenerator: SchemeDescriptorsGenerating {
             codeCoverageEnabled: testAction.coverage,
             codeCoverageTargets: codeCoverageTargets,
             onlyGenerateCoverageForSpecifiedTargets: onlyGenerateCoverageForSpecifiedTargets,
+            enableAddressSanitizer: enableAddressSanitizer,
+            enableASanStackUseAfterReturn: enableASanStackUseAfterReturn,
+            enableThreadSanitizer: enableThreadSanitizer,
             disableMainThreadChecker: disableMainThreadChecker,
             commandlineArguments: args,
             environmentVariables: environments,
             language: language,
-            region: region
+            region: region,
+            preferredScreenCaptureFormat: preferredScreenCaptureFormat
         )
-    }
+    } // swiftlint:enable function_body_length
 
+    // swiftlint:disable function_body_length
     /// Generates the scheme launch action.
     ///
     /// - Parameters:
@@ -402,7 +422,6 @@ final class SchemeDescriptorsGenerator: SchemeDescriptorsGenerating {
     ///   - rootPath: Root path to either project or workspace.
     ///   - generatedProjects: Project paths mapped to generated projects.
     /// - Returns: Scheme launch action.
-    // swiftlint:disable:next function_body_length
     func schemeLaunchAction(
         scheme: Scheme,
         graphTraverser: GraphTraversing,
@@ -440,6 +459,37 @@ final class SchemeDescriptorsGenerator: SchemeDescriptorsGenerating {
             }
         }
 
+        if let expandVariableFromTarget = scheme.runAction?.expandVariableFromTarget,
+           let graphTarget = graphTraverser.target(
+               path: expandVariableFromTarget.projectPath,
+               name: expandVariableFromTarget.name
+           ),
+           let buildableReference = try createBuildableReference(
+               graphTarget: graphTarget,
+               graphTraverser: graphTraverser,
+               rootPath: rootPath,
+               generatedProjects: generatedProjects
+           )
+        {
+            // Xcode assigns the runnable target to the expand variables target by default.
+            // Assigning the runnable target to macro expansion can lead to an unstable .xcscheme.
+            // Initially, macroExpansion is added, but when the edit scheme editor is opened and closed, macroExpansion gets
+            // removed.
+            if buildableProductRunnable?.buildableReference != buildableReference {
+                macroExpansion = buildableReference
+            }
+        }
+
+        let launchStyle: XCScheme.LaunchAction.Style = {
+            guard let style = scheme.runAction?.launchStyle else { return .auto }
+            switch style {
+            case .automatically:
+                return .auto
+            case .waitForExecutableToBeLaunched:
+                return .wait
+            }
+        }()
+
         var commandlineArguments: XCScheme.CommandLineArguments?
         var environments: [XCScheme.EnvironmentVariable]?
         var storeKitConfigurationFileReference: XCScheme.StoreKitConfigurationFileReference?
@@ -447,10 +497,16 @@ final class SchemeDescriptorsGenerator: SchemeDescriptorsGenerating {
 
         if let arguments = scheme.runAction?.arguments {
             commandlineArguments = XCScheme.CommandLineArguments(arguments: getCommandlineArguments(arguments.launchArguments))
-            environments = environmentVariables(arguments.environment)
+            environments = environmentVariables(arguments.environmentVariables)
         }
 
         let buildConfiguration = scheme.runAction?.configurationName ?? defaultBuildConfiguration
+        let enableAddressSanitizer = scheme.runAction?.diagnosticsOptions.contains(.enableAddressSanitizer) ?? false
+        var enableASanStackUseAfterReturn = false
+        if enableAddressSanitizer == true {
+            enableASanStackUseAfterReturn = scheme.runAction?.diagnosticsOptions.contains(.enableASanStackUseAfterReturn) ?? false
+        }
+        let enableThreadSanitizer = scheme.runAction?.diagnosticsOptions.contains(.enableThreadSanitizer) ?? false
         let disableMainThreadChecker = scheme.runAction?.diagnosticsOptions.contains(.mainThreadChecker) == false
         let disablePerformanceAntipatternChecker = scheme.runAction?.diagnosticsOptions
             .contains(.performanceAntipatternChecker) == false
@@ -478,18 +534,16 @@ final class SchemeDescriptorsGenerator: SchemeDescriptorsGenerating {
 
         let customLLDBInitFilePath: RelativePath?
         if let customLLDBInitFile = scheme.runAction?.customLLDBInitFile,
-           let graphTarget = graphTarget
+           let graphTarget
         {
             customLLDBInitFilePath = customLLDBInitFile.relative(to: graphTarget.project.path)
         } else {
             customLLDBInitFilePath = nil
         }
 
-        if let storeKitFilePath = scheme.runAction?.options.storeKitConfigurationPath,
-           let graphTarget = graphTarget
-        {
+        if let storeKitFilePath = scheme.runAction?.options.storeKitConfigurationPath {
             // the identifier is the relative path between the storekit file, and the xcode project
-            let fileRelativePath = storeKitFilePath.relative(to: graphTarget.project.xcodeProjPath)
+            let fileRelativePath = storeKitFilePath.relative(to: graphTraverser.workspace.xcWorkspacePath)
             storeKitConfigurationFileReference = .init(identifier: fileRelativePath.pathString)
         }
 
@@ -549,10 +603,14 @@ final class SchemeDescriptorsGenerator: SchemeDescriptorsGenerating {
             macroExpansion: macroExpansion,
             selectedDebuggerIdentifier: debuggerIdentifier,
             selectedLauncherIdentifier: launcherIdentifier,
+            launchStyle: launchStyle,
             askForAppToLaunch: launchActionConstants.askForAppToLaunch,
             pathRunnable: pathRunnable,
             locationScenarioReference: locationScenarioReference,
             enableGPUFrameCaptureMode: enableGPUFrameCaptureMode,
+            enableAddressSanitizer: enableAddressSanitizer,
+            enableASanStackUseAfterReturn: enableASanStackUseAfterReturn,
+            enableThreadSanitizer: enableThreadSanitizer,
             disableMainThreadChecker: disableMainThreadChecker,
             disablePerformanceAntipatternChecker: disablePerformanceAntipatternChecker,
             commandlineArguments: commandlineArguments,
@@ -563,7 +621,7 @@ final class SchemeDescriptorsGenerator: SchemeDescriptorsGenerating {
             storeKitConfigurationFileReference: storeKitConfigurationFileReference,
             customLLDBInitFile: customLLDBInitFilePath.map { "$(SRCROOT)/\($0.pathString)" }
         )
-    }
+    } // swiftlint:enable function_body_length
 
     /// Generates the scheme profile action for a given target.
     ///
@@ -588,7 +646,7 @@ final class SchemeDescriptorsGenerator: SchemeDescriptorsGenerating {
             if let arguments = action.arguments {
                 commandlineArguments = XCScheme
                     .CommandLineArguments(arguments: getCommandlineArguments(arguments.launchArguments))
-                environments = environmentVariables(arguments.environment)
+                environments = environmentVariables(arguments.environmentVariables)
             }
         } else if let action = scheme.runAction, let executable = action.executable {
             target = executable
@@ -825,19 +883,19 @@ final class SchemeDescriptorsGenerator: SchemeDescriptorsGenerating {
     /// - Returns: Path to the schemes directory.
     /// - Throws: A FatalError if the creation of the directory fails.
     private func createSchemesDirectory(path: AbsolutePath, shared: Bool = true) throws -> AbsolutePath {
-        let schemePath = schemeDirectory(path: path, shared: shared)
+        let schemePath = try schemeDirectory(path: path, shared: shared)
         if !FileHandler.shared.exists(schemePath) {
             try FileHandler.shared.createFolder(schemePath)
         }
         return schemePath
     }
 
-    private func schemeDirectory(path: AbsolutePath, shared: Bool = true) -> AbsolutePath {
+    private func schemeDirectory(path: AbsolutePath, shared: Bool = true) throws -> AbsolutePath {
         if shared {
-            return path.appending(RelativePath("xcshareddata/xcschemes"))
+            return path.appending(try RelativePath(validating: "xcshareddata/xcschemes"))
         } else {
             let username = NSUserName()
-            return path.appending(RelativePath("xcuserdata/\(username).xcuserdatad/xcschemes"))
+            return path.appending(try RelativePath(validating: "xcuserdata/\(username).xcuserdatad/xcschemes"))
         }
     }
 
@@ -857,9 +915,9 @@ final class SchemeDescriptorsGenerator: SchemeDescriptorsGenerating {
     /// - Parameters:
     ///     - environments: environment variables
     /// - Returns: XCScheme.EnvironmentVariable.
-    private func environmentVariables(_ environments: [String: String]) -> [XCScheme.EnvironmentVariable] {
-        environments.map { key, value in
-            XCScheme.EnvironmentVariable(variable: key, value: value, enabled: true)
+    private func environmentVariables(_ environments: [String: EnvironmentVariable]) -> [XCScheme.EnvironmentVariable] {
+        environments.map { key, variable in
+            XCScheme.EnvironmentVariable(variable: key, value: variable.value, enabled: variable.isEnabled)
         }.sorted { $0.variable < $1.variable }
     }
 
@@ -937,6 +995,7 @@ extension TestAction {
             diagnosticsOptions: [],
             language: nil,
             region: nil,
+            preferredScreenCaptureFormat: nil,
             testPlans: nil
         )
     }

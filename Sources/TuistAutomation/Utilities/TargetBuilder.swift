@@ -19,6 +19,7 @@ public protocol TargetBuilding {
     ///   - graphTraverser: The Graph traverser.
     func buildTarget(
         _ target: GraphTarget,
+        platform: TuistGraph.Platform,
         workspacePath: AbsolutePath,
         scheme: Scheme,
         clean: Bool,
@@ -26,6 +27,7 @@ public protocol TargetBuilding {
         buildOutputPath: AbsolutePath?,
         device: String?,
         osVersion: Version?,
+        rosetta: Bool,
         graphTraverser: GraphTraversing
     ) async throws
 }
@@ -73,6 +75,7 @@ public final class TargetBuilder: TargetBuilding {
 
     public func buildTarget(
         _ target: GraphTarget,
+        platform: TuistGraph.Platform,
         workspacePath: AbsolutePath,
         scheme: Scheme,
         clean: Bool,
@@ -80,6 +83,7 @@ public final class TargetBuilder: TargetBuilding {
         buildOutputPath: AbsolutePath?,
         device: String?,
         osVersion: Version?,
+        rosetta: Bool,
         graphTraverser: GraphTraversing
     ) async throws {
         logger.log(level: .notice, "Building scheme \(scheme.name)", metadata: .section)
@@ -93,6 +97,7 @@ public final class TargetBuilder: TargetBuilding {
 
         let destination = try await XcodeBuildDestination.find(
             for: target.target,
+            on: platform,
             scheme: scheme,
             version: osVersion,
             deviceName: device,
@@ -105,18 +110,19 @@ public final class TargetBuilder: TargetBuilding {
                 .workspace(workspacePath),
                 scheme: scheme.name,
                 destination: destination,
+                rosetta: rosetta,
                 clean: clean,
                 arguments: buildArguments
             )
             .printFormattedOutput()
 
-        if let buildOutputPath = buildOutputPath {
+        if let buildOutputPath {
             let configuration = configuration ?? target.project.settings.defaultDebugBuildConfiguration()?
                 .name ?? BuildConfiguration.debug.name
             try copyBuildProducts(
                 to: buildOutputPath,
                 projectPath: workspacePath,
-                platform: target.target.platform,
+                platform: platform,
                 configuration: configuration
             )
         }

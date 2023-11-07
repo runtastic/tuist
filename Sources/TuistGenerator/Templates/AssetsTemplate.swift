@@ -71,6 +71,8 @@ extension SynthesizedResourceInterfaceTemplates {
       {{accessModifier}} static let {{asset.name|swiftIdentifier:"pretty"|lowerFirstWord|escapeReservedKeywords}} = {{dataType}}(name: "{{asset.value}}")
       {% elif asset.type == "image" %}
       {{accessModifier}} static let {{asset.name|swiftIdentifier:"pretty"|lowerFirstWord|escapeReservedKeywords}} = {{imageType}}(name: "{{asset.value}}")
+      {% elif asset.type == "symbol" %}
+      {{accessModifier}} static let {{asset.name|swiftIdentifier:"pretty"|lowerFirstWord|escapeReservedKeywords}} = {{imageType}}(name: "{{asset.value}}")
       {% elif asset.items and ( forceNamespaces == "true" or asset.isNamespaced == "true" ) %}
       {{accessModifier}} enum {{asset.name|swiftIdentifier:"pretty"|escapeReservedKeywords}} {
         {% filter indent:2 %}{% call casesBlock asset.items %}{% endfilter %}
@@ -239,7 +241,7 @@ extension SynthesizedResourceInterfaceTemplates {
     #endif
 
     {% endif %}
-    {% if resourceCount.image > 0 %}
+    {% if resourceCount.image > 0 or resourceCount.symbol > 0 %}
     {{accessModifier}} struct {{imageType}} {
       {{accessModifier}} fileprivate(set) var name: String
 

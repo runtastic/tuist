@@ -31,26 +31,31 @@ extension TuistGraph.Target {
         externalDependencies: [TuistGraph.Platform: [String: [TuistGraph.TargetDependency]]]
     ) throws -> TuistGraph.Target {
         let name = manifest.name
-        let platform = try TuistGraph.Platform.from(manifest: manifest.platform)
+        let destinations = try TuistGraph.Destination.from(
+            platform: manifest.platform,
+            deploymentTarget: manifest.deploymentTarget
+        )
         let product = TuistGraph.Product.from(manifest: manifest.product)
 
         let bundleId = manifest.bundleId
         let productName = manifest.productName
-        let deploymentTarget = manifest.deploymentTarget.map { TuistGraph.DeploymentTarget.from(manifest: $0) }
+        let deploymentTargets = TuistGraph.DeploymentTargets.from(manifest: manifest.deploymentTarget)
 
         let dependencies = try manifest.dependencies.flatMap {
             try TuistGraph.TargetDependency.from(
                 manifest: $0,
                 generatorPaths: generatorPaths,
                 externalDependencies: externalDependencies,
-                platform: platform
+                platform: TuistGraph.Platform.from(manifest: manifest.platform)
             )
         }
 
         let infoPlist = try TuistGraph.InfoPlist.from(manifest: manifest.infoPlist, generatorPaths: generatorPaths)
-        let entitlements = try manifest.entitlements.map { try generatorPaths.resolve(path: $0) }
+
+        let entitlements = try TuistGraph.Entitlements.from(manifest: manifest.entitlements, generatorPaths: generatorPaths)
 
         let settings = try manifest.settings.map { try TuistGraph.Settings.from(manifest: $0, generatorPaths: generatorPaths) }
+        let mergedBinaryType = try TuistGraph.MergedBinaryType.from(manifest: manifest.mergedBinaryType)
 
         let (sources, sourcesPlaygrounds) = try sourcesAndPlaygrounds(
             manifest: manifest,
@@ -85,7 +90,7 @@ extension TuistGraph.Target {
             try TuistGraph.TargetScript.from(manifest: $0, generatorPaths: generatorPaths)
         }
 
-        let environment = manifest.environment
+        let environmentVariables = manifest.environmentVariables.mapValues(EnvironmentVariable.from)
         let launchArguments = manifest.launchArguments.map(LaunchArgument.from)
 
         let playgrounds = sourcesPlaygrounds + resourcesPlaygrounds
@@ -99,11 +104,11 @@ extension TuistGraph.Target {
 
         return TuistGraph.Target(
             name: name,
-            platform: platform,
+            destinations: destinations,
             product: product,
             productName: productName,
             bundleId: bundleId,
-            deploymentTarget: deploymentTarget,
+            deploymentTargets: deploymentTargets,
             infoPlist: infoPlist,
             entitlements: entitlements,
             settings: settings,
@@ -113,13 +118,15 @@ extension TuistGraph.Target {
             headers: headers,
             coreDataModels: coreDataModels,
             scripts: scripts,
-            environment: environment,
+            environmentVariables: environmentVariables,
             launchArguments: launchArguments,
             filesGroup: .group(name: "Project"),
             dependencies: dependencies,
             playgrounds: playgrounds,
             additionalFiles: additionalFiles,
-            buildRules: buildRules
+            buildRules: buildRules,
+            mergedBinaryType: mergedBinaryType,
+            mergeable: manifest.mergeable
         )
     }
 
@@ -211,4 +218,5 @@ extension TuistGraph.Target {
 
         return (sources: sourcesWithoutPlaygrounds, playgrounds: Array(playgrounds))
     }
+    // swiftlint:enable function_body_length
 }

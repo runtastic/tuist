@@ -1,5 +1,6 @@
 import Foundation
 import TSCBasic
+import TuistSupport
 @testable import TuistGraph
 
 extension FrameworkMetadata {
@@ -10,7 +11,8 @@ extension FrameworkMetadata {
         bcsymbolmapPaths: [AbsolutePath] = [],
         linking: BinaryLinking = .dynamic,
         architectures: [BinaryArchitecture] = [.arm64],
-        isCarthage: Bool = false
+        isCarthage: Bool = false,
+        status: FrameworkStatus = .required
     ) -> FrameworkMetadata {
         FrameworkMetadata(
             path: path,
@@ -19,7 +21,8 @@ extension FrameworkMetadata {
             bcsymbolmapPaths: bcsymbolmapPaths,
             linking: linking,
             architectures: architectures,
-            isCarthage: isCarthage
+            isCarthage: isCarthage,
+            status: status
         )
     }
 }

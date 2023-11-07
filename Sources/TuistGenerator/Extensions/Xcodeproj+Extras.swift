@@ -1,4 +1,5 @@
 import Foundation
+import TuistGraph
 import XcodeProj
 
 extension PBXFileElement {
@@ -22,6 +23,53 @@ extension PBXFileElement {
             return true
         default:
             return lhs.nameOrPath < rhs.nameOrPath
+        }
+    }
+}
+
+extension PBXBuildFile {
+    /// Apply platform filters either `platformFilter` or `platformFilters` depending on count
+    public func applyPlatformFilters(_ filters: PlatformFilters, applicableTo target: Target) {
+        let dependingTargetPlatformFilters = target.dependencyPlatformFilters
+
+        if dependingTargetPlatformFilters.isDisjoint(with: filters) {
+            // if no platforms in common, apply all filters to exclude from target
+            applyPlatformFilters(filters)
+        } else {
+            let applicableFilters = dependingTargetPlatformFilters.intersection(filters)
+
+            // Only apply filters if our intersection is a subset of the targets platforms
+            if applicableFilters.isStrictSubset(of: dependingTargetPlatformFilters) {
+                applyPlatformFilters(applicableFilters)
+            }
+        }
+    }
+
+    /// Apply platform filters either `platformFilter` or `platformFilters` depending on count
+    public func applyPlatformFilters(_ filters: PlatformFilters) {
+        guard !filters.isEmpty else { return }
+
+        if filters.count == 1,
+           let filter = filters.first,
+           useSinglePlatformFilter(for: filter)
+        {
+            platformFilter = filter.xcodeprojValue
+        } else {
+            platformFilters = filters.xcodeprojValue
+        }
+    }
+
+    private func useSinglePlatformFilter(
+        for platformFilter: PlatformFilter
+    ) -> Bool {
+        // Xcode uses the singlular `platformFilter` for a subset of filters
+        // when specified as a single filter, however foew newer platform filters
+        // uses the plural `platformFilters` even when specifying a single filter.
+        switch platformFilter {
+        case .catalyst, .ios:
+            return true
+        case .macos, .driverkit, .watchos, .tvos, .visionos:
+            return false
         }
     }
 }

@@ -1,6 +1,5 @@
 import Foundation
 import TuistAsyncQueue
-import TuistCloud
 import TuistCore
 import TuistGraph
 import TuistSupport
@@ -11,19 +10,8 @@ public struct TuistAnalyticsDispatcher: AsyncQueueDispatching {
 
     private let backend: TuistAnalyticsBackend?
 
-    public init(
-        cloud: Cloud?,
-        cloudClient: CloudClienting = CloudClient()
-    ) {
-        if let cloud = cloud {
-            backend = TuistAnalyticsCloudBackend(
-                config: cloud,
-                resourceFactory: CloudAnalyticsResourceFactory(cloudConfig: cloud),
-                client: cloudClient
-            )
-        } else {
-            backend = nil
-        }
+    public init(backend: TuistAnalyticsBackend?) {
+        self.backend = backend
     }
 
     // MARK: - AsyncQueueDispatching

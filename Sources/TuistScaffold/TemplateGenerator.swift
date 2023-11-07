@@ -58,7 +58,7 @@ public final class TemplateGenerator: TemplateGenerating {
                 string: $0.path.pathString,
                 context: attributes
             )
-            let path = RelativePath(renderedPathString)
+            let path = try RelativePath(validating: renderedPathString)
 
             var contents = $0.contents
             if case let Template.Contents.file(path) = contents {
@@ -92,7 +92,7 @@ public final class TemplateGenerator: TemplateGenerating {
         try renderedItems
             .map(\.path)
             .map {
-                destinationPath.appending(RelativePath($0.dirname))
+                destinationPath.appending(try RelativePath(validating: $0.dirname))
             }
             .forEach {
                 guard !FileHandler.shared.exists($0) else { return }
@@ -129,7 +129,7 @@ public final class TemplateGenerator: TemplateGenerating {
                 }
             case let .directory(path):
                 let destinationDirectoryPath = destinationPath
-                    .appending(RelativePath($0.path.pathString))
+                    .appending(try RelativePath(validating: $0.path.pathString))
                     .appending(component: path.basename)
                 // workaround for creating folder tree of destinationDirectoryPath
                 if !FileHandler.shared.exists(destinationDirectoryPath.parentDirectory) {
@@ -141,14 +141,17 @@ public final class TemplateGenerator: TemplateGenerating {
                 try FileHandler.shared.copy(from: path, to: destinationDirectoryPath)
                 renderedContents = nil
             }
-            // Generate file only when it has some content
-            guard let rendered = renderedContents,
-                  !rendered.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return }
-            try FileHandler.shared.write(
-                rendered,
-                path: destinationPath.appending($0.path),
-                atomically: true
-            )
+            // Generate file only when it has some content, unless it is a `.gitkeep` file
+            if let rendered = renderedContents,
+               !rendered.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ||
+               $0.path.basename == ".gitkeep"
+            {
+                try FileHandler.shared.write(
+                    rendered,
+                    path: destinationPath.appending($0.path),
+                    atomically: true
+                )
+            }
         }
     }
 }

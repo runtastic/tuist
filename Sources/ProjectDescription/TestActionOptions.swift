@@ -8,23 +8,14 @@ public struct TestActionOptions: Equatable, Codable {
     /// Region used to run the tests.
     public let region: String?
 
+    /// Preferred screen capture format for UI tests results in Xcode 15+
+    public let preferredScreenCaptureFormat: ScreenCaptureFormat?
+
     /// Whether the scheme should or not gather the test coverage data.
     public let coverage: Bool
 
     /// A list of targets you want to gather the test coverage data for them, which are defined in the project.
     public let codeCoverageTargets: [TargetReference]
-
-    init(
-        language: SchemeLanguage?,
-        region: String?,
-        coverage: Bool,
-        codeCoverageTargets: [TargetReference]
-    ) {
-        self.language = language
-        self.region = region
-        self.coverage = coverage
-        self.codeCoverageTargets = codeCoverageTargets
-    }
 
     /// Returns a set of options for a test action.
     /// - Parameters:
@@ -36,12 +27,14 @@ public struct TestActionOptions: Equatable, Codable {
     public static func options(
         language: SchemeLanguage? = nil,
         region: String? = nil,
+        preferredScreenCaptureFormat: ScreenCaptureFormat? = nil,
         coverage: Bool = false,
         codeCoverageTargets: [TargetReference] = []
     ) -> TestActionOptions {
         TestActionOptions(
             language: language,
             region: region,
+            preferredScreenCaptureFormat: preferredScreenCaptureFormat,
             coverage: coverage,
             codeCoverageTargets: codeCoverageTargets
         )

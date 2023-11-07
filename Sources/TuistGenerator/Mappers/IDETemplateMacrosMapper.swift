@@ -18,14 +18,15 @@ public final class IDETemplateMacrosMapper: ProjectMapping, WorkspaceMapping {
         for ideTemplateMacros: IDETemplateMacros?,
         to path: AbsolutePath
     ) throws -> [SideEffectDescriptor] {
-        guard let ideTemplateMacros = ideTemplateMacros else { return [] }
+        guard let ideTemplateMacros else { return [] }
 
         let encoder = PropertyListEncoder()
         let data = try encoder.encode(ideTemplateMacros)
 
         return [
             .file(FileDescriptor(
-                path: path.appending(RelativePath("xcshareddata/IDETemplateMacros.plist")),
+                // swiftlint:disable:next force_try
+                path: path.appending(try! RelativePath(validating: "xcshareddata/IDETemplateMacros.plist")),
                 contents: data
             )),
         ]

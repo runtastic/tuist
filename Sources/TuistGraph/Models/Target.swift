@@ -9,7 +9,7 @@ public struct Target: Equatable, Hashable, Comparable, Codable {
     //       in order to compile the documentation archive (including Tutorials, Articles, etc.)
     public static let validSourceExtensions: [String] = [
         "m", "swift", "mm", "cpp", "cc", "c", "d", "s", "intentdefinition", "xcmappingmodel", "metal", "mlmodel", "docc",
-        "playground", "rcproject",
+        "playground", "rcproject", "mlpackage",
     ]
     public static let validFolderExtensions: [String] = [
         "framework", "bundle", "app", "xcassets", "appiconset", "scnassets",
@@ -18,16 +18,16 @@ public struct Target: Equatable, Hashable, Comparable, Codable {
     // MARK: - Attributes
 
     public var name: String
-    public var platform: Platform
+    public var destinations: Destinations
     public var product: Product
     public var bundleId: String
     public var productName: String
-    public var deploymentTarget: DeploymentTarget?
+    public var deploymentTargets: DeploymentTargets
 
     // An info.plist file is needed for (dynamic) frameworks, applications and executables
     // however is not needed for other products such as static libraries.
     public var infoPlist: InfoPlist?
-    public var entitlements: AbsolutePath?
+    public var entitlements: Entitlements?
     public var settings: Settings?
     public var dependencies: [TargetDependency]
     public var sources: [SourceFile]
@@ -36,7 +36,7 @@ public struct Target: Equatable, Hashable, Comparable, Codable {
     public var headers: Headers?
     public var coreDataModels: [CoreDataModel]
     public var scripts: [TargetScript]
-    public var environment: [String: String]
+    public var environmentVariables: [String: EnvironmentVariable]
     public var launchArguments: [LaunchArgument]
     public var filesGroup: ProjectGroup
     public var rawScriptBuildPhases: [RawScriptBuildPhase]
@@ -44,18 +44,20 @@ public struct Target: Equatable, Hashable, Comparable, Codable {
     public let additionalFiles: [FileElement]
     public var buildRules: [BuildRule]
     public var prune: Bool
+    public let mergedBinaryType: MergedBinaryType
+    public let mergeable: Bool
 
     // MARK: - Init
 
     public init(
         name: String,
-        platform: Platform,
+        destinations: Destinations,
         product: Product,
         productName: String?,
         bundleId: String,
-        deploymentTarget: DeploymentTarget? = nil,
+        deploymentTargets: DeploymentTargets = DeploymentTargets(),
         infoPlist: InfoPlist? = nil,
-        entitlements: AbsolutePath? = nil,
+        entitlements: Entitlements? = nil,
         settings: Settings? = nil,
         sources: [SourceFile] = [],
         resources: [ResourceFileElement] = [],
@@ -63,7 +65,7 @@ public struct Target: Equatable, Hashable, Comparable, Codable {
         headers: Headers? = nil,
         coreDataModels: [CoreDataModel] = [],
         scripts: [TargetScript] = [],
-        environment: [String: String] = [:],
+        environmentVariables: [String: EnvironmentVariable] = [:],
         launchArguments: [LaunchArgument] = [],
         filesGroup: ProjectGroup,
         dependencies: [TargetDependency] = [],
@@ -71,14 +73,16 @@ public struct Target: Equatable, Hashable, Comparable, Codable {
         playgrounds: [AbsolutePath] = [],
         additionalFiles: [FileElement] = [],
         buildRules: [BuildRule] = [],
-        prune: Bool = false
+        prune: Bool = false,
+        mergedBinaryType: MergedBinaryType = .disabled,
+        mergeable: Bool = false
     ) {
         self.name = name
         self.product = product
-        self.platform = platform
+        self.destinations = destinations
         self.bundleId = bundleId
         self.productName = productName ?? name.replacingOccurrences(of: "-", with: "_")
-        self.deploymentTarget = deploymentTarget
+        self.deploymentTargets = deploymentTargets
         self.infoPlist = infoPlist
         self.entitlements = entitlements
         self.settings = settings
@@ -88,7 +92,7 @@ public struct Target: Equatable, Hashable, Comparable, Codable {
         self.headers = headers
         self.coreDataModels = coreDataModels
         self.scripts = scripts
-        self.environment = environment
+        self.environmentVariables = environmentVariables
         self.launchArguments = launchArguments
         self.filesGroup = filesGroup
         self.dependencies = dependencies
@@ -97,11 +101,28 @@ public struct Target: Equatable, Hashable, Comparable, Codable {
         self.additionalFiles = additionalFiles
         self.buildRules = buildRules
         self.prune = prune
+        self.mergedBinaryType = mergedBinaryType
+        self.mergeable = mergeable
     }
 
     /// Target can be included in the link phase of other targets
     public func isLinkable() -> Bool {
         [.dynamicLibrary, .staticLibrary, .framework, .staticFramework].contains(product)
+    }
+
+    /// Returns whether a target is exclusive to a single platform
+    public func isExclusiveTo(_ platform: Platform) -> Bool {
+        destinations.map(\.platform).allSatisfy { $0 == platform }
+    }
+
+    /// Returns whether a target supports a platform
+    public func supports(_ platform: Platform) -> Bool {
+        destinations.map(\.platform).contains(platform)
+    }
+
+    /// List of platforms this target deploys to
+    public var supportedPlatforms: Set<Platform> {
+        Set(destinations.map(\.platform))
     }
 
     /// Returns target's pre scripts.
@@ -112,6 +133,11 @@ public struct Target: Equatable, Hashable, Comparable, Codable {
     /// Returns target's post scripts.
     public var postScripts: [TargetScript] {
         scripts.filter { $0.order == .post }
+    }
+
+    /// Returns true if the target supports Mac Catalyst
+    public var supportsCatalyst: Bool {
+        destinations.contains(.macCatalyst)
     }
 
     /// Target can link static products (e.g. an app can link a staticLibrary)
@@ -145,13 +171,20 @@ public struct Target: Equatable, Hashable, Comparable, Codable {
 
     /// Returns true if the target supports having sources.
     public var supportsSources: Bool {
-        switch (platform, product) {
-        case (.iOS, .bundle), (.iOS, .stickerPackExtension),
-             (.watchOS, .watch2App), (.tvOS, .bundle), (.visionOS, .bundle):
+        switch product {
+        case .stickerPackExtension, .watch2App:
             return false
+        case .bundle:
+            // Bundles only support source when targetting macOS only
+            return isExclusiveTo(.macOS)
         default:
             return true
         }
+    }
+
+    /// Returns true if the target deploys to more then one platform
+    public var isMultiplatform: Bool {
+        supportedPlatforms.count > 1
     }
 
     /// Returns true if the target supports hosting resources
@@ -174,12 +207,17 @@ public struct Target: Equatable, Hashable, Comparable, Codable {
             return true
 
         case .commandLineTool,
+             .macro,
              .dynamicLibrary,
              .staticLibrary,
              .staticFramework,
              .xpc:
             return false
         }
+    }
+
+    public var legacyPlatform: Platform {
+        destinations.first?.platform ?? .iOS
     }
 
     /// Returns true if the target is an AppClip
@@ -193,93 +231,47 @@ public struct Target: Equatable, Hashable, Comparable, Codable {
     /// Determines if the target is an embeddable watch application
     /// i.e. a product that can be bundled with a host iOS application
     public func isEmbeddableWatchApplication() -> Bool {
-        switch (platform, product) {
-        case (.watchOS, .watch2App), (.watchOS, .app):
-            return true
-        default:
-            return false
-        }
+        let isWatchOS = isExclusiveTo(.watchOS)
+        let isApp = (product == .watch2App || product == .app)
+        return isWatchOS && isApp
     }
 
     /// Determines if the target is an embeddable xpc service
     /// i.e. a product that can be bundled with a host macOS application
     public func isEmbeddableXPCService() -> Bool {
-        switch (platform, product) {
-        case (.macOS, .xpc):
-            return true
-        default:
-            return false
-        }
+        product == .xpc
     }
 
     /// Determines if the target is an embeddable system extension
     /// i.e. a product that can be bundled with a host macOS application
     public func isEmbeddableSystemExtension() -> Bool {
-        switch (platform, product) {
-        case (.macOS, .systemExtension):
-            return true
-        default:
-            return false
-        }
+        product == .systemExtension
     }
 
     /// Determines if the target is able to embed a watch application
     /// i.e. a product that can be bundled with a watchOS application
     public func canEmbedWatchApplications() -> Bool {
-        switch (platform, product) {
-        case (.iOS, .app):
-            return true
-        default:
-            return false
-        }
-    }
-
-    /// Determines if the target is able to embed an xpc service
-    /// i.e. a product that can be bundled with a macOS application
-    public func canEmbedXPCServices() -> Bool {
-        switch (platform, product) {
-        case (.macOS, .app):
-            return true
-        default:
-            return false
-        }
+        isExclusiveTo(.iOS) && product == .app
     }
 
     /// Determines if the target is able to embed an system extension
     /// i.e. a product that can be bundled with a macOS application
     public func canEmbedSystemExtensions() -> Bool {
-        switch (platform, product) {
-        case (.macOS, .app):
-            return true
-        default:
-            return false
-        }
+        isExclusiveTo(.macOS) && product == .app
     }
 
-    /// For iOS targets that support macOS (Catalyst), this value is used
-    /// in the generated build files of the target dependency products to
-    /// indicate the build system that the dependency should be compiled
-    /// with Catalyst compatibility.
-    public var targetDependencyBuildFilesPlatformFilter: BuildFilePlatformFilter? {
-        switch deploymentTarget {
-        case let .iOS(_, devices, _) where devices.contains(.all):
-            return nil
-        case let .iOS(_, devices, _):
-            if devices.contains(.mac) {
-                return .catalyst
-            } else {
-                return .ios
-            }
-        default:
-            return nil
-        }
+    /// Return the a set of PlatformFilters to control linking based on what platform is being compiled
+    /// This allows a target to link against a dependency conditionally when it is being compiled for a compatible platform
+    /// E.g. An app linking against CarPlay only when built for iOS.
+    public var dependencyPlatformFilters: PlatformFilters {
+        Set(destinations.map(\.platformFilter))
     }
 
     // MARK: - Equatable
 
     public static func == (lhs: Target, rhs: Target) -> Bool {
         lhs.name == rhs.name &&
-            lhs.platform == rhs.platform &&
+            lhs.destinations == rhs.destinations &&
             lhs.product == rhs.product &&
             lhs.bundleId == rhs.bundleId &&
             lhs.productName == rhs.productName &&
@@ -292,17 +284,18 @@ public struct Target: Equatable, Hashable, Comparable, Codable {
             lhs.coreDataModels == rhs.coreDataModels &&
             lhs.scripts == rhs.scripts &&
             lhs.dependencies == rhs.dependencies &&
-            lhs.environment == rhs.environment
+            lhs.mergedBinaryType == rhs.mergedBinaryType &&
+            lhs.mergeable == rhs.mergeable &&
+            lhs.environmentVariables == rhs.environmentVariables
     }
 
     public func hash(into hasher: inout Hasher) {
         hasher.combine(name)
-        hasher.combine(platform)
+        hasher.combine(destinations)
         hasher.combine(product)
         hasher.combine(bundleId)
         hasher.combine(productName)
-        hasher.combine(entitlements)
-        hasher.combine(environment)
+        hasher.combine(environmentVariables)
     }
 
     /// Returns a new copy of the target with the given InfoPlist set.
@@ -310,6 +303,14 @@ public struct Target: Equatable, Hashable, Comparable, Codable {
     public func with(infoPlist: InfoPlist) -> Target {
         var copy = self
         copy.infoPlist = infoPlist
+        return copy
+    }
+
+    /// Returns a new copy of the target with the given entitlements set.
+    /// - Parameter entitlements: entitlements to be set to the copied instance.
+    public func with(entitlements: Entitlements) -> Target {
+        var copy = self
+        copy.entitlements = entitlements
         return copy
     }
 
@@ -347,7 +348,7 @@ public struct Target: Equatable, Hashable, Comparable, Codable {
     }
 }
 
-extension Sequence where Element == Target {
+extension Sequence<Target> {
     /// Filters and returns only the targets that are test bundles.
     var testBundles: [Target] {
         filter(\.product.testsBundle)

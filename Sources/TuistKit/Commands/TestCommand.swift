@@ -1,11 +1,17 @@
+import AnyCodable
 import ArgumentParser
 import Foundation
 import TSCBasic
+import TuistCore
 import TuistSupport
 
 /// Command that tests a target from the project in the current directory.
-struct TestCommand: AsyncParsableCommand {
-    static var configuration: CommandConfiguration {
+public struct TestCommand: AsyncParsableCommand, HasTrackableParameters {
+    public init() {}
+
+    public static var analyticsDelegate: TrackableParametersDelegate?
+
+    public static var configuration: CommandConfiguration {
         CommandConfiguration(
             commandName: "test",
             abstract: "Tests a project"
@@ -41,6 +47,12 @@ struct TestCommand: AsyncParsableCommand {
     )
     var os: String?
 
+    @Flag(
+        name: .long,
+        help: "When passed, append arch=x86_64 to the 'destination' to run simulator in a Rosetta mode."
+    )
+    var rosetta: Bool = false
+
     @Option(
         name: [.long, .customShort("C")],
         help: "The configuration to be used when testing the scheme."
@@ -65,10 +77,54 @@ struct TestCommand: AsyncParsableCommand {
     )
     var retryCount: Int = 0
 
-    func run() async throws {
+    @Option(
+        name: .long,
+        help: "The test plan to run."
+    )
+    var testPlan: String?
+
+    @Option(
+        name: .long,
+        parsing: .upToNextOption,
+        help: "The list of test identifiers you want to test. Expected format is TestTarget[/TestClass[/TestMethod]]. It is applied before --skip-testing",
+        transform: TestIdentifier.init(string:)
+    )
+    var testTargets: [TestIdentifier] = []
+
+    @Option(
+        name: .long,
+        parsing: .upToNextOption,
+        help: "The list of test identifiers you want to skip testing. Expected format is TestTarget[/TestClass[/TestMethod]].",
+        transform: TestIdentifier.init(string:)
+    )
+    var skipTestTargets: [TestIdentifier] = []
+
+    @Option(
+        name: .customLong("filter-configurations"),
+        parsing: .upToNextOption,
+        help: "The list of configurations you want to test. It is applied before --skip-configuration"
+    )
+    var configurations: [String] = []
+
+    @Option(
+        name: .long,
+        parsing: .upToNextOption,
+        help: "The list of configurations you want to skip testing."
+    )
+    var skipConfigurations: [String] = []
+
+    public func validate() throws {
+        try TestService().validateParameters(
+            testTargets: testTargets,
+            skipTestTargets: skipTestTargets
+        )
+    }
+
+    // swiftlint:disable:next function_body_length
+    public func run() async throws {
         let absolutePath: AbsolutePath
 
-        if let path = path {
+        if let path {
             absolutePath = try AbsolutePath(validating: path, relativeTo: FileHandler.shared.currentPath)
         } else {
             absolutePath = FileHandler.shared.currentPath
@@ -81,6 +137,7 @@ struct TestCommand: AsyncParsableCommand {
             path: absolutePath,
             deviceName: device,
             osVersion: os,
+            rosetta: rosetta,
             skipUITests: skipUITests,
             resultBundlePath: resultBundlePath.map {
                 try AbsolutePath(
@@ -88,7 +145,17 @@ struct TestCommand: AsyncParsableCommand {
                     relativeTo: FileHandler.shared.currentPath
                 )
             },
-            retryCount: retryCount
+            retryCount: retryCount,
+            testTargets: testTargets,
+            skipTestTargets: skipTestTargets,
+            testPlanConfiguration: testPlan.map { testPlan in
+                TestPlanConfiguration(
+                    testPlan: testPlan,
+                    configurations: configurations,
+                    skipConfigurations: skipConfigurations
+                )
+            },
+            validateTestTargetsParameters: false
         )
     }
 }

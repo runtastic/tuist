@@ -2,7 +2,6 @@ import Foundation
 import TSCBasic
 import struct TSCUtility.Version
 import TuistAutomation
-import TuistCache
 import TuistCore
 import TuistGraph
 import TuistLoader
@@ -66,10 +65,11 @@ final class RunService {
         configuration: String?,
         device: String?,
         version: String?,
+        rosetta: Bool,
         arguments: [String]
     ) async throws {
         let runPath: AbsolutePath
-        if let path = path {
+        if let path {
             runPath = try AbsolutePath(validating: path, relativeTo: FileHandler.shared.currentPath)
         } else {
             runPath = FileHandler.shared.currentPath
@@ -105,6 +105,7 @@ final class RunService {
 
         try await targetBuilder.buildTarget(
             graphTarget,
+            platform: try graphTarget.target.servicePlatform,
             workspacePath: workspacePath,
             scheme: scheme,
             clean: clean,
@@ -112,20 +113,20 @@ final class RunService {
             buildOutputPath: nil,
             device: device,
             osVersion: version?.version(),
+            rosetta: rosetta,
             graphTraverser: graphTraverser
         )
 
         let minVersion: Version?
-        if let deploymentTarget = graphTarget.target.deploymentTarget {
-            minVersion = deploymentTarget.version.version()
+        if let deploymentTargetVersion = graphTarget.target.deploymentTargets.configuredVersions.first?.1 {
+            minVersion = deploymentTargetVersion.version()
         } else {
             minVersion = scheme.targetDependencies()
                 .flatMap {
                     graphTraverser
                         .directLocalTargetDependencies(path: $0.projectPath, name: $0.name)
-                        .map(\.target)
-                        .map(\.deploymentTarget)
-                        .compactMap { $0?.version.version() }
+                        .flatMap(\.target.deploymentTargets.configuredVersions)
+                        .compactMap { $0.1.version() }
                 }
                 .sorted()
                 .first
@@ -140,6 +141,7 @@ final class RunService {
 
         try await targetRunner.runTarget(
             graphTarget,
+            platform: try graphTarget.target.servicePlatform,
             workspacePath: workspacePath,
             schemeName: scheme.name,
             configuration: configuration,

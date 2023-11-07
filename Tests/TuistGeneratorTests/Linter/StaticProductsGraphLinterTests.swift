@@ -32,9 +32,9 @@ class StaticProductsGraphLinterTests: XCTestCase {
         let frameworkDependency = GraphDependency.target(name: framework.name, path: path)
 
         let dependencies: [GraphDependency: Set<GraphDependency>] = [
-            appDependency: Set([frameworkDependency, .packageProduct(path: path, product: "Package")]),
-            frameworkDependency: Set([.packageProduct(path: path, product: "Package")]),
-            .packageProduct(path: path, product: "Package"): Set(),
+            appDependency: Set([frameworkDependency, .packageProduct(path: path, product: "Package", type: .sources)]),
+            frameworkDependency: Set([.packageProduct(path: path, product: "Package", type: .sources)]),
+            .packageProduct(path: path, product: "Package", type: .sources): Set(),
         ]
         let graph = Graph.test(
             path: path,
@@ -55,6 +55,41 @@ class StaticProductsGraphLinterTests: XCTestCase {
         XCTAssertEqual(results, [
             warning(product: "Package", type: "Package", linkedBy: [appDependency, frameworkDependency]),
         ])
+    }
+
+    func test_lint_whenPackagePluginDependencyLinkedTwice() throws {
+        // Given
+        let path: AbsolutePath = "/project"
+        let app = Target.test(name: "App")
+        let framework = Target.test(name: "Framework", product: .framework)
+        let project = Project.test(path: "/tmp/app", name: "AppProject")
+        let package = Package.remote(url: "https://test.tuist.io", requirement: .branch("main"))
+        let appDependency = GraphDependency.target(name: app.name, path: path)
+        let frameworkDependency = GraphDependency.target(name: framework.name, path: path)
+
+        let plugin = GraphDependency.packageProduct(path: path, product: "Package", type: .plugin)
+        let dependencies: [GraphDependency: Set<GraphDependency>] = [
+            appDependency: Set([frameworkDependency, plugin]),
+            frameworkDependency: Set([plugin]),
+            plugin: Set(),
+        ]
+        let graph = Graph.test(
+            path: path,
+            projects: [path: project],
+            packages: [path: ["Package": package]],
+            targets: [path: [
+                app.name: app,
+                framework.name: framework,
+            ]],
+            dependencies: dependencies
+        )
+        let graphTraverser = GraphTraverser(graph: graph)
+
+        // When
+        let results = subject.lint(graphTraverser: graphTraverser)
+
+        // Then
+        XCTAssertTrue(results.isEmpty)
     }
 
     func test_lint_whenPrecompiledStaticLibraryLinkedTwice() throws {
@@ -1056,7 +1091,7 @@ class StaticProductsGraphLinterTests: XCTestCase {
         let appDependency = GraphDependency.target(name: app.name, path: path)
         let watchAppDependency = GraphDependency.target(name: watchApp.name, path: path)
         let watchAppExtensionDependency = GraphDependency.target(name: watchAppExtension.name, path: path)
-        let swiftPackage = GraphDependency.packageProduct(path: "/path/to/package", product: "LocalPackage")
+        let swiftPackage = GraphDependency.packageProduct(path: "/path/to/package", product: "LocalPackage", type: .sources)
 
         let dependencies: [GraphDependency: Set<GraphDependency>] = [
             // apps declare they bundle watch apps via dependencies
@@ -1097,7 +1132,7 @@ class StaticProductsGraphLinterTests: XCTestCase {
         let watchAppDependency = GraphDependency.target(name: watchApp.name, path: path)
         let watchAppExtensionDependency = GraphDependency.target(name: watchAppExtension.name, path: path)
         let watchFrameworkDependency = GraphDependency.target(name: watchFramework.name, path: path)
-        let swiftPackage = GraphDependency.packageProduct(path: "/path/to/package", product: "LocalPackage")
+        let swiftPackage = GraphDependency.packageProduct(path: "/path/to/package", product: "LocalPackage", type: .sources)
 
         let dependencies: [GraphDependency: Set<GraphDependency>] = [
             // apps declare they bundle watch apps via dependencies

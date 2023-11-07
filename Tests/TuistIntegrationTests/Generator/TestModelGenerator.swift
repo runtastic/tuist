@@ -89,7 +89,7 @@ final class TestModelGenerator {
                 .release("CustomRelease2"): nil,
             ]
         )
-        let projectPath = pathTo(name)
+        let projectPath = try pathTo(name)
         let dependencies = try createDependencies(relativeTo: projectPath)
         let frameworkTargets = try frameworksNames.map {
             try createTarget(name: $0, product: .framework, dependencies: dependencies)
@@ -100,13 +100,13 @@ final class TestModelGenerator {
         let staticLibraryTargets = try staticLibraryNames.map {
             try createTarget(name: $0, product: .staticLibrary)
         }
-        let appTarget = createTarget(
+        let appTarget = try createTarget(
             path: projectPath,
             name: "\(name)AppTarget",
             settings: targetSettings,
             dependencies: frameworksNames + staticFrameworkNames + staticLibraryNames
         )
-        let appUnitTestsTargets = unitTestsTargetNames.map { createTarget(
+        let appUnitTestsTargets = try unitTestsTargetNames.map { try createTarget(
             path: projectPath,
             name: $0,
             product: .unitTests,
@@ -118,7 +118,7 @@ final class TestModelGenerator {
             appTarget: appTarget,
             otherTargets: frameworkTargets + staticLibraryTargets + staticLibraryTargets
         )
-        let project = createProject(
+        let project = try createProject(
             path: projectPath,
             name: name,
             settings: projectSettings,
@@ -134,7 +134,7 @@ final class TestModelGenerator {
             path: path,
             xcWorkspacePath: path.appending(component: "Workspace.xcworkspace"),
             name: "Workspace",
-            projects: projects.map { pathTo($0) }
+            projects: try projects.map { try pathTo($0) }
         )
     }
 
@@ -145,7 +145,7 @@ final class TestModelGenerator {
         targets: [Target],
         packages: [Package] = [],
         schemes: [Scheme]
-    ) -> Project {
+    ) throws -> Project {
         Project(
             path: path,
             sourceRootPath: path,
@@ -161,7 +161,7 @@ final class TestModelGenerator {
             packages: packages,
             schemes: schemes,
             ideTemplateMacros: nil,
-            additionalFiles: createAdditionalFiles(path: path),
+            additionalFiles: try createAdditionalFiles(path: path),
             resourceSynthesizers: [],
             lastUpgradeCheck: nil,
             isExternal: false
@@ -174,65 +174,65 @@ final class TestModelGenerator {
         product: Product = .app,
         settings: Settings?,
         dependencies: [String]
-    ) -> Target {
+    ) throws -> Target {
         Target(
             name: name,
-            platform: .iOS,
+            destinations: .iOS,
             product: product,
             productName: name,
             bundleId: "test.bundle",
             settings: settings,
-            sources: createSources(path: path),
-            resources: createResources(path: path),
-            headers: createHeaders(path: path),
+            sources: try createSources(path: path),
+            resources: try createResources(path: path),
+            headers: try createHeaders(path: path),
             filesGroup: .group(name: "ProjectGroup"),
             dependencies: dependencies.map { TargetDependency.target(name: $0) }
         )
     }
 
-    private func createSources(path: AbsolutePath) -> [SourceFile] {
-        let sources: [SourceFile] = (0 ..< config.sources)
+    private func createSources(path: AbsolutePath) throws -> [SourceFile] {
+        let sources: [SourceFile] = try (0 ..< config.sources)
             .map { "Sources/SourceFile\($0).swift" }
-            .map { SourceFile(path: path.appending(RelativePath($0))) }
+            .map { SourceFile(path: path.appending(try RelativePath(validating: $0))) }
             .shuffled()
         return sources
     }
 
-    private func createHeaders(path: AbsolutePath) -> Headers {
-        let publicHeaders = (0 ..< config.headers)
+    private func createHeaders(path: AbsolutePath) throws -> Headers {
+        let publicHeaders = try (0 ..< config.headers)
             .map { "Sources/PublicHeader\($0).h" }
-            .map { path.appending(RelativePath($0)) }
+            .map { path.appending(try RelativePath(validating: $0)) }
             .shuffled()
 
-        let privateHeaders = (0 ..< config.headers)
+        let privateHeaders = try (0 ..< config.headers)
             .map { "Sources/PrivateHeader\($0).h" }
-            .map { path.appending(RelativePath($0)) }
+            .map { path.appending(try RelativePath(validating: $0)) }
             .shuffled()
 
-        let projectHeaders = (0 ..< config.headers)
+        let projectHeaders = try (0 ..< config.headers)
             .map { "Sources/ProjectHeader\($0).h" }
-            .map { path.appending(RelativePath($0)) }
+            .map { path.appending(try RelativePath(validating: $0)) }
             .shuffled()
 
         return Headers(public: publicHeaders, private: privateHeaders, project: projectHeaders)
     }
 
-    private func createResources(path: AbsolutePath) -> [ResourceFileElement] {
-        let files = (0 ..< config.resources)
+    private func createResources(path: AbsolutePath) throws -> [ResourceFileElement] {
+        let files = try (0 ..< config.resources)
             .map { "Resources/Resource\($0).png" }
-            .map { ResourceFileElement.file(path: path.appending(RelativePath($0))) }
+            .map { ResourceFileElement.file(path: path.appending(try RelativePath(validating: $0))) }
 
-        let folderReferences = (0 ..< 10)
+        let folderReferences = try (0 ..< 10)
             .map { "Resources/Folder\($0)" }
-            .map { ResourceFileElement.folderReference(path: path.appending(RelativePath($0))) }
+            .map { ResourceFileElement.folderReference(path: path.appending(try RelativePath(validating: $0))) }
 
         return (files + folderReferences).shuffled()
     }
 
-    private func createAdditionalFiles(path: AbsolutePath) -> [FileElement] {
-        let files = (0 ..< 10)
+    private func createAdditionalFiles(path: AbsolutePath) throws -> [FileElement] {
+        let files = try (0 ..< 10)
             .map { "Files/File\($0).md" }
-            .map { FileElement.file(path: path.appending(RelativePath($0))) }
+            .map { FileElement.file(path: path.appending(try RelativePath(validating: $0))) }
 
         // When using ** glob patterns (e.g. `Documentation/**`)
         // the results will include the folders in addition to the files
@@ -243,12 +243,12 @@ final class TestModelGenerator {
         //    Documentation/Subfolder
         //    Documentation/Subfolder/a.md
         let filesWithFolderPaths = files + [
-            .file(path: path.appending(RelativePath("Files"))),
+            .file(path: path.appending(try RelativePath(validating: "Files"))),
         ]
 
-        let folderReferences = (0 ..< 10)
+        let folderReferences = try (0 ..< 10)
             .map { "Documentation\($0)" }
-            .map { FileElement.folderReference(path: path.appending(RelativePath($0))) }
+            .map { FileElement.folderReference(path: path.appending(try RelativePath(validating: $0))) }
 
         return (filesWithFolderPaths + folderReferences).shuffled()
     }
@@ -260,7 +260,7 @@ final class TestModelGenerator {
     ) throws -> Target {
         Target(
             name: name,
-            platform: .iOS,
+            destinations: [.iPhone, .iPad, .mac],
             product: product,
             productName: nil,
             bundleId: "test.bundle.\(name)",
@@ -272,13 +272,20 @@ final class TestModelGenerator {
     }
 
     private func createDependencies(relativeTo path: AbsolutePath) throws -> [TargetDependency] {
-        let frameworks = (0 ..< 10)
+        let frameworks = try (0 ..< 10)
             .map { "Frameworks/Framework\($0).framework" }
-            .map { TargetDependency.framework(path: path.appending(RelativePath($0))) }
+            .map { TargetDependency.framework(path: path.appending(try RelativePath(validating: $0)), status: .required) }
 
         let libraries = try createLibraries(relativeTo: path)
-
-        return (frameworks + libraries).shuffled()
+        let sdks: [TargetDependency] = [
+            .sdk(name: "Accelerate.framework", status: .required),
+            .sdk(name: "AVKit.framework", status: .required),
+            .sdk(name: "Intents.framework", status: .optional),
+            .sdk(name: "HealthKit.framework", status: .optional),
+            .sdk(name: "libc++.tbd", status: .required),
+            .sdk(name: "libxml2.tbd", status: .required),
+        ]
+        return (frameworks + libraries + sdks).shuffled()
     }
 
     private func createLibraries(relativeTo path: AbsolutePath) throws -> [TargetDependency] {
@@ -292,9 +299,9 @@ final class TestModelGenerator {
 
             libraries.append(
                 .library(
-                    path: path.appending(RelativePath(library)),
-                    publicHeaders: path.appending(RelativePath(headers)),
-                    swiftModuleMap: path.appending(RelativePath(swiftModuleMap))
+                    path: path.appending(try RelativePath(validating: library)),
+                    publicHeaders: path.appending(try RelativePath(validating: headers)),
+                    swiftModuleMap: path.appending(try RelativePath(validating: swiftModuleMap))
                 )
             )
         }
@@ -303,7 +310,7 @@ final class TestModelGenerator {
     }
 
     private func createSchemes(projectName: String, appTarget: Target, otherTargets: [Target]) throws -> [Scheme] {
-        let targets = ([appTarget] + otherTargets).map { targetReference(from: $0, projectName: projectName) }
+        let targets = try ([appTarget] + otherTargets).map { try targetReference(from: $0, projectName: projectName) }
         return (0 ..< config.schemes).map {
             let boolStub = $0 % 2 == 0
 
@@ -347,9 +354,10 @@ final class TestModelGenerator {
     }
 
     private func createArguments() -> Arguments {
-        let environment = (0 ..< 10).reduce([String: String]()) { acc, value in
+        let environmentVariables = (0 ..< 10).reduce([String: EnvironmentVariable]()) { acc, value in
             var acc = acc
-            acc["Environment\(value)"] = "EnvironmentValue\(value)"
+            let arg = EnvironmentVariable(value: "EnvironmentValue\(value)", isEnabled: true)
+            acc["Environment\(value)"] = arg
             return acc
         }
         let launch = (0 ..< 10).reduce([LaunchArgument]()) { acc, value in
@@ -358,7 +366,7 @@ final class TestModelGenerator {
             acc.append(arg)
             return acc
         }
-        return Arguments(environment: environment, launchArguments: launch)
+        return Arguments(environmentVariables: environmentVariables, launchArguments: launch)
     }
 
     private func createExecutionActions() -> [ExecutionAction] {
@@ -373,11 +381,11 @@ final class TestModelGenerator {
         }
     }
 
-    private func pathTo(_ relativePath: String) -> AbsolutePath {
-        rootPath.appending(RelativePath(relativePath))
+    private func pathTo(_ relativePath: String) throws -> AbsolutePath {
+        rootPath.appending(try RelativePath(validating: relativePath))
     }
 
-    private func targetReference(from target: Target, projectName: String) -> TargetReference {
-        TargetReference(projectPath: pathTo(projectName), name: target.name)
+    private func targetReference(from target: Target, projectName: String) throws -> TargetReference {
+        TargetReference(projectPath: try pathTo(projectName), name: target.name)
     }
 }

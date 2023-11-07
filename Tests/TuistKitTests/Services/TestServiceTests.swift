@@ -63,22 +63,99 @@ final class TestServiceTests: TuistUnitTestCase {
         super.tearDown()
     }
 
-    func test_run_uses_project_directory() async throws {
-        // Given
-        contentHasher.hashStub = {
-            "\($0.replacingOccurrences(of: "/", with: ""))-hash"
-        }
+    func test_validateParameters_noParameters() throws {
+        try subject.validateParameters(testTargets: [], skipTestTargets: [])
+    }
 
-        // When
-        try? await subject.testRun(
-            path: try AbsolutePath(validating: "/test")
+    func test_validateParameters_nonConflictingParameters_target() throws {
+        try subject.validateParameters(
+            testTargets: [TestIdentifier(string: "test1")],
+            skipTestTargets: [TestIdentifier(string: "test1/class1")]
         )
+    }
 
-        // Then
-        let gotPath = generatorFactory.invokedTestParametersList.first?.automationPath
-        XCTAssertEqual(
-            gotPath,
-            cacheDirectoriesProvider.cacheDirectory(for: .generatedAutomationProjects).appending(component: "test-hash")
+    func test_validateParameters_nonConflictingParameters_targetClass() throws {
+        try subject.validateParameters(
+            testTargets: [TestIdentifier(string: "test1/class1")],
+            skipTestTargets: [TestIdentifier(string: "test1/class1/method1")]
+        )
+    }
+
+    func test_validateParameters_conflictingParameters_target() throws {
+        let testTargets = try [TestIdentifier(string: "test1")]
+        let skipTestTargets = try [TestIdentifier(string: "test2")]
+        let error = TestServiceError.nothingToSkip(skipped: skipTestTargets, included: testTargets)
+        XCTAssertThrowsSpecific(
+            try subject.validateParameters(
+                testTargets: testTargets,
+                skipTestTargets: skipTestTargets
+            ),
+            error
+        )
+    }
+
+    func test_validateParameters_conflictingParameters_targetClass() throws {
+        let testTargets = try [TestIdentifier(string: "test1/class1")]
+        let skipTestTargets = try [TestIdentifier(string: "test1/class2")]
+        let error = TestServiceError.nothingToSkip(skipped: skipTestTargets, included: testTargets)
+        XCTAssertThrowsSpecific(
+            try subject.validateParameters(
+                testTargets: testTargets,
+                skipTestTargets: skipTestTargets
+            ),
+            error
+        )
+    }
+
+    func test_validateParameters_conflictingParameters_targetClassMethod() throws {
+        let testTargets = try [TestIdentifier(string: "test1/class1/method1")]
+        let skipTestTargets = try [TestIdentifier(string: "test1/class2/method2")]
+        let error = TestServiceError.nothingToSkip(skipped: skipTestTargets, included: testTargets)
+        XCTAssertThrowsSpecific(
+            try subject.validateParameters(
+                testTargets: testTargets,
+                skipTestTargets: skipTestTargets
+            ),
+            error
+        )
+    }
+
+    func test_validateParameters_duplicatedParameters_target() throws {
+        let testTargets = try [TestIdentifier(string: "test1")]
+        let skipTestTargets = try [TestIdentifier(string: "test1")]
+        let error = TestServiceError.duplicatedTestTargets(Set(testTargets))
+        XCTAssertThrowsSpecific(
+            try subject.validateParameters(
+                testTargets: testTargets,
+                skipTestTargets: skipTestTargets
+            ),
+            error
+        )
+    }
+
+    func test_validateParameters_duplicatedParameters_targetClass() throws {
+        let testTargets = try [TestIdentifier(string: "test1/class1")]
+        let skipTestTargets = try [TestIdentifier(string: "test1/class1")]
+        let error = TestServiceError.duplicatedTestTargets(Set(testTargets))
+        XCTAssertThrowsSpecific(
+            try subject.validateParameters(
+                testTargets: testTargets,
+                skipTestTargets: skipTestTargets
+            ),
+            error
+        )
+    }
+
+    func test_validateParameters_duplicatedParameters_targetClassMethod() throws {
+        let testTargets = try [TestIdentifier(string: "test1/class1/method1")]
+        let skipTestTargets = try [TestIdentifier(string: "test1/class1/method1")]
+        let error = TestServiceError.duplicatedTestTargets(Set(testTargets))
+        XCTAssertThrowsSpecific(
+            try subject.validateParameters(
+                testTargets: testTargets,
+                skipTestTargets: skipTestTargets
+            ),
+            error
         )
     }
 
@@ -100,6 +177,41 @@ final class TestServiceTests: TuistUnitTestCase {
         XCTAssertEqual(generatedPath, path)
     }
 
+    func test_run_tests_wtih_specified_arch() async throws {
+        // Given
+        buildGraphInspector.testableSchemesStub = { _ in
+            [
+                Scheme.test(name: "App-Workspace"),
+                Scheme.test(name: "TestScheme"),
+            ]
+        }
+        buildGraphInspector.testableTargetStub = { scheme, _, _, _, _ in
+            GraphTarget.test(
+                target: Target.test(
+                    name: scheme.name
+                )
+            )
+        }
+        generator.generateWithGraphStub = { path in
+            (path, Graph.test())
+        }
+        var testedRosetta: Bool?
+        xcodebuildController.testStub = { _, _, _, _, rosetta, _, _, _, _, _, _, _ in
+            testedRosetta = rosetta
+            return [.standardOutput(.init(raw: "success"))]
+        }
+
+        // When
+        try await subject.testRun(
+            schemeName: "TestScheme",
+            path: try temporaryPath(),
+            rosetta: true
+        )
+
+        // Then
+        XCTAssertEqual(testedRosetta, true)
+    }
+
     func test_run_tests_for_only_specified_scheme() async throws {
         // Given
         buildGraphInspector.testableSchemesStub = { _ in
@@ -108,7 +220,7 @@ final class TestServiceTests: TuistUnitTestCase {
                 Scheme.test(name: "TestScheme"),
             ]
         }
-        buildGraphInspector.testableTargetStub = { scheme, _ in
+        buildGraphInspector.testableTargetStub = { scheme, _, _, _, _ in
             GraphTarget.test(
                 target: Target.test(
                     name: scheme.name
@@ -119,7 +231,7 @@ final class TestServiceTests: TuistUnitTestCase {
             (path, Graph.test())
         }
         var testedSchemes: [String] = []
-        xcodebuildController.testStub = { _, scheme, _, _, _, _, _, _ in
+        xcodebuildController.testStub = { _, scheme, _, _, _, _, _, _, _, _, _, _ in
             testedSchemes.append(scheme)
             return [.standardOutput(.init(raw: "success"))]
         }
@@ -151,7 +263,7 @@ final class TestServiceTests: TuistUnitTestCase {
             (path, Graph.test())
         }
         var testedSchemes: [String] = []
-        xcodebuildController.testStub = { _, scheme, _, _, _, _, _, _ in
+        xcodebuildController.testStub = { _, scheme, _, _, _, _, _, _, _, _, _, _ in
             testedSchemes.append(scheme)
             return [.standardOutput(.init(raw: "success"))]
         }
@@ -200,7 +312,7 @@ final class TestServiceTests: TuistUnitTestCase {
             (path, Graph.test())
         }
         var testedSchemes: [String] = []
-        xcodebuildController.testStub = { _, scheme, _, _, _, _, _, _ in
+        xcodebuildController.testStub = { _, scheme, _, _, _, _, _, _, _, _, _, _ in
             testedSchemes.append(scheme)
             return [.standardOutput(.init(raw: "success"))]
         }
@@ -239,7 +351,7 @@ final class TestServiceTests: TuistUnitTestCase {
         }
         var testedSchemes: [String] = []
         xcodebuildController.testErrorStub = NSError.test()
-        xcodebuildController.testStub = { _, scheme, _, _, _, _, _, _ in
+        xcodebuildController.testStub = { _, scheme, _, _, _, _, _, _, _, _, _, _ in
             testedSchemes.append(scheme)
             return []
         }
@@ -274,7 +386,7 @@ final class TestServiceTests: TuistUnitTestCase {
             (path, Graph.test())
         }
         var testedSchemes: [String] = []
-        xcodebuildController.testStub = { _, scheme, _, _, _, _, _, _ in
+        xcodebuildController.testStub = { _, scheme, _, _, _, _, _, _, _, _, _, _ in
             testedSchemes.append(scheme)
             return [.standardOutput(.init(raw: "success"))]
         }
@@ -294,7 +406,7 @@ final class TestServiceTests: TuistUnitTestCase {
         let expectedResourceBundlePath = try AbsolutePath(validating: "/test")
         var resourceBundlePath: AbsolutePath?
 
-        xcodebuildController.testStub = { _, _, _, _, _, gotResourceBundlePath, _, _ in
+        xcodebuildController.testStub = { _, _, _, _, _, _, gotResourceBundlePath, _, _, _, _, _ in
             resourceBundlePath = gotResourceBundlePath
             return []
         }
@@ -325,7 +437,7 @@ final class TestServiceTests: TuistUnitTestCase {
         let expectedResourceBundlePath = try AbsolutePath(validating: "/test")
         var resourceBundlePath: AbsolutePath?
 
-        xcodebuildController.testStub = { _, _, _, _, _, gotResourceBundlePath, _, _ in
+        xcodebuildController.testStub = { _, _, _, _, _, _, gotResourceBundlePath, _, _, _, _, _ in
             resourceBundlePath = gotResourceBundlePath
             return []
         }
@@ -370,7 +482,7 @@ final class TestServiceTests: TuistUnitTestCase {
         }
 
         var passedRetryCount = 0
-        xcodebuildController.testStub = { _, _, _, _, _, _, _, retryCount in
+        xcodebuildController.testStub = { _, _, _, _, _, _, _, _, retryCount, _, _, _ in
             passedRetryCount = retryCount
             return [.standardOutput(.init(raw: "success"))]
         }
@@ -403,7 +515,7 @@ final class TestServiceTests: TuistUnitTestCase {
         }
 
         var passedRetryCount = -1
-        xcodebuildController.testStub = { _, _, _, _, _, _, _, retryCount in
+        xcodebuildController.testStub = { _, _, _, _, _, _, _, _, retryCount, _, _, _ in
             passedRetryCount = retryCount
             return [.standardOutput(.init(raw: "success"))]
         }
@@ -417,6 +529,95 @@ final class TestServiceTests: TuistUnitTestCase {
         // Then
         XCTAssertEqual(passedRetryCount, 0)
     }
+
+    func test_run_test_plan_success() async throws {
+        // Given
+        let testPlan = "TestPlan"
+        let testPlanPath = try AbsolutePath(validating: "/testPlan/\(testPlan)")
+        buildGraphInspector.testableSchemesStub = { _ in
+            [
+                Scheme.test(name: "App-Workspace"),
+                Scheme.test(
+                    name: "TestScheme",
+                    testAction: .test(
+                        testPlans: [.init(path: testPlanPath, testTargets: [], isDefault: true)]
+                    )
+                ),
+            ]
+        }
+        var passedTestPlan: String?
+        buildGraphInspector.testableTargetStub = { scheme, testPlan, _, _, _ in
+            passedTestPlan = testPlan
+            return GraphTarget.test(
+                target: Target.test(
+                    name: scheme.name
+                )
+            )
+        }
+        generator.generateWithGraphStub = { path in
+            (path, Graph.test())
+        }
+        var testedSchemes: [String] = []
+        xcodebuildController.testStub = { _, scheme, _, _, _, _, _, _, _, _, _, _ in
+            testedSchemes.append(scheme)
+            return [.standardOutput(.init(raw: "success"))]
+        }
+
+        // When
+        try await subject.testRun(
+            schemeName: "TestScheme",
+            path: try temporaryPath(),
+            testPlanConfiguration: TestPlanConfiguration(testPlan: testPlan)
+        )
+
+        // Then
+        XCTAssertEqual(testedSchemes, ["TestScheme"])
+        XCTAssertEqual(passedTestPlan, testPlan)
+    }
+
+    func test_run_test_plan_failure() async throws {
+        // Given
+        let testPlan = "TestPlan"
+        let testPlanPath = try AbsolutePath(validating: "/testPlan/\(testPlan)")
+        buildGraphInspector.testableSchemesStub = { _ in
+            [
+                Scheme.test(name: "App-Workspace"),
+                Scheme.test(
+                    name: "TestScheme",
+                    testAction: .test(
+                        testPlans: [.init(path: testPlanPath, testTargets: [], isDefault: true)]
+                    )
+                ),
+            ]
+        }
+        buildGraphInspector.workspaceSchemesStub = { _ in
+            [
+                Scheme.test(name: "ProjectSchemeOne"),
+            ]
+        }
+        generator.generateWithGraphStub = { path in
+            (path, Graph.test())
+        }
+        xcodebuildController.testStub = { _, _, _, _, _, _, _, _, _, _, _, _ in
+            [.standardOutput(.init(raw: "success"))]
+        }
+
+        let notDefinedTestPlan = "NotDefined"
+        do {
+            // When
+            try await subject.testRun(
+                schemeName: "TestScheme",
+                path: try temporaryPath(),
+                testPlanConfiguration: TestPlanConfiguration(testPlan: notDefinedTestPlan)
+            )
+        } catch let TestServiceError.testPlanNotFound(_, passedTestPlan, existing) {
+            // Then
+            XCTAssertEqual(passedTestPlan, notDefinedTestPlan)
+            XCTAssertEqual(existing, [testPlan])
+        } catch {
+            throw error
+        }
+    }
 }
 
 // MARK: - Helpers
@@ -429,9 +630,13 @@ extension TestService {
         path: AbsolutePath,
         deviceName: String? = nil,
         osVersion: String? = nil,
+        rosetta: Bool = false,
         skipUiTests: Bool = false,
         resultBundlePath: AbsolutePath? = nil,
-        retryCount: Int = 0
+        retryCount: Int = 0,
+        testTargets: [TestIdentifier] = [],
+        skipTestTargets: [TestIdentifier] = [],
+        testPlanConfiguration: TestPlanConfiguration? = nil
     ) async throws {
         try await run(
             schemeName: schemeName,
@@ -440,9 +645,13 @@ extension TestService {
             path: path,
             deviceName: deviceName,
             osVersion: osVersion,
+            rosetta: rosetta,
             skipUITests: skipUiTests,
             resultBundlePath: resultBundlePath,
-            retryCount: retryCount
+            retryCount: retryCount,
+            testTargets: testTargets,
+            skipTestTargets: skipTestTargets,
+            testPlanConfiguration: testPlanConfiguration
         )
     }
 }

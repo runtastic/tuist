@@ -61,7 +61,7 @@ enum PluginServiceConstants {
 }
 
 /// A default implementation of `PluginServicing` which loads `Plugins` using the `Config` manifest.
-public final class PluginService: PluginServicing { // swiftlint:disable:this type_body_length
+public final class PluginService: PluginServicing {
     private let manifestLoader: ManifestLoading
     private let templatesDirectoryLocator: TemplatesDirectoryLocating
     private let fileHandler: FileHandling
@@ -109,8 +109,8 @@ public final class PluginService: PluginServicing { // swiftlint:disable:this ty
                     config: config
                 )
                 var repositoryPath = pluginCacheDirectory.appending(component: PluginServiceConstants.repository)
-                if let directory = directory {
-                    repositoryPath = repositoryPath.appending(RelativePath(directory))
+                if let directory {
+                    repositoryPath = repositoryPath.appending(try RelativePath(validating: directory))
                 }
                 return RemotePluginPaths(
                     repositoryPath: repositoryPath,
@@ -123,8 +123,8 @@ public final class PluginService: PluginServicing { // swiftlint:disable:this ty
                     config: config
                 )
                 var repositoryPath = pluginCacheDirectory.appending(component: PluginServiceConstants.repository)
-                if let directory = directory {
-                    repositoryPath = repositoryPath.appending(RelativePath(directory))
+                if let directory {
+                    repositoryPath = repositoryPath.appending(try RelativePath(validating: directory))
                 }
                 let releasePath = pluginCacheDirectory.appending(component: PluginServiceConstants.release)
                 return RemotePluginPaths(

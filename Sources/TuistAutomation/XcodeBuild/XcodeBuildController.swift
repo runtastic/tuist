@@ -38,9 +38,10 @@ public final class XcodeBuildController: XcodeBuildControlling {
         _ target: XcodeBuildTarget,
         scheme: String,
         destination: XcodeBuildDestination?,
+        rosetta: Bool,
         clean: Bool = false,
         arguments: [XcodeBuildArgument]
-    ) -> AsyncThrowingStream<SystemEvent<XcodeBuildOutput>, Error> {
+    ) throws -> AsyncThrowingStream<SystemEvent<XcodeBuildOutput>, Error> {
         var command = ["/usr/bin/xcrun", "xcodebuild"]
 
         // Action
@@ -61,14 +62,18 @@ public final class XcodeBuildController: XcodeBuildControlling {
         // Destination
         switch destination {
         case let .device(udid):
-            command.append(contentsOf: ["-destination", "id=\(udid)"])
+            var value = ["id=\(udid)"]
+            if rosetta {
+                value += ["arch=x86_64"]
+            }
+            command.append(contentsOf: ["-destination", value.joined(separator: ",")])
         case .mac:
             command.append(contentsOf: ["-destination", SimulatorController().macOSDestination()])
         case nil:
             break
         }
 
-        return run(command: command, isVerbose: environment.isVerbose)
+        return try run(command: command, isVerbose: environment.isVerbose)
     }
 
     public func test(
@@ -76,11 +81,15 @@ public final class XcodeBuildController: XcodeBuildControlling {
         scheme: String,
         clean: Bool = false,
         destination: XcodeBuildDestination,
+        rosetta: Bool,
         derivedDataPath: AbsolutePath?,
         resultBundlePath: AbsolutePath?,
         arguments: [XcodeBuildArgument],
-        retryCount: Int
-    ) -> AsyncThrowingStream<SystemEvent<XcodeBuildOutput>, Error> {
+        retryCount: Int,
+        testTargets: [TestIdentifier],
+        skipTestTargets: [TestIdentifier],
+        testPlanConfiguration: TestPlanConfiguration?
+    ) throws -> AsyncThrowingStream<SystemEvent<XcodeBuildOutput>, Error> {
         var command = ["/usr/bin/xcrun", "xcodebuild"]
 
         // Action
@@ -106,7 +115,11 @@ public final class XcodeBuildController: XcodeBuildControlling {
         // Destination
         switch destination {
         case let .device(udid):
-            command.append(contentsOf: ["-destination", "id=\(udid)"])
+            var value = ["id=\(udid)"]
+            if rosetta {
+                value += ["arch=x86_64"]
+            }
+            command.append(contentsOf: ["-destination", value.joined(separator: ",")])
         case .mac:
             command.append(contentsOf: ["-destination", SimulatorController().macOSDestination()])
         }
@@ -121,7 +134,26 @@ public final class XcodeBuildController: XcodeBuildControlling {
             command.append(contentsOf: ["-resultBundlePath", resultBundlePath.pathString])
         }
 
-        return run(command: command, isVerbose: environment.isVerbose)
+        for test in testTargets {
+            command.append(contentsOf: ["-only-testing", test.description])
+        }
+
+        for test in skipTestTargets {
+            command.append(contentsOf: ["-skip-testing", test.description])
+        }
+
+        if let testPlanConfiguration {
+            command.append(contentsOf: ["-testPlan", testPlanConfiguration.testPlan])
+            for configuration in testPlanConfiguration.configurations {
+                command.append(contentsOf: ["-only-test-configuration", configuration])
+            }
+
+            for configuration in testPlanConfiguration.skipConfigurations {
+                command.append(contentsOf: ["-skip-test-configuration", configuration])
+            }
+        }
+
+        return try run(command: command, isVerbose: environment.isVerbose)
     }
 
     public func archive(
@@ -130,7 +162,7 @@ public final class XcodeBuildController: XcodeBuildControlling {
         clean: Bool,
         archivePath: AbsolutePath,
         arguments: [XcodeBuildArgument]
-    ) -> AsyncThrowingStream<SystemEvent<XcodeBuildOutput>, Error> {
+    ) throws -> AsyncThrowingStream<SystemEvent<XcodeBuildOutput>, Error> {
         var command = ["/usr/bin/xcrun", "xcodebuild"]
 
         // Action
@@ -151,21 +183,31 @@ public final class XcodeBuildController: XcodeBuildControlling {
         // Arguments
         command.append(contentsOf: arguments.flatMap(\.arguments))
 
-        return run(command: command, isVerbose: environment.isVerbose)
+        return try run(command: command, isVerbose: environment.isVerbose)
     }
 
     public func createXCFramework(
         frameworks: [AbsolutePath],
         output: AbsolutePath
-    ) -> AsyncThrowingStream<SystemEvent<XcodeBuildOutput>, Error> {
+    ) throws -> AsyncThrowingStream<SystemEvent<XcodeBuildOutput>, Error> {
         var command = ["/usr/bin/xcrun", "xcodebuild", "-create-xcframework"]
-        command.append(contentsOf: frameworks.flatMap { ["-framework", $0.pathString] })
+        command.append(contentsOf: frameworks.flatMap {
+            let pathString = $0.pathString
+            return [
+                "-framework",
+                // It's workaround for Xcode 15 RC bug
+                // remove it since bug will be fixed
+                // more details here: https://github.com/tuist/tuist/issues/5354
+                pathString.hasPrefix("/var/") ? pathString.replacingOccurrences(of: "/var/", with: "/private/var/") : pathString
+            ]
+        })
         command.append(contentsOf: ["-output", output.pathString])
         command.append("-allow-internal-distribution")
-        return run(command: command, isVerbose: environment.isVerbose)
+        return try run(command: command, isVerbose: environment.isVerbose)
     }
 
     enum ShowBuildSettingsError: Error {
+        // swiftformat:disable trailingCommas
         case timeout
     }
 
@@ -240,18 +282,32 @@ public final class XcodeBuildController: XcodeBuildControlling {
         return buildSettingsByTargetName
     }
 
-    fileprivate func run(command: [String], isVerbose: Bool) -> AsyncThrowingStream<SystemEvent<XcodeBuildOutput>, Error> {
-        run(command: command, isVerbose: isVerbose)
+    fileprivate func run(command: [String], isVerbose: Bool) throws -> AsyncThrowingStream<SystemEvent<XcodeBuildOutput>, Error> {
+        try run(command: command, isVerbose: isVerbose)
             .mapAsXcodeBuildOutput()
             .stream
     }
 
-    fileprivate func run(command: [String], isVerbose: Bool) -> AnyPublisher<SystemEvent<Data>, Error> {
+    fileprivate func run(command: [String], isVerbose: Bool) throws -> AnyPublisher<SystemEvent<Data>, Error> {
         if isVerbose {
             return System.shared.publisher(command)
         } else {
-            // swiftlint:disable:next force_try
-            return System.shared.publisher(command, pipeTo: try! formatter.buildArguments())
+            let fomatterExecutable = try formatter.formatterExecutable()
+            let compilationPublisher: AnyPublisher<SystemEvent<Data>, Error>? = if let compilation = fomatterExecutable.compilation {
+                System.shared.publisher(compilation)
+            } else {
+                nil
+            }
+            if fomatterExecutable.compilation != nil {
+                logger.debug("We've detected xcbeautify as sources so we'll compile it to use it with xcodebuild")
+            }
+            let xcodebuildPublisher = System.shared.publisher(command, pipeTo: fomatterExecutable.execution)
+            
+            if let compilationPublisher = compilationPublisher {
+                return compilationPublisher.append(xcodebuildPublisher).eraseToAnyPublisher()
+            } else {
+                return xcodebuildPublisher
+            }
         }
     }
 }

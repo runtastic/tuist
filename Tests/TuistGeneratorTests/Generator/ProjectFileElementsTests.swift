@@ -387,7 +387,7 @@ final class ProjectFileElementsTests: TuistUnitTestCase {
             product: .app,
             bundleId: "com.bundle.id",
             infoPlist: .file(path: try AbsolutePath(validating: "/project/info.plist")),
-            entitlements: try AbsolutePath(validating: "/project/app.entitlements"),
+            entitlements: .file(path: try AbsolutePath(validating: "/project/app.entitlements")),
             settings: settings,
             sources: [SourceFile(path: try AbsolutePath(validating: "/project/file.swift"))],
             resources: [
@@ -647,7 +647,7 @@ final class ProjectFileElementsTests: TuistUnitTestCase {
         // Given
         let from = try AbsolutePath(validating: "/project/")
         let fileAbsolutePath = try AbsolutePath(validating: "/project/MyPlayground.playground")
-        let fileRelativePath = RelativePath("./MyPlayground.playground")
+        let fileRelativePath = try RelativePath(validating: "./MyPlayground.playground")
         let group = PBXGroup()
         let pbxproj = PBXProj()
         pbxproj.add(object: group)
@@ -674,7 +674,7 @@ final class ProjectFileElementsTests: TuistUnitTestCase {
         // Given
         let from = try AbsolutePath(validating: "/project/")
         let folderAbsolutePath = try AbsolutePath(validating: "/project/model.xcdatamodeld")
-        let folderRelativePath = RelativePath("./model.xcdatamodeld")
+        let folderRelativePath = try RelativePath(validating: "./model.xcdatamodeld")
         let group = PBXGroup()
         let pbxproj = PBXProj()
         pbxproj.add(object: group)
@@ -700,7 +700,7 @@ final class ProjectFileElementsTests: TuistUnitTestCase {
     func test_addFileElement() throws {
         let from = try AbsolutePath(validating: "/project/")
         let fileAbsolutePath = try AbsolutePath(validating: "/project/file.swift")
-        let fileRelativePath = RelativePath("./file.swift")
+        let fileRelativePath = try RelativePath(validating: "./file.swift")
         let group = PBXGroup()
         let pbxproj = PBXProj()
         pbxproj.add(object: group)
@@ -755,11 +755,11 @@ final class ProjectFileElementsTests: TuistUnitTestCase {
         XCTAssertEqual(normalized, path)
     }
 
-    func test_closestRelativeElementPath() {
+    func test_closestRelativeElementPath() throws {
         let pathRelativeToSourceRoot = try! AbsolutePath(validating: "/a/framework/framework.framework")
             .relative(to: try! AbsolutePath(validating: "/a/b/c/project"))
-        let got = subject.closestRelativeElementPath(pathRelativeToSourceRoot: pathRelativeToSourceRoot)
-        XCTAssertEqual(got, RelativePath("../../../framework"))
+        let got = try subject.closestRelativeElementPath(pathRelativeToSourceRoot: pathRelativeToSourceRoot)
+        XCTAssertEqual(got, try RelativePath(validating: "../../../framework"))
     }
 
     func test_generateDependencies_sdks() throws {
@@ -832,7 +832,7 @@ final class ProjectFileElementsTests: TuistUnitTestCase {
             ],
             dependencies: [
                 .target(name: graphTarget.target.name, path: graphTarget.path): [
-                    .packageProduct(path: project.path, product: "A"),
+                    .packageProduct(path: project.path, product: "A", type: .sources),
                 ],
             ]
         )

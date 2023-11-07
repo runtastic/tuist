@@ -8,8 +8,10 @@ public protocol BuildGraphInspecting {
     /// Returns the build arguments to be used with the given target.
     /// - Parameter project: Project whose build arguments will be returned.
     /// - Parameter target: Target whose build arguments will be returned.
-    /// - Parameter configuration: The configuration to be built. When nil, it defaults to the configuration specified in the scheme.
-    /// - Parameter skipSigning: Skip code signing during build that is not required to be signed (eg. build for testing on iOS Simulator)
+    /// - Parameter configuration: The configuration to be built. When nil, it defaults to the configuration specified in the
+    /// scheme.
+    /// - Parameter skipSigning: Skip code signing during build that is not required to be signed (eg. build for testing on iOS
+    /// Simulator)
     func buildArguments(project: Project, target: Target, configuration: String?, skipSigning: Bool) -> [XcodeBuildArgument]
 
     /// Given a directory, it returns the first .xcworkspace found.
@@ -24,8 +26,15 @@ public protocol BuildGraphInspecting {
 
     ///  From the list of testable targets of the given scheme, it returns the first one.
     /// - Parameters:
+    ///   - testPlan: When specified, the Test Plan to use.
     ///   - scheme: Scheme in which to look up the target.
-    func testableTarget(scheme: Scheme, graphTraverser: GraphTraversing) -> GraphTarget?
+    func testableTarget(
+        scheme: Scheme,
+        testPlan: String?,
+        testTargets: [TestIdentifier],
+        skipTestTargets: [TestIdentifier],
+        graphTraverser: GraphTraversing
+    ) -> GraphTarget?
 
     /// Given a graphTraverser, it returns a list of buildable schemes.
     func buildableSchemes(graphTraverser: GraphTraversing) -> [Scheme]
@@ -64,7 +73,7 @@ public final class BuildGraphInspector: BuildGraphInspecting {
         var arguments = [XcodeBuildArgument]()
 
         // Configuration
-        if let configuration = configuration {
+        if let configuration {
             if (target.settings ?? project.settings)?.configurations.first(where: { $0.key.name == configuration }) != nil {
                 arguments.append(.configuration(configuration))
             } else {
@@ -101,9 +110,33 @@ public final class BuildGraphInspector: BuildGraphInspecting {
         )
     }
 
-    public func testableTarget(scheme: Scheme, graphTraverser: GraphTraversing) -> GraphTarget? {
-        guard let testTarget = scheme.testAction?.targets.first else { return nil }
-        return graphTraverser.target(path: testTarget.target.projectPath, name: testTarget.target.name)
+    public func testableTarget(
+        scheme: Scheme,
+        testPlan: String?,
+        testTargets: [TestIdentifier],
+        skipTestTargets: [TestIdentifier],
+        graphTraverser: GraphTraversing
+    ) -> GraphTarget? {
+        func isIncluded(_ testTarget: TestableTarget) -> Bool {
+            if testTarget.isSkipped {
+                return false
+            } else if testTargets.isEmpty {
+                return !skipTestTargets.contains { $0.target == testTarget.target.name }
+            } else {
+                return testTargets.contains { $0.target == testTarget.target.name }
+            }
+        }
+
+        if let testPlanName = testPlan,
+           let testPlan = scheme.testAction?.testPlans?.first(where: { $0.name == testPlanName }),
+           let target = testPlan.testTargets.first(where: { isIncluded($0) })?.target
+        {
+            return graphTraverser.target(path: target.projectPath, name: target.name)
+        } else if let testTarget = scheme.testAction?.targets.first {
+            return graphTraverser.target(path: testTarget.target.projectPath, name: testTarget.target.name)
+        } else {
+            return nil
+        }
     }
 
     public func buildableSchemes(graphTraverser: GraphTraversing) -> [Scheme] {
@@ -122,7 +155,7 @@ public final class BuildGraphInspector: BuildGraphInspecting {
 
     public func testableSchemes(graphTraverser: GraphTraversing) -> [Scheme] {
         graphTraverser.schemes()
-            .filter { $0.testAction?.targets.isEmpty == false }
+            .filter { $0.testAction?.targets.isEmpty == false || $0.testAction?.testPlans?.isEmpty == false }
             .sorted(by: { $0.name < $1.name })
     }
 

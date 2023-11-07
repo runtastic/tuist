@@ -163,7 +163,7 @@ final class TargetLinterTests: TuistUnitTestCase {
     func test_lint_when_infoplist_not_found() throws {
         let temporaryPath = try temporaryPath()
         let path = temporaryPath.appending(component: "App.entitlements")
-        let target = Target.test(entitlements: path)
+        let target = Target.test(entitlements: .file(path: path))
 
         let got = subject.lint(target: target)
 
@@ -203,7 +203,7 @@ final class TargetLinterTests: TuistUnitTestCase {
     func test_lint_when_ios_bundle_has_sources() {
         // Given
         let bundle = Target.empty(
-            platform: .iOS,
+            destinations: .iOS,
             product: .bundle,
             sources: [
                 SourceFile(path: "/path/to/some/source.swift"),
@@ -218,7 +218,7 @@ final class TargetLinterTests: TuistUnitTestCase {
         XCTContainsLintingIssue(
             result,
             LintingIssue(
-                reason: "Target \(bundle.name) cannot contain sources. iOS bundle targets don't support source files",
+                reason: "Target \(bundle.name) cannot contain sources. bundle targets in one of these destinations doesn't support source files: iPad, iPhone, macWithiPadDesign",
                 severity: .error
             )
         )
@@ -227,7 +227,7 @@ final class TargetLinterTests: TuistUnitTestCase {
     func test_lint_when_macos_bundle_has_no_sources() {
         // Given
         let bundle = Target.empty(
-            platform: .macOS,
+            destinations: .macOS,
             product: .bundle,
             sources: [],
             resources: []
@@ -243,7 +243,7 @@ final class TargetLinterTests: TuistUnitTestCase {
     func test_lint_valid_ios_bundle() {
         // Given
         let bundle = Target.empty(
-            platform: .iOS,
+            destinations: .iOS,
             product: .bundle,
             resources: [
                 .file(path: "/path/to/some/asset.png"),
@@ -289,7 +289,7 @@ final class TargetLinterTests: TuistUnitTestCase {
     }
 
     func test_lint_when_target_platform_and_deployment_target_property_mismatch() throws {
-        let invalidCombinations: [(Platform, DeploymentTarget)] = [
+        let invalidCombinations: [(Platform, DeploymentTargets)] = [
             (.iOS, .macOS("10.0.0")),
             (.watchOS, .macOS("10.0.0")),
             (.macOS, .watchOS("10.0.0")),
@@ -302,11 +302,12 @@ final class TargetLinterTests: TuistUnitTestCase {
             // When
             let got = subject.lint(target: target)
 
+            let expectedPlatform = try XCTUnwrap(combinations.1.configuredVersions.first?.platform.caseValue)
             // Then
             XCTContainsLintingIssue(
                 got,
                 LintingIssue(
-                    reason: "Found an inconsistency between a platform `\(combinations.0.caseValue)` and deployment target `\(combinations.1.platform)`",
+                    reason: "Found deployment platforms (\(expectedPlatform)) missing corresponding destination",
                     severity: .error
                 )
             )
@@ -316,8 +317,8 @@ final class TargetLinterTests: TuistUnitTestCase {
     func test_lint_invalidProductPlatformCombinations() throws {
         // Given
         let invalidTargets: [Target] = [
-            .empty(name: "WatchApp_for_iOS", platform: .iOS, product: .watch2App),
-            .empty(name: "Watch2Extension_for_iOS", platform: .iOS, product: .watch2Extension),
+            .empty(name: "WatchApp_for_iOS", destinations: .iOS, product: .watch2App),
+            .empty(name: "Watch2Extension_for_iOS", destinations: .iOS, product: .watch2Extension),
         ]
 
         // When

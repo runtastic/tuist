@@ -22,8 +22,27 @@ final class SettingsHelper {
         buildSettings = settings.toAny()
     }
 
-    func settingsProviderPlatform(_ target: Target) -> BuildSettingsProvider.Platform? {
-        switch target.platform {
+    /// Overlays a SettingsDictionary by adding a `[sdk=<sdk>*]` qualifier
+    /// e.g. for a multiplatform target
+    ///  `LD_RUNPATH_SEARCH_PATHS = @executable_path/Frameworks`
+    ///  `LD_RUNPATH_SEARCH_PATHS[sdk=macosx*] = @executable_path/../Frameworks`
+    func overlay(
+        settings: inout SettingsDictionary,
+        with other: SettingsDictionary,
+        for platform: Platform
+    ) {
+        other.forEach { key, newValue in
+            if settings[key] == nil {
+                settings[key] = newValue
+            } else if settings[key] != newValue {
+                let newKey = "\(key)[sdk=\(platform.xcodeSdkRoot)*]"
+                settings[newKey] = newValue
+            }
+        }
+    }
+
+    func settingsProviderPlatform(_ platform: Platform) -> BuildSettingsProvider.Platform? {
+        switch platform {
         case .iOS: return .iOS
         case .macOS: return .macOS
         case .tvOS: return .tvOS
@@ -63,7 +82,7 @@ final class SettingsHelper {
 
     private func merge(oldValue: SettingValue?, newValue: SettingValue) -> SettingValue {
         // No need to merge, just return newValue when the oldValue is nil (buildSettings[key] == nil).
-        guard let oldValue = oldValue else {
+        guard let oldValue else {
             return newValue
         }
 
@@ -76,7 +95,8 @@ final class SettingsHelper {
         // it will need to be merged with the oldValue, otherwise the oldValue will be discarded
         // and the newValue returned without merging.
         //
-        // The .sortAndTrim() method ensures the result of merging does not contain duplicate "$(inherited)" and that "$(inherited)" is the first element
+        // The .sortAndTrim() method ensures the result of merging does not contain duplicate "$(inherited)" and that
+        // "$(inherited)" is the first element
         // i.e. merging the following values:
         // oldValue = ["$(inherited)", "VALUE_1"]
         // newValue = ["$(inherited)", "VALUE_2"]

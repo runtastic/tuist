@@ -109,24 +109,34 @@ public class GraphLinter: GraphLinting {
     }
 
     private func lintDependency(from: GraphTarget, to: GraphTarget) -> [LintingIssue] {
-        let fromTarget = LintableTarget(
-            platform: from.target.platform,
-            product: from.target.product
-        )
-        let toTarget = LintableTarget(
-            platform: to.target.platform,
-            product: to.target.product
-        )
+        let fromPlatforms = from.target.supportedPlatforms
+        let toPlatforms = to.target.supportedPlatforms
 
-        guard let supportedTargets = GraphLinter.validLinks[fromTarget] else {
-            let reason =
-                "Target \(from.target.name) has platform '\(from.target.platform)' and product '\(from.target.product)' which is an invalid or not supported yet combination."
-            return [LintingIssue(reason: reason, severity: .error)]
+        var validLinksCount = 0
+        for fromPlatform in fromPlatforms {
+            let fromTarget = LintableTarget(
+                platform: fromPlatform,
+                product: from.target.product
+            )
+
+            guard let supportedTargets = GraphLinter.validLinks[fromTarget] else {
+                let reason =
+                    "Target \(from.target.name) has platform '\(fromPlatform)' and product '\(from.target.product)' which is an invalid or not yet supported combination."
+                return [LintingIssue(reason: reason, severity: .error)]
+            }
+
+            let toLintTargets = toPlatforms.map {
+                LintableTarget(platform: $0, product: to.target.product)
+            }
+
+            let validLinks = Set(toLintTargets).intersection(supportedTargets)
+            validLinksCount += validLinks.count
         }
 
-        guard supportedTargets.contains(toTarget) else {
+        // Need to have at least one valid link based on common platforms
+        guard validLinksCount > 0 else {
             let reason =
-                "Target \(from.target.name) has platform '\(from.target.platform)' and product '\(from.target.product)' and depends on target \(to.target.name) of type \(to.target.product) and platform '\(to.target.platform)' which is an invalid or not supported yet combination."
+                "Target \(from.target.name) has platforms '\(fromPlatforms.map(\.caseValue).listed())' and product '\(from.target.product)' and depends on target \(to.target.name) of type '\(to.target.product)' and platforms '\(toPlatforms.map(\.caseValue).listed())' which is an invalid or not yet supported combination."
             return [LintingIssue(reason: reason, severity: .error)]
         }
 
@@ -244,9 +254,13 @@ public class GraphLinter: GraphLinting {
         guard watchApp.target.bundleId.hasPrefix(parentApp.target.bundleId) else {
             return [
                 LintingIssue(reason: """
-                Watch app '\(watchApp.target.name)' bundleId: \(watchApp.target
-                    .bundleId) isn't prefixed with its parent's app '\(parentApp.target.bundleId)' bundleId '\(parentApp.target
-                    .bundleId)'
+                Watch app '\(watchApp.target.name)' bundleId: \(
+                    watchApp.target
+                        .bundleId
+                ) isn't prefixed with its parent's app '\(parentApp.target.bundleId)' bundleId '\(
+                    parentApp.target
+                        .bundleId
+                )'
                 """, severity: .error),
             ]
         }
@@ -257,9 +271,13 @@ public class GraphLinter: GraphLinting {
         guard watchExtension.target.bundleId.hasPrefix(parentWatchApp.target.bundleId) else {
             return [
                 LintingIssue(reason: """
-                Watch extension '\(watchExtension.target.name)' bundleId: \(watchExtension.target
-                    .bundleId) isn't prefixed with its parent's watch app '\(parentWatchApp.target
-                    .bundleId)' bundleId '\(parentWatchApp.target.bundleId)'
+                Watch extension '\(watchExtension.target.name)' bundleId: \(
+                    watchExtension.target
+                        .bundleId
+                ) isn't prefixed with its parent's watch app '\(
+                    parentWatchApp.target
+                        .bundleId
+                )' bundleId '\(parentWatchApp.target.bundleId)'
                 """, severity: .error),
             ]
         }
@@ -272,18 +290,22 @@ public class GraphLinter: GraphLinting {
         if !appClip.target.bundleId.hasPrefix(parentApp.target.bundleId) {
             foundIssues.append(
                 LintingIssue(reason: """
-                AppClip '\(appClip.target.name)' bundleId: \(appClip.target
-                    .bundleId) isn't prefixed with its parent's app '\(parentApp.target.name)' bundleId '\(parentApp.target
-                    .bundleId)'
+                AppClip '\(appClip.target.name)' bundleId: \(
+                    appClip.target
+                        .bundleId
+                ) isn't prefixed with its parent's app '\(parentApp.target.name)' bundleId '\(
+                    parentApp.target
+                        .bundleId
+                )'
                 """, severity: .error)
             )
         }
 
         if let entitlements = appClip.target.entitlements {
-            if !FileHandler.shared.exists(entitlements) {
+            if case let .file(path: path) = entitlements, !FileHandler.shared.exists(path) {
                 foundIssues
                     .append(LintingIssue(
-                        reason: "The entitlements at path '\(entitlements)' referenced by target does not exist",
+                        reason: "The entitlements at path '\(path.pathString)' referenced by target does not exist",
                         severity: .error
                     ))
             }
@@ -457,6 +479,8 @@ public class GraphLinter: GraphLinting {
         LintableTarget(platform: .macOS, product: .xpc): [
             LintableTarget(platform: .macOS, product: .staticLibrary),
             LintableTarget(platform: .macOS, product: .staticFramework),
+            LintableTarget(platform: .macOS, product: .dynamicLibrary),
+            LintableTarget(platform: .macOS, product: .framework),
         ],
         LintableTarget(platform: .tvOS, product: .app): [
             LintableTarget(platform: .tvOS, product: .staticLibrary),
@@ -639,4 +663,4 @@ public class GraphLinter: GraphLinting {
             LintableTarget(platform: .visionOS, product: .staticFramework),
         ],
     ]
-}
+} // swiftlint:enable type_body_length

@@ -51,6 +51,7 @@ final class TargetTests: TuistUnitTestCase {
                 "docc",
                 "playground",
                 "rcproject",
+                "mlpackage",
             ]
         )
     }
@@ -123,12 +124,12 @@ final class TargetTests: TuistUnitTestCase {
         // When
         let sources = try Target.sources(targetName: "Target", sources: [
             SourceFileGlob(
-                glob: temporaryPath.appending(RelativePath("sources/**")).pathString,
+                glob: temporaryPath.appending(try RelativePath(validating: "sources/**")).pathString,
                 excluding: [],
                 compilerFlags: nil
             ),
             SourceFileGlob(
-                glob: temporaryPath.appending(RelativePath("sources/**")).pathString,
+                glob: temporaryPath.appending(try RelativePath(validating: "sources/**")).pathString,
                 excluding: [],
                 compilerFlags: nil
             ),
@@ -165,8 +166,8 @@ final class TargetTests: TuistUnitTestCase {
         // When
         let sources = try Target.sources(targetName: "Target", sources: [
             SourceFileGlob(
-                glob: temporaryPath.appending(RelativePath("sources/**")).pathString,
-                excluding: [temporaryPath.appending(RelativePath("sources/**/*Tests.swift")).pathString],
+                glob: temporaryPath.appending(try RelativePath(validating: "sources/**")).pathString,
+                excluding: [temporaryPath.appending(try RelativePath(validating: "sources/**/*Tests.swift")).pathString],
                 compilerFlags: nil
             ),
         ])
@@ -199,15 +200,15 @@ final class TargetTests: TuistUnitTestCase {
             "sources/d/d.m",
         ])
         let excluding: [String] = [
-            temporaryPath.appending(RelativePath("sources/**/*Tests.swift")).pathString,
-            temporaryPath.appending(RelativePath("sources/**/*Fake.swift")).pathString,
-            temporaryPath.appending(RelativePath("sources/**/*.m")).pathString,
+            temporaryPath.appending(try RelativePath(validating: "sources/**/*Tests.swift")).pathString,
+            temporaryPath.appending(try RelativePath(validating: "sources/**/*Fake.swift")).pathString,
+            temporaryPath.appending(try RelativePath(validating: "sources/**/*.m")).pathString,
         ]
 
         // When
         let sources = try Target.sources(targetName: "Target", sources: [
             SourceFileGlob(
-                glob: temporaryPath.appending(RelativePath("sources/**")).pathString,
+                glob: temporaryPath.appending(try RelativePath(validating: "sources/**")).pathString,
                 excluding: excluding,
                 compilerFlags: nil
             ),
@@ -228,8 +229,8 @@ final class TargetTests: TuistUnitTestCase {
         let temporaryPath = try temporaryPath()
         let invalidGlobs: [InvalidGlob] = [
             .init(
-                pattern: temporaryPath.appending(RelativePath("invalid/path/**")).pathString,
-                nonExistentPath: temporaryPath.appending(RelativePath("invalid/path"))
+                pattern: temporaryPath.appending(try RelativePath(validating: "invalid/path/**")).pathString,
+                nonExistentPath: temporaryPath.appending(try RelativePath(validating: "invalid/path"))
             ),
         ]
         let error = TargetError.invalidSourcesGlob(
@@ -238,7 +239,7 @@ final class TargetTests: TuistUnitTestCase {
         )
         // When
         XCTAssertThrowsSpecific(try Target.sources(targetName: "Target", sources: [
-            SourceFileGlob(glob: temporaryPath.appending(RelativePath("invalid/path/**")).pathString),
+            SourceFileGlob(glob: temporaryPath.appending(try RelativePath(validating: "invalid/path/**")).pathString),
         ]), error)
     }
 
@@ -297,25 +298,69 @@ final class TargetTests: TuistUnitTestCase {
         ])
     }
 
-    func test_targetDependencyBuildFilesPlatformFilter_when_iOS_targets_mac() {
+    func test_dependencyPlatformFilters_when_iOS_targets_mac() {
         // Given
-        let target = Target.test(deploymentTarget: .iOS("14.0", [.mac], supportsMacDesignedForIOS: false))
+        let target = Target.test(destinations: [.macCatalyst])
 
         // When
-        let got = target.targetDependencyBuildFilesPlatformFilter
+        let got = target.dependencyPlatformFilters
 
         // Then
-        XCTAssertEqual(got, .catalyst)
+        XCTAssertEqual(got, [PlatformFilter.catalyst])
     }
 
-    func test_targetDependencyBuildFilesPlatformFilter_when_iOS_and_doesnt_target_mac() {
+    func test_dependencyPlatformFilters_when_iOS_and_doesnt_target_mac() {
         // Given
-        let target = Target.test(deploymentTarget: .iOS("14.0", [.iphone], supportsMacDesignedForIOS: false))
+        let target = Target.test(destinations: .iOS)
 
         // When
-        let got = target.targetDependencyBuildFilesPlatformFilter
+        let got = target.dependencyPlatformFilters
 
         // Then
-        XCTAssertEqual(got, .ios)
+        XCTAssertEqual(got, [PlatformFilter.ios])
+    }
+
+    func test_dependencyPlatformFilters_when_iOS_and_catalyst() {
+        // Given
+        let target = Target.test(destinations: [.iPhone, .iPad, .macCatalyst])
+
+        // When
+        let got = target.dependencyPlatformFilters
+
+        // Then
+        XCTAssertEqual(got, [PlatformFilter.ios, PlatformFilter.catalyst])
+    }
+
+    func test_dependencyPlatformFilters_when_using_many_destinations() {
+        // Given
+        let target = Target.test(destinations: [.iPhone, .iPad, .macCatalyst, .mac, .appleVision])
+
+        // When
+        let got = target.dependencyPlatformFilters
+
+        // Then
+        XCTAssertEqual(got, [PlatformFilter.ios, PlatformFilter.catalyst, PlatformFilter.macos, PlatformFilter.visionos])
+    }
+
+    func test_supportsCatalyst_returns_true_when_the_destinations_include_macCatalyst() {
+        // Given
+        let target = Target.test(destinations: [.macCatalyst])
+
+        // When
+        let got = target.supportsCatalyst
+
+        // Then
+        XCTAssertTrue(got)
+    }
+
+    func test_supportsCatalyst_returns_false_when_the_destinations_include_macCatalyst() {
+        // Given
+        let target = Target.test(destinations: [.iPad])
+
+        // When
+        let got = target.supportsCatalyst
+
+        // Then
+        XCTAssertFalse(got)
     }
 }
