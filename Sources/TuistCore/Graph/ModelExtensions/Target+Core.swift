@@ -26,7 +26,11 @@ extension Target {
         case .commandLineTool:
             return productName
         case _:
-            return "\(productName).\(product.xcodeValue.fileExtension!)"
+            if let fileExtension = product.xcodeValue.fileExtension {
+                return "\(productName).\(fileExtension)"
+            } else {
+                return productName
+            }
         }
     }
 
@@ -82,7 +86,12 @@ extension Target {
                     return Target.validSourceExtensions
                         .contains(where: { $0.caseInsensitiveCompare(`extension`) == .orderedSame })
                 }
-                .forEach { sourceFiles[$0] = SourceFile(path: $0, compilerFlags: source.compilerFlags, codeGen: source.codeGen) }
+                .forEach { sourceFiles[$0] = SourceFile(
+                    path: $0,
+                    compilerFlags: source.compilerFlags,
+                    codeGen: source.codeGen,
+                    compilationCondition: source.compilationCondition
+                ) }
         }
 
         if !invalidGlobs.isEmpty {

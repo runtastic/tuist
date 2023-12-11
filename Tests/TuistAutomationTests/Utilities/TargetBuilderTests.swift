@@ -82,7 +82,7 @@ final class TargetBuilderTests: TuistUnitTestCase {
             buildArguments
         }
 
-        xcodeBuildController.buildStub = { _workspace, _scheme, _destination, _rosetta, _clean, _buildArguments in
+        xcodeBuildController.buildStub = { _workspace, _scheme, _destination, _rosetta, _, _clean, _buildArguments, _ in
             XCTAssertEqual(_workspace.path, workspacePath)
             XCTAssertEqual(_scheme, scheme.name)
             XCTAssertEqual(_destination, destination)
@@ -101,10 +101,12 @@ final class TargetBuilderTests: TuistUnitTestCase {
             clean: clean,
             configuration: configuration,
             buildOutputPath: nil,
+            derivedDataPath: nil,
             device: device,
             osVersion: version,
             rosetta: rosetta,
-            graphTraverser: MockGraphTraverser()
+            graphTraverser: MockGraphTraverser(),
+            rawXcodebuildLogs: false
         )
     }
 
@@ -116,12 +118,12 @@ final class TargetBuilderTests: TuistUnitTestCase {
         let workspacePath = try AbsolutePath(validating: "/path/to/project.xcworkspace")
         let graphTraverser = MockGraphTraverser()
 
-        xcodeBuildController.buildStub = { _, _, _, _, _, _ in
+        xcodeBuildController.buildStub = { _, _, _, _, _, _, _, _ in
             [.standardOutput(.init(raw: "success"))]
         }
 
         let xcodeBuildPath = path.appending(components: "Xcode", "DerivedData", "MyProject-hash", "Debug")
-        xcodeProjectBuildDirectoryLocator.locateStub = { _, _, _ in xcodeBuildPath }
+        xcodeProjectBuildDirectoryLocator.locateStub = { _, _, _, _ in xcodeBuildPath }
         try createFiles([
             "Xcode/DerivedData/MyProject-hash/Debug/App.app",
             "Xcode/DerivedData/MyProject-hash/Debug/App.swiftmodule",
@@ -136,10 +138,12 @@ final class TargetBuilderTests: TuistUnitTestCase {
             clean: false,
             configuration: nil,
             buildOutputPath: buildOutputPath,
+            derivedDataPath: nil,
             device: nil,
             osVersion: nil,
             rosetta: false,
-            graphTraverser: graphTraverser
+            graphTraverser: graphTraverser,
+            rawXcodebuildLogs: false
         )
 
         // Then
@@ -166,12 +170,12 @@ final class TargetBuilderTests: TuistUnitTestCase {
         let workspacePath = try AbsolutePath(validating: "/path/to/project.xcworkspace")
         let graphTraverser = MockGraphTraverser()
 
-        xcodeBuildController.buildStub = { _, _, _, _, _, _ in
+        xcodeBuildController.buildStub = { _, _, _, _, _, _, _, _ in
             [.standardOutput(.init(raw: "success"))]
         }
 
         let xcodeBuildPath = path.appending(components: "Xcode", "DerivedData", "MyProject-hash", configuration)
-        xcodeProjectBuildDirectoryLocator.locateStub = { _, _, _ in xcodeBuildPath }
+        xcodeProjectBuildDirectoryLocator.locateStub = { _, _, _, _ in xcodeBuildPath }
         try createFiles([
             "Xcode/DerivedData/MyProject-hash/\(configuration)/App.app",
             "Xcode/DerivedData/MyProject-hash/\(configuration)/App.swiftmodule",
@@ -186,10 +190,12 @@ final class TargetBuilderTests: TuistUnitTestCase {
             clean: false,
             configuration: configuration,
             buildOutputPath: buildOutputPath,
+            derivedDataPath: nil,
             device: nil,
             osVersion: nil,
             rosetta: false,
-            graphTraverser: graphTraverser
+            graphTraverser: graphTraverser,
+            rawXcodebuildLogs: false
         )
 
         // Then

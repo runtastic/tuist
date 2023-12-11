@@ -34,12 +34,13 @@ var targets: [Target] = [
     ),
     .target(
         name: "TuistGraphTesting",
-        dependencies: ["TuistGraph", "TuistSupportTesting"],
+        dependencies: [
+            "TuistGraph",
+            "TuistSupportTesting",
+            swiftToolsSupportDependency,
+            "AnyCodable",
+        ],
         linkerSettings: [.linkedFramework("XCTest")]
-    ),
-    .testTarget(
-        name: "TuistGraphTests",
-        dependencies: ["TuistGraph", "TuistGraphTesting", "TuistSupportTesting", "TuistCoreTesting"]
     ),
     .target(
         name: "TuistCore",
@@ -49,21 +50,17 @@ var targets: [Target] = [
             "TuistSupport",
             "TuistGraph",
             "XcodeProj",
-            "Checksum",
         ]
     ),
     .target(
         name: "TuistCoreTesting",
-        dependencies: ["TuistCore", "TuistSupportTesting", "TuistGraphTesting"],
+        dependencies: [
+            "TuistCore",
+            "TuistSupportTesting",
+            "TuistGraphTesting",
+            swiftToolsSupportDependency,
+        ],
         linkerSettings: [.linkedFramework("XCTest")]
-    ),
-    .testTarget(
-        name: "TuistCoreTests",
-        dependencies: ["TuistCore", "TuistCoreTesting", "TuistSupportTesting"]
-    ),
-    .testTarget(
-        name: "TuistCoreIntegrationTests",
-        dependencies: ["TuistCore", "TuistSupportTesting"]
     ),
     .target(
         name: "TuistKit",
@@ -88,40 +85,6 @@ var targets: [Target] = [
             "TuistGraph",
         ]
     ),
-    .testTarget(
-        name: "TuistKitTests",
-        dependencies: [
-            "TuistKit",
-            "TuistAutomation",
-            "TuistSupportTesting",
-            "TuistCoreTesting",
-            "ProjectDescription",
-            "ProjectAutomation",
-            "TuistLoaderTesting",
-            "TuistGeneratorTesting",
-            "TuistScaffoldTesting",
-            "TuistAutomationTesting",
-            "TuistSigningTesting",
-            "TuistDependenciesTesting",
-            "TuistMigrationTesting",
-            "TuistAsyncQueueTesting",
-            "TuistGraphTesting",
-            "TuistPlugin",
-            "TuistPluginTesting",
-        ]
-    ),
-    .testTarget(
-        name: "TuistKitIntegrationTests",
-        dependencies: [
-            "TuistKit",
-            "TuistCoreTesting",
-            "TuistSupportTesting",
-            "ProjectDescription",
-            "ProjectAutomation",
-            "TuistLoaderTesting",
-            "TuistGraphTesting",
-        ]
-    ),
     .executableTarget(
         name: "tuist",
         dependencies: [
@@ -138,13 +101,6 @@ var targets: [Target] = [
             "TuistSupport",
         ]
     ),
-    .testTarget(
-        name: "TuistEnvKitTests",
-        dependencies: [
-            "TuistEnvKit",
-            "TuistSupportTesting",
-        ]
-    ),
     .executableTarget(
         name: "tuistenv",
         dependencies: [
@@ -154,13 +110,6 @@ var targets: [Target] = [
     .target(
         name: "ProjectDescription",
         dependencies: []
-    ),
-    .testTarget(
-        name: "ProjectDescriptionTests",
-        dependencies: [
-            "ProjectDescription",
-            "TuistSupportTesting",
-        ]
     ),
     .target(
         name: "ProjectAutomation"
@@ -174,7 +123,6 @@ var targets: [Target] = [
             "KeychainAccess",
             swifterDependency,
             "ZIPFoundation",
-            "Checksum",
             "ProjectDescription",
         ]
     ),
@@ -187,20 +135,15 @@ var targets: [Target] = [
         ],
         linkerSettings: [.linkedFramework("XCTest")]
     ),
-    .testTarget(
-        name: "TuistSupportTests",
+    .target(
+        name: "TuistAcceptanceTesting",
         dependencies: [
+            "TuistKit",
             "TuistCore",
-            "TuistSupport",
             "TuistSupportTesting",
-        ]
-    ),
-    .testTarget(
-        name: "TuistSupportIntegrationTests",
-        dependencies: [
-            "TuistSupport",
-            "TuistSupportTesting",
-        ]
+            swiftToolsSupportDependency,
+        ],
+        linkerSettings: [.linkedFramework("XCTest")]
     ),
     .target(
         name: "TuistGenerator",
@@ -219,32 +162,9 @@ var targets: [Target] = [
         name: "TuistGeneratorTesting",
         dependencies: [
             "TuistGenerator",
-            "TuistCoreTesting",
-            "TuistSupportTesting",
-            "TuistGraphTesting",
+            swiftToolsSupportDependency,
         ],
         linkerSettings: [.linkedFramework("XCTest")]
-    ),
-    .testTarget(
-        name: "TuistGeneratorTests",
-        dependencies: [
-            "TuistGenerator",
-            "TuistSupportTesting",
-            "TuistCoreTesting",
-            "TuistGeneratorTesting",
-            "TuistSigningTesting",
-            "TuistGraphTesting",
-        ]
-    ),
-    .testTarget(
-        name: "TuistGeneratorIntegrationTests",
-        dependencies: [
-            "TuistGenerator",
-            "TuistSupportTesting",
-            "TuistCoreTesting",
-            "TuistGeneratorTesting",
-            "TuistGraphTesting",
-        ]
     ),
     .target(
         name: "TuistScaffold",
@@ -258,69 +178,14 @@ var targets: [Target] = [
         ]
     ),
     .target(
-        name: "TuistScaffoldTesting",
-        dependencies: [
-            "TuistScaffold",
-            "TuistGraphTesting",
-        ],
-        linkerSettings: [.linkedFramework("XCTest")]
-    ),
-    .testTarget(
-        name: "TuistScaffoldTests",
-        dependencies: [
-            "TuistScaffold",
-            "TuistSupportTesting",
-            "TuistCoreTesting",
-            "TuistGraphTesting",
-        ]
-    ),
-    .testTarget(
-        name: "TuistScaffoldIntegrationTests",
-        dependencies: [
-            "TuistScaffold",
-            "TuistSupportTesting",
-            "TuistGraphTesting",
-        ]
-    ),
-    .target(
         name: "TuistAutomation",
         dependencies: [
             "XcodeProj",
             swiftToolsSupportDependency,
+            .product(name: "XcbeautifyLib", package: "xcbeautify"),
             "TuistCore",
             "TuistGraph",
             "TuistSupport",
-        ]
-    ),
-    .testTarget(
-        name: "TuistAutomationTests",
-        dependencies: [
-            "TuistAutomation",
-            "TuistAutomationTesting",
-            "TuistSupportTesting",
-            "TuistCoreTesting",
-            "TuistGraphTesting",
-        ]
-    ),
-    .target(
-        name: "TuistAutomationTesting",
-        dependencies: [
-            "TuistAutomation",
-            swiftToolsSupportDependency,
-            "TuistCore",
-            "TuistCoreTesting",
-            "ProjectDescription",
-            "TuistSupportTesting",
-            "TuistGraphTesting",
-        ],
-        linkerSettings: [.linkedFramework("XCTest")]
-    ),
-    .testTarget(
-        name: "TuistAutomationIntegrationTests",
-        dependencies: [
-            "TuistAutomation",
-            "TuistSupportTesting",
-            "TuistGraphTesting",
         ]
     ),
     .target(
@@ -330,24 +195,7 @@ var targets: [Target] = [
             "TuistGraph",
             "TuistSupport",
             "CryptoSwift",
-        ]
-    ),
-    .target(
-        name: "TuistSigningTesting",
-        dependencies: [
-            "TuistSigning",
-            "TuistGraphTesting",
-        ],
-        linkerSettings: [.linkedFramework("XCTest")]
-    ),
-    .testTarget(
-        name: "TuistSigningTests",
-        dependencies: [
-            "TuistSigning",
-            "TuistSupportTesting",
-            "TuistCoreTesting",
-            "TuistSigningTesting",
-            "TuistGraphTesting",
+            swiftToolsSupportDependency,
         ]
     ),
     .target(
@@ -358,26 +206,7 @@ var targets: [Target] = [
             "TuistGraph",
             "TuistSupport",
             "TuistPlugin",
-        ]
-    ),
-    .target(
-        name: "TuistDependenciesTesting",
-        dependencies: [
-            "TuistDependencies",
-            "TuistGraphTesting",
-        ],
-        linkerSettings: [.linkedFramework("XCTest")]
-    ),
-    .testTarget(
-        name: "TuistDependenciesTests",
-        dependencies: [
-            "TuistCoreTesting",
-            "TuistDependencies",
-            "TuistDependenciesTesting",
-            "TuistGraphTesting",
-            "TuistLoaderTesting",
-            "TuistSupportTesting",
-            "TuistPluginTesting",
+            swiftToolsSupportDependency,
         ]
     ),
     .target(
@@ -391,34 +220,6 @@ var targets: [Target] = [
         ]
     ),
     .target(
-        name: "TuistMigrationTesting",
-        dependencies: [
-            "TuistMigration",
-            "TuistGraphTesting",
-        ],
-        linkerSettings: [.linkedFramework("XCTest")]
-    ),
-    .testTarget(
-        name: "TuistMigrationTests",
-        dependencies: [
-            "TuistMigration",
-            "TuistSupportTesting",
-            "TuistCoreTesting",
-            "TuistMigrationTesting",
-            "TuistGraphTesting",
-        ]
-    ),
-    .testTarget(
-        name: "TuistMigrationIntegrationTests",
-        dependencies: [
-            "TuistMigration",
-            "TuistSupportTesting",
-            "TuistCoreTesting",
-            "TuistMigrationTesting",
-            "TuistGraphTesting",
-        ]
-    ),
-    .target(
         name: "TuistAsyncQueue",
         dependencies: [
             "TuistCore",
@@ -427,24 +228,6 @@ var targets: [Target] = [
             "XcodeProj",
             swiftToolsSupportDependency,
             "Queuer",
-        ]
-    ),
-    .target(
-        name: "TuistAsyncQueueTesting",
-        dependencies: [
-            "TuistAsyncQueue",
-            "TuistGraphTesting",
-        ],
-        linkerSettings: [.linkedFramework("XCTest")]
-    ),
-    .testTarget(
-        name: "TuistAsyncQueueTests",
-        dependencies: [
-            "TuistAsyncQueue",
-            "TuistSupportTesting",
-            "TuistCoreTesting",
-            "TuistAsyncQueueTesting",
-            "TuistGraphTesting",
         ]
     ),
     .target(
@@ -470,36 +253,6 @@ var targets: [Target] = [
         ],
         linkerSettings: [.linkedFramework("XCTest")]
     ),
-    .testTarget(
-        name: "TuistLoaderTests",
-        dependencies: [
-            "TuistLoader",
-            "TuistGraphTesting",
-            "TuistSupportTesting",
-            "TuistLoaderTesting",
-            "TuistCoreTesting",
-        ]
-    ),
-    .testTarget(
-        name: "TuistLoaderIntegrationTests",
-        dependencies: [
-            "TuistLoader",
-            "TuistGraphTesting",
-            "TuistSupportTesting",
-            "ProjectDescription",
-        ]
-    ),
-    .testTarget(
-        name: "TuistIntegrationTests",
-        dependencies: [
-            "TuistGenerator",
-            "TuistSupportTesting",
-            "TuistSupport",
-            "TuistCoreTesting",
-            "TuistGraphTesting",
-            "TuistLoaderTesting",
-        ]
-    ),
     .target(
         name: "TuistAnalytics",
         dependencies: [
@@ -508,6 +261,7 @@ var targets: [Target] = [
             "TuistCore",
             "TuistGraph",
             "TuistLoader",
+            swiftToolsSupportDependency,
         ]
     ),
     .target(
@@ -517,30 +271,6 @@ var targets: [Target] = [
             "TuistLoader",
             "TuistSupport",
             "TuistScaffold",
-            swiftToolsSupportDependency,
-        ]
-    ),
-    .target(
-        name: "TuistPluginTesting",
-        dependencies: [
-            "TuistGraph",
-            "TuistPlugin",
-            swiftToolsSupportDependency,
-        ],
-        linkerSettings: [.linkedFramework("XCTest")]
-    ),
-    .testTarget(
-        name: "TuistPluginTests",
-        dependencies: [
-            "ProjectDescription",
-            "TuistLoader",
-            "TuistLoaderTesting",
-            "TuistGraphTesting",
-            "TuistPlugin",
-            "TuistSupport",
-            "TuistSupportTesting",
-            "TuistScaffoldTesting",
-            "TuistCoreTesting",
             swiftToolsSupportDependency,
         ]
     ),
@@ -604,6 +334,18 @@ let package = Package(
             name: "TuistAnalytics",
             targets: ["TuistAnalytics"]
         ),
+        .library(
+            name: "TuistAutomation",
+            targets: ["TuistAutomation"]
+        ),
+        .library(
+            name: "TuistSigning",
+            targets: ["TuistSigning"]
+        ),
+        .library(
+            name: "TuistAcceptanceTesting",
+            targets: ["TuistAcceptanceTesting"]
+        ),
         /// TuistGenerator
         ///
         /// A high level Xcode generator library
@@ -632,12 +374,12 @@ let package = Package(
         .package(url: "https://github.com/httpswift/swifter.git", revision: "1e4f51c92d7ca486242d8bf0722b99de2c3531aa"),
         .package(url: "https://github.com/kishikawakatsumi/KeychainAccess", from: "4.2.2"),
         .package(url: "https://github.com/krzyzanowskim/CryptoSwift", from: "1.8.0"),
-        .package(url: "https://github.com/rnine/Checksum", from: "1.0.2"),
         .package(url: "https://github.com/stencilproject/Stencil", exact: "0.15.1"),
         .package(url: "https://github.com/SwiftDocOrg/GraphViz", exact: "0.2.0"),
         .package(url: "https://github.com/SwiftGen/StencilSwiftKit", exact: "2.10.1"),
         .package(url: "https://github.com/SwiftGen/SwiftGen", exact: "6.6.2"),
         .package(url: "https://github.com/tuist/XcodeProj", exact: "8.15.0"),
+        .package(url: "https://github.com/tuist/xcbeautify", from: "1.0.1"),
     ],
     targets: targets
 )

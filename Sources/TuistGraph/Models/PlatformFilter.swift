@@ -12,7 +12,7 @@ extension PlatformFilters: Comparable {
 /// Defines a set of platforms that can be used to limit where things
 /// like build files, resources, and dependencies are used.
 /// Context: https://github.com/tuist/tuist/pull/3152
-public enum PlatformFilter: Comparable, Hashable, Codable {
+public enum PlatformFilter: Comparable, Hashable, Codable, CaseIterable {
     case ios
     case macos
     case tvos

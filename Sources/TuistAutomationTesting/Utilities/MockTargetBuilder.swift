@@ -14,10 +14,12 @@ public final class MockTargetBuilder: TargetBuilding {
         Bool,
         String?,
         AbsolutePath?,
+        AbsolutePath?,
         String?,
         Version?,
         Bool,
-        GraphTraversing
+        GraphTraversing,
+        Bool
     ) throws -> Void)?
 
     public func buildTarget(
@@ -28,10 +30,12 @@ public final class MockTargetBuilder: TargetBuilding {
         clean: Bool,
         configuration: String?,
         buildOutputPath: AbsolutePath?,
+        derivedDataPath: AbsolutePath?,
         device: String?,
         osVersion: Version?,
         rosetta: Bool,
-        graphTraverser: GraphTraversing
+        graphTraverser: GraphTraversing,
+        rawXcodebuildLogs: Bool
     ) throws {
         try buildTargetStub?(
             target,
@@ -40,10 +44,12 @@ public final class MockTargetBuilder: TargetBuilding {
             clean,
             configuration,
             buildOutputPath,
+            derivedDataPath,
             device,
             osVersion,
             rosetta,
-            graphTraverser
+            graphTraverser,
+            rawXcodebuildLogs
         )
     }
 }

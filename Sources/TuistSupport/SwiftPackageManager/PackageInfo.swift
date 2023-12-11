@@ -79,6 +79,10 @@ extension PackageInfo {
             self.version = version
             self.options = options
         }
+
+        public var platform: PackagePlatform? {
+            PackagePlatform(rawValue: platformName)
+        }
     }
 }
 
@@ -377,6 +381,10 @@ extension PackageInfo.Target {
 
             /// The condition at which the setting should be applied.
             public let condition: PackageInfo.PackageConditionDescription?
+
+            public var hasConditions: Bool {
+                condition != nil || condition?.platformNames.isEmpty == true
+            }
 
             /// The value of the setting.
             ///

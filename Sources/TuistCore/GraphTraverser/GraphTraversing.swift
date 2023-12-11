@@ -86,6 +86,15 @@ public protocol GraphTraversing {
     ///   - name: Target name.
     func directLocalTargetDependencies(path: AbsolutePath, name: String) -> Set<GraphTarget>
 
+    /// Given a project directory and a target name, it returns all direct dependencies with their conditions
+    /// - Parameters:
+    ///   - path: Path to the directory that contains the project.
+    ///   - name: Target name.
+    func directLocalTargetDependenciesWithConditions(path: AbsolutePath, name: String) -> [(
+        GraphTarget,
+        PlatformCondition?
+    )]
+
     /// Given a project directory and a target name, it returns all the dependencies that are extensions.
     /// - Parameters:
     ///   - path: Path to the directory that contains the project.
@@ -196,6 +205,20 @@ public protocol GraphTraversing {
     ///   - path: Path to the directory that contains the project.
     ///   - name: Target name.
     func extensionKitExtensionDependencies(path: AbsolutePath, name: String) -> Set<GraphTarget>
+
+    /// Given a project and a target name, it returns all the direct target dependencies of the target that represent Swift Macro
+    /// executables.
+    /// - Parameters:
+    ///   - path: Path to the directory that contains the project.
+    ///   - name: Target name.
+    func directSwiftMacroExecutables(path: AbsolutePath, name: String) -> Set<GraphDependencyReference>
+
+    /// Given a project and a target name, it returns all the direct target dependencies that are a static framework representing
+    /// a Swift Macro
+    /// - Parameters:
+    ///   - path: Path to the directory that contains the project.
+    ///   - name: Target name.
+    func directSwiftMacroFrameworkTargets(path: AbsolutePath, name: String) -> Set<GraphTarget>
 }
 
 extension GraphTraversing {

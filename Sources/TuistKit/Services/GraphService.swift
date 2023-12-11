@@ -224,11 +224,11 @@ extension ProjectAutomation.Target {
 
     private static func from(_ dependency: TuistGraph.TargetDependency) -> ProjectAutomation.TargetDependency {
         switch dependency {
-        case let .target(name):
+        case let .target(name, _):
             return .target(name: name)
-        case let .project(target, path):
+        case let .project(target, path, _):
             return .project(target: target, path: path.pathString)
-        case let .framework(path, status):
+        case let .framework(path, status, _):
             let frameworkStatus: ProjectAutomation.FrameworkStatus
             switch status {
             case .optional:
@@ -237,7 +237,7 @@ extension ProjectAutomation.Target {
                 frameworkStatus = .required
             }
             return .framework(path: path.pathString, status: frameworkStatus)
-        case let .xcframework(path, status):
+        case let .xcframework(path, status, _):
             let frameworkStatus: ProjectAutomation.FrameworkStatus
             switch status {
             case .optional:
@@ -246,19 +246,22 @@ extension ProjectAutomation.Target {
                 frameworkStatus = .required
             }
             return .xcframework(path: path.pathString, status: frameworkStatus)
-        case let .library(path, publicHeaders, swiftModuleMap):
+        case let .library(path, publicHeaders, swiftModuleMap, _):
             return .library(
                 path: path.pathString,
                 publicHeaders: publicHeaders.pathString,
                 swiftModuleMap: swiftModuleMap?.pathString
             )
-        case let .package(product):
-            return .package(product: product)
-        case let .packagePlugin(product):
-            return .packagePlugin(product: product)
-        case let .packageMacro(product):
-            return .packageMacro(product: product)
-        case let .sdk(name, status):
+        case let .package(product, type, _):
+            switch type {
+            case .macro:
+                return .packageMacro(product: product)
+            case .plugin:
+                return .packagePlugin(product: product)
+            case .runtime:
+                return .package(product: product)
+            }
+        case let .sdk(name, status, _):
             let projectAutomationStatus: ProjectAutomation.SDKStatus
             switch status {
             case .optional:

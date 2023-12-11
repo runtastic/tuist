@@ -140,8 +140,7 @@ public final class DefaultSettingsProvider: DefaultSettingsProviding {
                 let filteredSettings = platformSetting
                     .filter { !DefaultSettingsProvider.multiplatformExcludedSettingsKeys.contains($0.key) }
 
-                let settingsHelper = SettingsHelper()
-                settingsHelper.overlay(settings: &settings, with: filteredSettings, for: platform)
+                settings.overlay(with: filteredSettings, for: platform)
             }
         } else if let platform = target.supportedPlatforms.first {
             settings = try targetSettings(
@@ -253,6 +252,10 @@ public final class DefaultSettingsProvider: DefaultSettingsProviding {
                     "$(inherited)",
                     "@executable_path/Frameworks",
                 ],
+            ]
+        } else if target.product == .macro {
+            return [
+                "SKIP_INSTALL": "YES",
             ]
         } else {
             return [:]

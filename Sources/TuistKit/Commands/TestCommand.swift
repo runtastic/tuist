@@ -42,6 +42,12 @@ public struct TestCommand: AsyncParsableCommand, HasTrackableParameters {
     var device: String?
 
     @Option(
+        name: .long,
+        help: "Test on a specific platform."
+    )
+    var platform: String?
+
+    @Option(
         name: .shortAndLong,
         help: "Test with a specific version of the OS."
     )
@@ -70,6 +76,11 @@ public struct TestCommand: AsyncParsableCommand, HasTrackableParameters {
         help: "Path where test result bundle will be saved."
     )
     var resultBundlePath: String?
+
+    @Option(
+        help: "Overrides the folder that should be used for derived data when testing a project."
+    )
+    var derivedDataPath: String?
 
     @Option(
         name: .long,
@@ -113,6 +124,12 @@ public struct TestCommand: AsyncParsableCommand, HasTrackableParameters {
     )
     var skipConfigurations: [String] = []
 
+    @Flag(
+        name: [.customLong("raw-xcodebuild-logs")],
+        help: "When passed, it outputs the raw xcodebuild logs without formatting them."
+    )
+    var rawXcodebuildLogs: Bool = false
+
     public func validate() throws {
         try TestService().validateParameters(
             testTargets: testTargets,
@@ -120,7 +137,6 @@ public struct TestCommand: AsyncParsableCommand, HasTrackableParameters {
         )
     }
 
-    // swiftlint:disable:next function_body_length
     public func run() async throws {
         let absolutePath: AbsolutePath
 
@@ -136,6 +152,7 @@ public struct TestCommand: AsyncParsableCommand, HasTrackableParameters {
             configuration: configuration,
             path: absolutePath,
             deviceName: device,
+            platform: platform,
             osVersion: os,
             rosetta: rosetta,
             skipUITests: skipUITests,
@@ -145,6 +162,7 @@ public struct TestCommand: AsyncParsableCommand, HasTrackableParameters {
                     relativeTo: FileHandler.shared.currentPath
                 )
             },
+            derivedDataPath: derivedDataPath,
             retryCount: retryCount,
             testTargets: testTargets,
             skipTestTargets: skipTestTargets,
@@ -155,7 +173,8 @@ public struct TestCommand: AsyncParsableCommand, HasTrackableParameters {
                     skipConfigurations: skipConfigurations
                 )
             },
-            validateTestTargetsParameters: false
+            validateTestTargetsParameters: false,
+            rawXcodebuildLogs: rawXcodebuildLogs
         )
     }
 }

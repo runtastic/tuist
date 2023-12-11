@@ -61,7 +61,10 @@ final class LinkGeneratorTests: XCTestCase {
         // Given
         var dependencies: Set<GraphDependencyReference> = []
         dependencies.insert(GraphDependencyReference.testFramework())
-        dependencies.insert(GraphDependencyReference.product(target: "Test", productName: "Test.framework"))
+        dependencies.insert(GraphDependencyReference.product(
+            target: "Test",
+            productName: "Test.framework"
+        ))
         let pbxproj = PBXProj()
         let (pbxTarget, target) = createTargets(product: .framework)
         let fileElements = ProjectFileElements()
@@ -112,7 +115,10 @@ final class LinkGeneratorTests: XCTestCase {
     func test_generateEmbedPhaseWithNoEmbeddableFrameworks() throws {
         // Given
         var dependencies: Set<GraphDependencyReference> = []
-        dependencies.insert(GraphDependencyReference.product(target: "Test", productName: "Test.framework"))
+        dependencies.insert(GraphDependencyReference.product(
+            target: "Test",
+            productName: "Test.framework"
+        ))
         let pbxproj = PBXProj()
         let (pbxTarget, target) = createTargets(product: .framework)
         let fileElements = ProjectFileElements()
@@ -158,7 +164,10 @@ final class LinkGeneratorTests: XCTestCase {
 
             var dependencies: Set<GraphDependencyReference> = []
             dependencies.insert(GraphDependencyReference.testFramework())
-            dependencies.insert(GraphDependencyReference.product(target: "Test", productName: "Test.framework"))
+            dependencies.insert(GraphDependencyReference.product(
+                target: "Test",
+                productName: "Test.framework"
+            ))
             let pbxproj = PBXProj()
             let (pbxTarget, target) = createTargets(product: product)
             let fileElements = ProjectFileElements()
@@ -199,7 +208,10 @@ final class LinkGeneratorTests: XCTestCase {
 
             var dependencies: Set<GraphDependencyReference> = []
             dependencies.insert(GraphDependencyReference.testFramework())
-            dependencies.insert(GraphDependencyReference.product(target: "Test", productName: "Test.framework"))
+            dependencies.insert(GraphDependencyReference.product(
+                target: "Test",
+                productName: "Test.framework"
+            ))
             let pbxproj = PBXProj()
             let (pbxTarget, target) = createTargets(product: product)
             let fileElements = ProjectFileElements()
@@ -236,7 +248,10 @@ final class LinkGeneratorTests: XCTestCase {
 
     func test_generateEmbedPhase_throws_when_aProductIsMissing() throws {
         var dependencies: Set<GraphDependencyReference> = []
-        dependencies.insert(GraphDependencyReference.product(target: "Test", productName: "Test.framework"))
+        dependencies.insert(GraphDependencyReference.product(
+            target: "Test",
+            productName: "Test.framework"
+        ))
         let pbxproj = PBXProj()
         let (pbxTarget, target) = createTargets(product: .framework)
         let fileElements = ProjectFileElements()
@@ -597,7 +612,10 @@ final class LinkGeneratorTests: XCTestCase {
     func test_generateLinkingPhase() throws {
         var dependencies: Set<GraphDependencyReference> = []
         dependencies.insert(GraphDependencyReference.testFramework(path: "/test.framework"))
-        dependencies.insert(GraphDependencyReference.product(target: "Test", productName: "Test.framework"))
+        dependencies.insert(GraphDependencyReference.product(
+            target: "Test",
+            productName: "Test.framework"
+        ))
         let pbxproj = PBXProj()
         let (pbxTarget, target) = createTargets(product: .framework)
         let fileElements = ProjectFileElements()
@@ -632,7 +650,10 @@ final class LinkGeneratorTests: XCTestCase {
     func test_generateLinkingPhase_optionalFramework() throws {
         var dependencies: Set<GraphDependencyReference> = []
         dependencies.insert(GraphDependencyReference.testFramework(path: "/test.framework", status: .optional))
-        dependencies.insert(GraphDependencyReference.product(target: "Test", productName: "Test.framework"))
+        dependencies.insert(GraphDependencyReference.product(
+            target: "Test",
+            productName: "Test.framework"
+        ))
         let pbxproj = PBXProj()
         let (pbxTarget, target) = createTargets(product: .framework)
         let fileElements = ProjectFileElements()
@@ -689,7 +710,10 @@ final class LinkGeneratorTests: XCTestCase {
 
     func test_generateLinkingPhase_throws_whenProductIsMissing() throws {
         var dependencies: Set<GraphDependencyReference> = []
-        dependencies.insert(GraphDependencyReference.product(target: "Test", productName: "Test.framework"))
+        dependencies.insert(GraphDependencyReference.product(
+            target: "Test",
+            productName: "Test.framework"
+        ))
         let pbxproj = PBXProj()
         let (pbxTarget, target) = createTargets(product: .framework)
         let fileElements = ProjectFileElements()
@@ -712,15 +736,23 @@ final class LinkGeneratorTests: XCTestCase {
     func test_generateLinkingPhase_sdk() throws {
         // Given
         var dependencies: Set<GraphDependencyReference> = []
-        dependencies.insert(GraphDependencyReference.sdk(path: "/Strong/Foo.framework", status: .required, source: .developer))
-        dependencies.insert(GraphDependencyReference.sdk(path: "/Weak/Bar.framework", status: .optional, source: .developer))
+        dependencies.insert(GraphDependencyReference.sdk(
+            path: "/Strong/Foo.framework",
+            status: .required,
+            source: .developer
+        ))
+        dependencies.insert(GraphDependencyReference.sdk(
+            path: "/Weak/Bar.framework",
+            status: .optional,
+            source: .developer
+        ))
         let pbxproj = PBXProj()
         let (pbxTarget, target) = createTargets(product: .framework)
         let fileElements = ProjectFileElements()
         let requiredFile = PBXFileReference(name: "required")
         let optionalFile = PBXFileReference(name: "optional")
-        fileElements.sdks["/Strong/Foo.framework"] = requiredFile
-        fileElements.sdks["/Weak/Bar.framework"] = optionalFile
+        fileElements.compiled["/Strong/Foo.framework"] = requiredFile
+        fileElements.compiled["/Weak/Bar.framework"] = optionalFile
         let path = try AbsolutePath(validating: "/path/")
         let graphTraverser = MockGraphTraverser()
         graphTraverser.stubbedLinkableDependenciesResult = dependencies
@@ -939,6 +971,62 @@ final class LinkGeneratorTests: XCTestCase {
         XCTAssertEqual(buildFiles, [
             "ResourceBundle.bundle",
         ])
+    }
+
+    func test_generateLinks_generatesAShellScriptBuildPhase_when_targetIsAMacroFramework() throws {
+        // Given
+        let projectSettings = Settings.default
+        let app = Target.test(name: "app", platform: .iOS, product: .app)
+        let macroFramework = Target.test(name: "framework", platform: .macOS, product: .staticFramework)
+        let macroExecutable = Target.test(name: "macro", platform: .macOS, product: .macro)
+        let project = Project.test(targets: [app, macroFramework, macroExecutable])
+
+        let graph = Graph.test(path: project.path, projects: [project.path: project], targets: [
+            project.path: [
+                app.name: app,
+                macroFramework.name: macroFramework,
+                macroExecutable.name: macroExecutable,
+            ],
+        ], dependencies: [
+            .target(name: app.name, path: project.path): Set([.target(name: macroFramework.name, path: project.path)]),
+            .target(name: macroFramework.name, path: project.path): Set([.target(
+                name: macroExecutable.name,
+                path: project.path
+            )]),
+            .target(name: macroExecutable.name, path: project.path): Set([]),
+        ])
+        let graphTraverser = GraphTraverser(graph: graph)
+        let xcodeProjElements = createXcodeprojElements()
+        let fileElements = createProjectFileElements(for: [app, macroFramework, macroExecutable])
+
+        // When
+        try subject.generateLinks(
+            target: macroFramework,
+            pbxTarget: xcodeProjElements.pbxTarget,
+            pbxproj: xcodeProjElements.pbxproj,
+            fileElements: fileElements,
+            path: project.path,
+            sourceRootPath: project.path,
+            graphTraverser: graphTraverser
+        )
+
+        // Then
+        let buildPhase = xcodeProjElements
+            .pbxTarget
+            .buildPhases
+            .compactMap { $0 as? PBXShellScriptBuildPhase }
+            .first(where: { $0.name() == "Copy Swift Macro executable into /Macros" })
+
+        XCTAssertNotNil(buildPhase)
+
+        let expectedScript =
+            "cp \"$SYMROOT/$CONFIGURATION/\(macroExecutable.productName)\" \"$BUILT_PRODUCTS_DIR/$FULL_PRODUCT_NAME/Macros/\(macroExecutable.productName)\""
+        XCTAssertTrue(buildPhase?.shellScript?.contains(expectedScript) == true)
+        XCTAssertTrue(buildPhase?.inputPaths.contains("$SYMROOT/$CONFIGURATION/\(macroExecutable.productName)") == true)
+        XCTAssertTrue(
+            buildPhase?.outputPaths
+                .contains("$BUILT_PRODUCTS_DIR/$FULL_PRODUCT_NAME/Macros/\(macroExecutable.productName)") == true
+        )
     }
 
     // MARK: - Helpers

@@ -1,6 +1,28 @@
 import Foundation
 import TSCBasic
 
+/// A directed edge linking representing a dependent relationship
+/// e.g. `from` (MainApp) depends on `to` (UIKit)
+public struct GraphEdge: Hashable, Codable {
+    public let from: GraphDependency
+    public let to: GraphDependency
+    public init(from: GraphDependency, to: GraphDependency) {
+        self.from = from
+        self.to = to
+    }
+}
+
+extension [GraphEdge: PlatformCondition] {
+    public subscript(_ edge: (GraphDependency, GraphDependency)) -> PlatformCondition? {
+        get {
+            self[GraphEdge(from: edge.0, to: edge.1)]
+        }
+        set {
+            self[GraphEdge(from: edge.0, to: edge.1)] = newValue
+        }
+    }
+}
+
 /// A directed acyclic graph (DAG) that Tuist uses to represent the dependency tree.
 public struct Graph: Equatable, Codable {
     /// The name of the graph
@@ -27,6 +49,9 @@ public struct Graph: Equatable, Codable {
     /// A dictionary that contains the one-to-many dependencies that represent the graph.
     public var dependencies: [GraphDependency: Set<GraphDependency>]
 
+    /// A dictionary that contains the Conditions to apply to a dependency relationship
+    public var dependencyConditions: [GraphEdge: PlatformCondition]
+
     public init(
         name: String,
         path: AbsolutePath,
@@ -34,7 +59,8 @@ public struct Graph: Equatable, Codable {
         projects: [AbsolutePath: Project],
         packages: [AbsolutePath: [String: Package]],
         targets: [AbsolutePath: [String: Target]],
-        dependencies: [GraphDependency: Set<GraphDependency>]
+        dependencies: [GraphDependency: Set<GraphDependency>],
+        dependencyConditions: [GraphEdge: PlatformCondition]
     ) {
         self.name = name
         self.path = path
@@ -43,5 +69,6 @@ public struct Graph: Equatable, Codable {
         self.packages = packages
         self.targets = targets
         self.dependencies = dependencies
+        self.dependencyConditions = dependencyConditions
     }
 }

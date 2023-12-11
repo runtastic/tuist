@@ -66,7 +66,8 @@ final class RunService {
         device: String?,
         version: String?,
         rosetta: Bool,
-        arguments: [String]
+        arguments: [String],
+        rawXcodebuildLogs: Bool
     ) async throws {
         let runPath: AbsolutePath
         if let path {
@@ -111,10 +112,12 @@ final class RunService {
             clean: clean,
             configuration: configuration,
             buildOutputPath: nil,
+            derivedDataPath: nil,
             device: device,
             osVersion: version?.version(),
             rosetta: rosetta,
-            graphTraverser: graphTraverser
+            graphTraverser: graphTraverser,
+            rawXcodebuildLogs: rawXcodebuildLogs
         )
 
         let minVersion: Version?

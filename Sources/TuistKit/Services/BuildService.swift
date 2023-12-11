@@ -55,10 +55,13 @@ final class BuildService {
         clean: Bool,
         configuration: String?,
         buildOutputPath: AbsolutePath?,
+        derivedDataPath: String?,
         path: AbsolutePath,
         device: String?,
+        platform: String?,
         osVersion: String?,
-        rosetta: Bool
+        rosetta: Bool,
+        rawXcodebuildLogs: Bool
     ) async throws {
         let graph: Graph
         let generator = generatorFactory.default()
@@ -75,6 +78,13 @@ final class BuildService {
         let graphTraverser = GraphTraverser(graph: graph)
         let buildableSchemes = buildGraphInspector.buildableSchemes(graphTraverser: graphTraverser)
 
+        let derivedDataPath = try derivedDataPath.map {
+            try AbsolutePath(
+                validating: $0,
+                relativeTo: FileHandler.shared.currentPath
+            )
+        }
+
         logger.log(
             level: .debug,
             "Found the following buildable schemes: \(buildableSchemes.map(\.name).joined(separator: ", "))"
@@ -89,18 +99,28 @@ final class BuildService {
                 throw TargetBuilderError.schemeWithoutBuildableTargets(scheme: scheme.name)
             }
 
+            let buildPlatform: TuistGraph.Platform
+
+            if let platform, let inputPlatform = TuistGraph.Platform(rawValue: platform) {
+                buildPlatform = inputPlatform
+            } else {
+                buildPlatform = try graphTarget.target.servicePlatform
+            }
+
             try await targetBuilder.buildTarget(
                 graphTarget,
-                platform: try graphTarget.target.servicePlatform,
+                platform: buildPlatform,
                 workspacePath: workspacePath,
                 scheme: scheme,
                 clean: clean,
                 configuration: configuration,
                 buildOutputPath: buildOutputPath,
+                derivedDataPath: derivedDataPath,
                 device: device,
                 osVersion: osVersion?.version(),
                 rosetta: rosetta,
-                graphTraverser: graphTraverser
+                graphTraverser: graphTraverser,
+                rawXcodebuildLogs: rawXcodebuildLogs
             )
         } else {
             var cleaned = false
@@ -111,18 +131,28 @@ final class BuildService {
                     throw TargetBuilderError.schemeWithoutBuildableTargets(scheme: scheme.name)
                 }
 
+                let buildPlatform: TuistGraph.Platform
+
+                if let platform, let inputPlatform = TuistGraph.Platform(rawValue: platform) {
+                    buildPlatform = inputPlatform
+                } else {
+                    buildPlatform = try graphTarget.target.servicePlatform
+                }
+
                 try await targetBuilder.buildTarget(
                     graphTarget,
-                    platform: try graphTarget.target.servicePlatform,
+                    platform: buildPlatform,
                     workspacePath: workspacePath,
                     scheme: scheme,
                     clean: !cleaned && clean,
                     configuration: configuration,
                     buildOutputPath: buildOutputPath,
+                    derivedDataPath: derivedDataPath,
                     device: device,
                     osVersion: osVersion?.version(),
                     rosetta: rosetta,
-                    graphTraverser: graphTraverser
+                    graphTraverser: graphTraverser,
+                    rawXcodebuildLogs: rawXcodebuildLogs
                 )
                 cleaned = true
             }

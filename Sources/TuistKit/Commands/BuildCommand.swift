@@ -4,8 +4,9 @@ import TSCBasic
 import TuistSupport
 
 /// Command that builds a target from the project in the current directory.
-struct BuildCommand: AsyncParsableCommand {
-    static var configuration: CommandConfiguration {
+public struct BuildCommand: AsyncParsableCommand {
+    public init() {}
+    public static var configuration: CommandConfiguration {
         CommandConfiguration(
             commandName: "build",
             abstract: "Builds a project"
@@ -41,6 +42,12 @@ struct BuildCommand: AsyncParsableCommand {
     var device: String?
 
     @Option(
+        name: .long,
+        help: "Build for a specific platform."
+    )
+    var platform: String?
+
+    @Option(
         name: .shortAndLong,
         help: "Build with a specific version of the OS."
     )
@@ -64,7 +71,18 @@ struct BuildCommand: AsyncParsableCommand {
     )
     var buildOutputPath: String?
 
-    func run() async throws {
+    @Option(
+        help: "Overrides the folder that should be used for derived data when building the project."
+    )
+    var derivedDataPath: String?
+
+    @Flag(
+        name: [.customLong("raw-xcodebuild-logs")],
+        help: "When passed, it outputs the raw xcodebuild logs without formatting them."
+    )
+    var rawXcodebuildLogs: Bool = false
+
+    public func run() async throws {
         let absolutePath: AbsolutePath
         if let path {
             absolutePath = try AbsolutePath(validating: path, relativeTo: FileHandler.shared.currentPath)
@@ -78,10 +96,13 @@ struct BuildCommand: AsyncParsableCommand {
             clean: clean,
             configuration: configuration,
             buildOutputPath: buildOutputPath.map { try AbsolutePath(validating: $0, relativeTo: FileHandler.shared.currentPath) },
+            derivedDataPath: derivedDataPath,
             path: absolutePath,
             device: device,
+            platform: platform,
             osVersion: os,
-            rosetta: rosetta
+            rosetta: rosetta,
+            rawXcodebuildLogs: rawXcodebuildLogs
         )
     }
 }

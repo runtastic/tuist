@@ -2,7 +2,6 @@
 
 Tuist is a command-line interface (CLI) designed to tackle the complexities of building large-scale applications for Apple platforms.
 
-> Warning: This website represents a partial revamp of the [Tuist documentation website](https://docs.tuist.io). For any documentation not available here, we recommend visiting the old website.
 ## Motivation
 
 As Xcode projects expand, **organizations may face a decline in productivity** due to several factors, including unreliable incremental builds, frequent clearing of Xcode's global cache by developers encountering issues, and fragile project configurations. To maintain rapid feature development, organizations typically explore various strategies.
@@ -36,7 +35,7 @@ Once you've defined your project, Tuist offers various workflows to manage and i
 - **Build:** This workflow not only generates the Xcode project but also employs xcodebuild to compile it.
 - **Test:** Operating much like the build workflow, this not only generates the Xcode project but utilizes xcodebuild to test it.
 
-Additionally, as detailed in <doc:Tuist-Cloud---Intro>, Tuist offers a suite of optimizations. These include **target-focused project generation**, the ability to swap out targets and dependencies with their **binary** equivalents, and ensuring build and test incrementality across different environments (e.g., local machine vs. CI). Plus, it provides actionable insights to guide teams in making informed choices.
+Additionally, as detailed in <doc:Tuist-Cloud---What>, Tuist offers a suite of optimizations. These include **target-focused project generation**, the ability to swap out targets and dependencies with their **binary** equivalents, and ensuring build and test incrementality across different environments (e.g., local machine vs. CI). Plus, it provides actionable insights to guide teams in making informed choices.
 
 > Tip: Tuist's optimizations and insights stem from the knowledge gained from your project's manifest files. To ensure teams remain productive, data-backed decisions are essential—something Xcode doesn't offer. As a result, teams often operate without clear insights, unsure if their choices benefit the project.
 
@@ -68,9 +67,19 @@ The choice is yours. By adding .xcodeproj and .xcworkspace files to your .gitign
 
 ### Tuist
 
+- <doc:Tuist---Installation>
 - <doc:Tuist-Tutorial>
 
 ### Tuist Cloud
 
 - <doc:Tuist-Cloud---What>
+- <doc:Tuist-Cloud---Binary-caching>
 - <doc:Tuist-Cloud-Tutorial>
+
+### Contributing
+
+- <doc:Contributing---Get-Started>
+- <doc:Contributing---Manifesto>
+- <doc:Contributing---Code-Reviews>
+- <doc:Contributing---Reporting-Bugs>
+- <doc:Contributing---Championing-Projects>

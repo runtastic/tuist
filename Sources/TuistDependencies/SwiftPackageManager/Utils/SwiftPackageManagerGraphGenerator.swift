@@ -49,7 +49,7 @@ public protocol SwiftPackageManagerGraphGenerating {
     func generate(
         at path: AbsolutePath,
         productTypes: [String: TuistGraph.Product],
-        platforms: Set<TuistGraph.Platform>,
+        platforms: Set<TuistGraph.PackagePlatform>,
         baseSettings: TuistGraph.Settings,
         targetSettings: [String: TuistGraph.SettingsDictionary],
         swiftToolsVersion: TSCUtility.Version?,
@@ -73,7 +73,7 @@ public final class SwiftPackageManagerGraphGenerator: SwiftPackageManagerGraphGe
     public func generate(
         at path: AbsolutePath,
         productTypes: [String: TuistGraph.Product],
-        platforms: Set<TuistGraph.Platform>,
+        platforms: Set<TuistGraph.PackagePlatform>,
         baseSettings: TuistGraph.Settings,
         targetSettings: [String: TuistGraph.SettingsDictionary],
         swiftToolsVersion: TSCUtility.Version?,
@@ -100,6 +100,9 @@ public final class SwiftPackageManagerGraphGenerator: SwiftPackageManagerGraphGe
                     throw SwiftPackageManagerGraphGeneratorError.missingPathInLocalSwiftPackage(name)
                 }
                 packageFolder = try AbsolutePath(validating: path)
+            case "registry":
+                let registryFolder = path.appending(try RelativePath(validating: "registry/downloads"))
+                packageFolder = registryFolder.appending(try RelativePath(validating: dependency.subpath))
             default:
                 throw SwiftPackageManagerGraphGeneratorError.unsupportedDependencyKind(dependency.packageRef.kind)
             }
@@ -132,9 +135,25 @@ public final class SwiftPackageManagerGraphGenerator: SwiftPackageManagerGraphGe
             packageInfos: packageInfoDictionary,
             idToPackage: idToPackage,
             packageToFolder: packageToFolder,
-            packageToTargetsToArtifactPaths: packageToTargetsToArtifactPaths,
-            platforms: platforms
+            packageToTargetsToArtifactPaths: packageToTargetsToArtifactPaths
         )
+
+        let destinations: ProjectDescription.Destinations = Set(platforms.flatMap { platform -> ProjectDescription.Destinations in
+            switch platform {
+            case .iOS:
+                [.iPhone, .iPad, .appleVisionWithiPadDesign, .macWithiPadDesign]
+            case .macCatalyst:
+                [.macCatalyst]
+            case .macOS:
+                [.mac]
+            case .tvOS:
+                [.appleTv]
+            case .watchOS:
+                [.appleWatch]
+            case .visionOS:
+                [.appleVision]
+            }
+        })
 
         let externalProjects: [Path: ProjectDescription.Project] = try packageInfos.reduce(into: [:]) { result, packageInfo in
             let manifest = try packageInfoMapper.map(
@@ -147,11 +166,11 @@ public final class SwiftPackageManagerGraphGenerator: SwiftPackageManagerGraphGe
                 targetSettings: targetSettings,
                 projectOptions: projectOptions[packageInfo.name],
                 minDeploymentTargets: preprocessInfo.platformToMinDeploymentTarget,
-                platforms: preprocessInfo.platforms,
+                destinations: destinations,
                 targetToProducts: preprocessInfo.targetToProducts,
                 targetToResolvedDependencies: preprocessInfo.targetToResolvedDependencies,
+                macroDependencies: preprocessInfo.macroDependencies,
                 targetToModuleMap: preprocessInfo.targetToModuleMap,
-                macOSTargets: preprocessInfo.macOSTargets,
                 packageToProject: packageToProject,
                 swiftToolsVersion: swiftToolsVersion
             )

@@ -43,7 +43,8 @@ public final class ResourceLocator: ResourceLocating {
     private func frameworkPath(_ name: String) throws -> AbsolutePath {
         let frameworkNames = ["lib\(name).dylib", "\(name).framework", "PackageFrameworks/\(name).framework"]
         let bundlePath = try AbsolutePath(validating: Bundle(for: ManifestLoader.self).bundleURL.path)
-        let paths = [
+
+        var paths: [AbsolutePath] = [
             bundlePath,
             bundlePath.parentDirectory,
             /**
@@ -57,6 +58,13 @@ public final class ResourceLocator: ResourceLocating {
                 */
             bundlePath.parentDirectory.appending(component: "lib"),
         ]
+        if let frameworkSearchPaths = ProcessEnv.vars["TUIST_FRAMEWORK_SEARCH_PATHS"]?.components(separatedBy: " ")
+            .filter({ !$0.isEmpty })
+        {
+            paths.append(
+                contentsOf: try frameworkSearchPaths.map { try AbsolutePath(validating: $0) }
+            )
+        }
         let candidates = try paths.flatMap { path in
             try frameworkNames.map { path.appending(try RelativePath(validating: $0)) }
         }

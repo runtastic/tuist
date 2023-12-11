@@ -52,6 +52,29 @@ You can use our [contribution docs](https://docs.tuist.io/contributors/get-start
 
 The financial sustainability of the project is possible thanks to the ongoing contributions from our [GitHub Sponsors](https://github.com/sponsors/tuist) and [Open Collective Backers](https://opencollective.com/tuistapp). From them, we'd like to give a special mention to the following sponsors:
 
+### Gold Sponsors
+
+[Monday.com](https://monday.com?utm_source=Github&utm_medium=Github_Repo_Content_Ad&utm_content=Developer&&utm_term=tuist)  is a cloud-based work operating system (Work OS) that empowers teams to run projects and workflows with confidence. It's a versatile platform that combines features of project management, workflow automation, and team collaboration to streamline the way teams work together. 
+
+<div >
+  <a href="https://monday.com?utm_source=Github&utm_medium=Github_Repo_Content_Ad&utm_content=Developer&&utm_term=tuist" target="_blank">
+    <picture>
+      <img width="300" src="assets/companies/monday.com.svg"/>
+    </picture>
+  </a>
+</div>
+
+[Lapse](https://lapse.com?utm_source=Github&utm_medium=Github_Repo_Content_Ad&utm_content=Developer&&utm_term=tuist) is an app designed to reclaim how we take and share memories. A camera for living in the moment and a private photo journal for friends, not followers.
+
+<div >
+  <a href="https://lapse.com?utm_source=Github&utm_medium=Github_Repo_Content_Ad&utm_content=Developer&&utm_term=tuist" target="_blank">
+    <picture>
+      <img width="200" src="assets/companies/lapse.svg"/>
+    </picture>
+  </a>
+</div>
+
+
 ### Silver sponsors
 
 [Stream](https://getstream.io/chat/sdk/ios/?utm_source=Github&utm_medium=Github_Repo_Content_Ad&utm_content=Developer&utm_campaign=Github_Jan2022_SwiftSDK&utm_term=tuist) helps build scalable in-app chat or activity feeds in days. Product teams trust Stream to launch faster, iterate more often, and ship a better user experience.
@@ -68,19 +91,6 @@ The financial sustainability of the project is possible thanks to the ongoing co
 </div>
 
 <br/>
-
-[Bitrise](https://bitrise.io?utm_source=Github&utm_medium=Github_Repo_Content_Ad&utm_content=Developer&utm_term=tuist) is a mobile DevOps platform built to adress mobile's challenges, empowering mobile teams to deliver their best work.
-
-<div >
-  <a href="https://bitrise.io?utm_source=Github&utm_medium=Github_Repo_Content_Ad&utm_content=Developer&utm_term=tuist" target="_blank">
-    <picture>
-      <source 
-      srcset="https://assets-global.website-files.com/5db35de024bb983af1b4e151/5e6f9ccda4e7ff12841abe18_Bitrise%20Logo%20-%20White%20Bg.png" 
-      media="(prefers-color-scheme: dark)">
-      <img width="140" src="https://assets-global.website-files.com/5db35de024bb983af1b4e151/5e6f9ccda4e7ff12841abe18_Bitrise%20Logo%20-%20White%20Bg.png"/>
-    </picture>
-  </a>
-</div>
 
 [Runway](https://www.runway.team) streamlines collaboration and automation for mobile app releases, from kickoff to rollout.
 
@@ -232,6 +242,7 @@ If you are interested in contributing to the project, our documentation has a se
     <td align="center"><a href="https://github.com/fortmarek"><img src="https://avatars0.githubusercontent.com/u/9371695?v=4" width="100px;" alt=""/><br /><sub><b>Marek Fořt</b></sub></a><br /></td>
     <td align="center"><a href="http://www.matrixprojects.net"><img src="https://avatars3.githubusercontent.com/u/11914919?v=4" width="100px;" alt=""/><br /><sub><b>Kas</b></sub></a><br /></td>
     <td align="center"><a href="https://github.com/danyf90"><img src="https://avatars.githubusercontent.com/u/2794031?v=4" width="100px;" alt=""/><br /><sub><b>Daniele Formichelli</b></sub></a><br /></td>
+    <td align="center" valign="top" width="14.28%"><a href="https://github.com/waltflanagan"><img src="https://avatars.githubusercontent.com/u/398293?v=4" width="100px;" alt=""/><br /><sub><b>Mike Simons</b></sub></a></td>
   </tr>
 </table>
 
@@ -397,7 +408,7 @@ Thanks goes to these wonderful people:
     </tr>
     <tr>
       <td align="center" valign="top" width="14.28%"><a href="https://github.com/MontakOleg"><img src="https://avatars.githubusercontent.com/u/1800899?v=4" width="100px;" alt=""/><br /><sub><b>MontakOleg</b></sub></a></td>
-      <td align="center" valign="top" width="14.28%"><a href="https://github.com/waltflanagan"><img src="https://avatars.githubusercontent.com/u/398293?v=4" width="100px;" alt=""/><br /><sub><b>Mike Simons</b></sub></a></td>
+      <td align="center" valign="top" width="14.28%"><a href="http://blog.jihoon.me"><img src="https://avatars.githubusercontent.com/u/68891494?v=4" width="100px;" alt=""/><br /><sub><b>안지훈</b></sub></a></td>
       <td align="center" valign="top" width="14.28%"><a href="https://github.com/oozoofrog"><img src="https://avatars.githubusercontent.com/u/3011832?v=4" width="100px;" alt=""/><br /><sub><b>oozoofrog</b></sub></a></td>
       <td align="center" valign="top" width="14.28%"><a href="https://github.com/MartinStrambach"><img src="https://avatars.githubusercontent.com/u/11178869?v=4" width="100px;" alt=""/><br /><sub><b>Martin Strambach</b></sub></a></td>
       <td align="center" valign="top" width="14.28%"><a href="https://github.com/sh-a-n"><img src="https://avatars.githubusercontent.com/u/2219548?v=4" width="100px;" alt=""/><br /><sub><b>sh-a-n</b></sub></a></td>
@@ -435,7 +446,6 @@ Thanks goes to these wonderful people:
       <td align="center" valign="top" width="14.28%"><a href="http://dc.wtf"><img src="https://avatars.githubusercontent.com/u/643865?v=4" width="100px;" alt=""/><br /><sub><b>dc</b></sub></a></td>
       <td align="center" valign="top" width="14.28%"><a href="https://github.com/baekteun"><img src="https://avatars.githubusercontent.com/u/74440939?v=4" width="100px;" alt=""/><br /><sub><b>baegteun</b></sub></a></td>
       <td align="center" valign="top" width="14.28%"><a href="http://vcoutasso.com"><img src="https://avatars.githubusercontent.com/u/44986513?v=4" width="100px;" alt=""/><br /><sub><b>Vinícius Couto Tasso</b></sub></a></td>
-      <td align="center" valign="top" width="14.28%"><a href="http://blog.jihoon.me"><img src="https://avatars.githubusercontent.com/u/68891494?v=4" width="100px;" alt=""/><br /><sub><b>안지훈</b></sub></a></td>
     </tr>
   </tbody>
 </table>

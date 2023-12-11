@@ -1,6 +1,93 @@
 # Changelog
 
-## 3.32.1-runtastic - 2023-11-07
+## 3.35.5 - 2023-12-10
+
+### Fixed
+
+- Fixed archival with swift macro [#5655](https://github.com/tuist/tuist/pull/5655) by [@kevinrandrup](https://github.com/kevinrandrup)
+- Fix missing SPM platforms [#5640](https://github.com/tuist/tuist/pull/5640) by [@waltflanagan](https://github.com/waltflanagan)
+
+## 3.35.4 - 2023-12-07
+
+### Added
+
+- [Multiplatform] Add support for multi platform conditions for source and resource files [#5628](https://github.com/tuist/tuist/pull/5628) by [@alexanderwe](https://github.com/alexanderwe)
+- Add flag to opt out from beautifying `xcodebuild` logs [#5635](https://github.com/tuist/tuist/pull/5635) by [@pepicrft](https://github.com/pepicrft)
+
+### Fixed
+
+- Add SKIP_INSTALL=YES to build settings for macro targets [#5641](https://github.com/tuist/tuist/pull/5641) by [@roanutil](https://github.com/roanutil)
+- Revert using `Workspace.swift` to detect the root directory [#5637](https://github.com/tuist/tuist/pull/5637) by [@pepicrft](https://github.com/pepicrft)
+- Fix regression in platform specific settings mapping [#5643](https://github.com/tuist/tuist/pull/5643) by [@waltflanagan](https://github.com/waltflanagan)
+
+## 3.35.3 - 2023-12-07
+
+### Added
+
+- [Multiplatform] Add support for multi platform conditions for source and resource files [#5628](https://github.com/tuist/tuist/pull/5628) by [@alexanderwe](https://github.com/alexanderwe)
+- Add flag to opt out from beautifying `xcodebuild` logs [#5635](https://github.com/tuist/tuist/pull/5635) by [@pepicrft](https://github.com/pepicrft)
+
+### Fixed
+
+- Add SKIP_INSTALL=YES to build settings for macro targets [#5641](https://github.com/tuist/tuist/pull/5641) by [@roanutil](https://github.com/roanutil)
+- Revert using `Workspace.swift` to detect the root directory [#5637](https://github.com/tuist/tuist/pull/5637) by [@pepicrft](https://github.com/pepicrft)
+- Fix regression in platform specific settings mapping [#5643](https://github.com/tuist/tuist/pull/5643) by [@waltflanagan](https://github.com/waltflanagan)
+
+## 3.35.2 - 2023-12-05
+
+### Fixed
+
+- Fix for package platform parsing to be case insensitive [#5627](https://github.com/tuist/tuist/pull/5627) by [@ladislas](https://github.com/ladislas)
+
+## 3.35.1 - 2023-12-04
+
+- no changes
+
+## 3.35.0 - 2023-12-04
+
+### Changed
+
+- Improve the group hierarchy for cache binaries [#5617](https://github.com/tuist/tuist/pull/5617) by [@pepicrft](https://github.com/pepicrft)
+
+## 3.34.0 - 2023-11-30
+
+### Fixed
+
+- Only filter test devices by MaxRuntime if Version is nil [#5596](https://github.com/tuist/tuist/pull/5596) by [@regularberry](https://github.com/regularberry)
+- Fix warnings with including `.stencil` files when running `tuist edit`. Fixes #5603 [#5609](https://github.com/tuist/tuist/pull/5609) by [@waltflanagan](https://github.com/waltflanagan)
+- Fix usage of --test-targets [#5615](https://github.com/tuist/tuist/pull/5615) by [@fortmarek](https://github.com/fortmarek)
+
+## 3.33.4 - 2023-11-24
+
+### Fixed
+
+- Fix mapping of `registry` SwiftPackageManager dependencies [#5563](https://github.com/tuist/tuist/pull/5563) by [@danyf90](https://github.com/danyf90)
+
+## 3.33.3 - 2023-11-18
+
+- no changes
+
+## 3.33.2 - 2023-11-17
+
+- no changes
+
+## 3.33.1 - 2023-11-17
+
+### Changed
+
+- Increase the timeout for uploading and downloading files [#5584](https://github.com/tuist/tuist/pull/5584) by [@pepicrft](https://github.com/pepicrft)
+
+### Added
+
+- Flatten the workspace groups hierarchy for dependencies [#5575](https://github.com/tuist/tuist/pull/5575) by [@pepicrft](https://github.com/pepicrft)
+- Automatically use the github-actions renderer [#5577](https://github.com/tuist/tuist/pull/5577) by [@pepicrft](https://github.com/pepicrft)
+- Config.swift defaults to `https://cloud.tuist.io` as the Tuist Cloud URL [#5581](https://github.com/tuist/tuist/pull/5581) by [@pepicrft](https://github.com/pepicrft)
+
+## 3.33.0 - 2023-11-15
+
+- no changes
+
+## 3.32.1 - 2023-11-14
 
 - no changes
 
@@ -182,10 +269,10 @@
 
 ### Breaking
 
-- Multi-platform / Multi-destination prep work will cause the following build settings to no longer be overridable in xcconfigs. This is to ensure the upcoming feature can be more predictable and reliable. The `.deploymentTarget()` API can be used to control those settings in the interim, please report any issues you may encounter related to this.   
-  - `SUPPORTS_XR_DESIGNED_FOR_IPHONE_IPAD`   
-  - `SUPPORTS_MAC_DESIGNED_FOR_IPHONE_IPAD`   
-  - `SUPPORTS_MACCATALYST`   
+- Multi-platform / Multi-destination prep work will cause the following build settings to no longer be overridable in xcconfigs. This is to ensure the upcoming feature can be more predictable and reliable. The `.deploymentTarget()` API can be used to control those settings in the interim, please report any issues you may encounter related to this.
+  - `SUPPORTS_XR_DESIGNED_FOR_IPHONE_IPAD`
+  - `SUPPORTS_MAC_DESIGNED_FOR_IPHONE_IPAD`
+  - `SUPPORTS_MACCATALYST`
   
 
 ## 3.22.0 - 2023-07-31

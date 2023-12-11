@@ -14,9 +14,11 @@ public protocol TargetBuilding {
     ///   - clean: Whether to clean the project before running.
     ///   - configuration: The configuration to use while building the scheme.
     ///   - buildOutputPath: An optional path to copy the build products to.
+    ///   - derivedDataPath: An optional path for derived data.
     ///   - device: An optional device specifier to use when building the scheme.
     ///   - osVersion: An optional OS number to use when building the scheme.
     ///   - graphTraverser: The Graph traverser.
+    ///   - rawXcodebuildLogs: When true, it outputs the raw xcodebuild logs.
     func buildTarget(
         _ target: GraphTarget,
         platform: TuistGraph.Platform,
@@ -25,10 +27,12 @@ public protocol TargetBuilding {
         clean: Bool,
         configuration: String?,
         buildOutputPath: AbsolutePath?,
+        derivedDataPath: AbsolutePath?,
         device: String?,
         osVersion: Version?,
         rosetta: Bool,
-        graphTraverser: GraphTraversing
+        graphTraverser: GraphTraversing,
+        rawXcodebuildLogs: Bool
     ) async throws
 }
 
@@ -81,10 +85,12 @@ public final class TargetBuilder: TargetBuilding {
         clean: Bool,
         configuration: String?,
         buildOutputPath: AbsolutePath?,
+        derivedDataPath: AbsolutePath?,
         device: String?,
         osVersion: Version?,
         rosetta: Bool,
-        graphTraverser: GraphTraversing
+        graphTraverser: GraphTraversing,
+        rawXcodebuildLogs: Bool
     ) async throws {
         logger.log(level: .notice, "Building scheme \(scheme.name)", metadata: .section)
 
@@ -111,8 +117,10 @@ public final class TargetBuilder: TargetBuilding {
                 scheme: scheme.name,
                 destination: destination,
                 rosetta: rosetta,
+                derivedDataPath: derivedDataPath,
                 clean: clean,
-                arguments: buildArguments
+                arguments: buildArguments,
+                rawXcodebuildLogs: rawXcodebuildLogs
             )
             .printFormattedOutput()
 
@@ -122,6 +130,7 @@ public final class TargetBuilder: TargetBuilding {
             try copyBuildProducts(
                 to: buildOutputPath,
                 projectPath: workspacePath,
+                derivedDataPath: derivedDataPath,
                 platform: platform,
                 configuration: configuration
             )
@@ -131,12 +140,14 @@ public final class TargetBuilder: TargetBuilding {
     private func copyBuildProducts(
         to outputPath: AbsolutePath,
         projectPath: AbsolutePath,
+        derivedDataPath: AbsolutePath?,
         platform: TuistGraph.Platform,
         configuration: String
     ) throws {
         let xcodeSchemeBuildPath = try xcodeProjectBuildDirectoryLocator.locate(
             platform: platform,
             projectPath: projectPath,
+            derivedDataPath: derivedDataPath,
             configuration: configuration
         )
         guard FileHandler.shared.exists(xcodeSchemeBuildPath) else {

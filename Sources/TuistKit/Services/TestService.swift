@@ -115,7 +115,7 @@ public final class TestService { // swiftlint:disable:this type_body_length
             let skipTestTargetsOnly = try Set(skipTestTargets.map { try TestIdentifier(target: $0.target) })
             let testTargetsOnly = try testTargets.map { try TestIdentifier(target: $0.target) }
             let targetsOnlyIntersection = skipTestTargetsOnly.intersection(testTargetsOnly)
-            if targetsOnlyIntersection.isEmpty {
+            if !skipTestTargets.isEmpty, targetsOnlyIntersection.isEmpty {
                 throw TestServiceError.nothingToSkip(
                     skipped: try skipTestTargets
                         .filter { skipTarget in try !testTargetsOnly.contains(TestIdentifier(target: skipTarget.target)) },
@@ -128,7 +128,7 @@ public final class TestService { // swiftlint:disable:this type_body_length
             let testTargetsClasses = try testTargets.lazy.filter { $0.class != nil }
                 .map { try TestIdentifier(target: $0.target, class: $0.class) }
             let targetsClassesIntersection = skipTestTargetsClasses.intersection(testTargetsClasses)
-            if !testTargetsClasses.isEmpty, targetsClassesIntersection.isEmpty {
+            if !testTargetsClasses.isEmpty, !skipTestTargetsClasses.isEmpty, targetsClassesIntersection.isEmpty {
                 throw TestServiceError.nothingToSkip(
                     skipped: try skipTestTargets
                         .filter { skipTarget in
@@ -143,7 +143,9 @@ public final class TestService { // swiftlint:disable:this type_body_length
             let skipTestTargetsClassesMethods = Set(skipTestTargets)
             let testTargetsClassesMethods = testTargets.lazy.filter { $0.class != nil && $0.method != nil }
             let targetsClassesMethodsIntersection = skipTestTargetsClassesMethods.intersection(testTargetsClasses)
-            if !testTargetsClassesMethods.isEmpty, targetsClassesMethodsIntersection.isEmpty {
+            if !testTargetsClassesMethods.isEmpty, targetsClassesMethodsIntersection.isEmpty,
+               !skipTestTargetsClassesMethods.isEmpty
+            {
                 throw TestServiceError.nothingToSkip(skipped: skipTestTargets, included: testTargets)
             }
         }
@@ -156,16 +158,19 @@ public final class TestService { // swiftlint:disable:this type_body_length
         configuration: String?,
         path: AbsolutePath,
         deviceName: String?,
+        platform: String?,
         osVersion: String?,
         rosetta: Bool,
         skipUITests: Bool,
         resultBundlePath: AbsolutePath?,
+        derivedDataPath: String?,
         retryCount: Int,
         testTargets: [TestIdentifier],
         skipTestTargets: [TestIdentifier],
         testPlanConfiguration: TestPlanConfiguration?,
         validateTestTargetsParameters: Bool = true,
-        generator: Generating? = nil
+        generator: Generating? = nil,
+        rawXcodebuildLogs: Bool
     ) async throws {
         if validateTestTargetsParameters {
             try validateParameters(
@@ -207,6 +212,13 @@ public final class TestService { // swiftlint:disable:this type_body_length
             "Found the following testable schemes: \(Set(testableSchemes.map(\.name)).joined(separator: ", "))"
         )
 
+        let derivedDataPath = try derivedDataPath.map {
+            try AbsolutePath(
+                validating: $0,
+                relativeTo: FileHandler.shared.currentPath
+            )
+        }
+
         if let schemeName {
             guard let scheme = testableSchemes.first(where: { $0.name == schemeName })
             else {
@@ -237,12 +249,15 @@ public final class TestService { // swiftlint:disable:this type_body_length
                     configuration: configuration,
                     version: version,
                     deviceName: deviceName,
+                    platform: platform,
                     rosetta: rosetta,
                     resultBundlePath: resultBundlePath,
+                    derivedDataPath: derivedDataPath,
                     retryCount: retryCount,
                     testTargets: testTargets,
                     skipTestTargets: skipTestTargets,
-                    testPlanConfiguration: testPlanConfiguration
+                    testPlanConfiguration: testPlanConfiguration,
+                    rawXcodebuildLogs: rawXcodebuildLogs
                 )
             }
         } else {
@@ -264,12 +279,15 @@ public final class TestService { // swiftlint:disable:this type_body_length
                     configuration: configuration,
                     version: version,
                     deviceName: deviceName,
+                    platform: platform,
                     rosetta: rosetta,
                     resultBundlePath: resultBundlePath,
+                    derivedDataPath: derivedDataPath,
                     retryCount: retryCount,
                     testTargets: testTargets,
                     skipTestTargets: skipTestTargets,
-                    testPlanConfiguration: testPlanConfiguration
+                    testPlanConfiguration: testPlanConfiguration,
+                    rawXcodebuildLogs: rawXcodebuildLogs
                 )
             }
         }
@@ -305,12 +323,15 @@ public final class TestService { // swiftlint:disable:this type_body_length
         configuration: String?,
         version: Version?,
         deviceName: String?,
+        platform: String?,
         rosetta: Bool,
         resultBundlePath: AbsolutePath?,
+        derivedDataPath: AbsolutePath?,
         retryCount: Int,
         testTargets: [TestIdentifier],
         skipTestTargets: [TestIdentifier],
-        testPlanConfiguration: TestPlanConfiguration?
+        testPlanConfiguration: TestPlanConfiguration?,
+        rawXcodebuildLogs: Bool
     ) async throws {
         logger.log(level: .notice, "Testing scheme \(scheme.name)", metadata: .section)
         if let testPlan = testPlanConfiguration?.testPlan, let testPlans = scheme.testAction?.testPlans,
@@ -332,11 +353,17 @@ public final class TestService { // swiftlint:disable:this type_body_length
             throw TestServiceError.schemeWithoutTestableTargets(scheme: scheme.name, testPlan: testPlanConfiguration?.testPlan)
         }
 
-        let platform = try buildableTarget.target.servicePlatform
+        let buildPlatform: TuistGraph.Platform
+
+        if let platform, let inputPlatform = TuistGraph.Platform(rawValue: platform) {
+            buildPlatform = inputPlatform
+        } else {
+            buildPlatform = try buildableTarget.target.servicePlatform
+        }
 
         let destination = try await XcodeBuildDestination.find(
             for: buildableTarget.target,
-            on: platform,
+            on: buildPlatform,
             scheme: scheme,
             version: version,
             deviceName: deviceName,
@@ -350,7 +377,7 @@ public final class TestService { // swiftlint:disable:this type_body_length
             clean: clean,
             destination: destination,
             rosetta: rosetta,
-            derivedDataPath: nil,
+            derivedDataPath: derivedDataPath,
             resultBundlePath: resultBundlePath,
             arguments: buildGraphInspector.buildArguments(
                 project: buildableTarget.project,
@@ -361,7 +388,8 @@ public final class TestService { // swiftlint:disable:this type_body_length
             retryCount: retryCount,
             testTargets: testTargets,
             skipTestTargets: skipTestTargets,
-            testPlanConfiguration: testPlanConfiguration
+            testPlanConfiguration: testPlanConfiguration,
+            rawXcodebuildLogs: rawXcodebuildLogs
         )
         .printFormattedOutput()
     }
