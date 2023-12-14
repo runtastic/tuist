@@ -257,6 +257,14 @@
 
 - Fix tuist cache warm --xcframeworks of SPM frameworks due to missing macCatalyst availability [#5302](https://github.com/tuist/tuist/pull/5302) by [@MontakOleg](https://github.com/MontakOleg)
 
+## 3.22.4-runtastic - 2023-08-10
+
+- no changes
+
+## 3.22.3-runtastic - 2023-08-10
+
+- no changes
+
 ## Unreleased
 
 ### Breaking
@@ -317,6 +325,10 @@
 
 - chore: Removed `BundleExecutableKey` from Info.plist for watchOS bundles [#5194](https://github.com/tuist/tuist/pull/5194) by [@griches](https://github.com/griches)
 - Improve error message when `tuist generate` is called without calling `tuist fetch` first [#5193](https://github.com/tuist/tuist/pull/5193) by [@mustiikhalil](https://github.com/mustiikhalil)
+
+## 3.19.1-runtastic - 2023-05-21
+
+- no changes
 
 ## 3.19.0 - 2023-04-29
 
