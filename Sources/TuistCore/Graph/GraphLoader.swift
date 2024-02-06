@@ -41,9 +41,9 @@ public final class GraphLoader: GraphLoading {
     public func loadWorkspace(workspace: Workspace, projects: [Project]) throws -> Graph {
         let cache = Cache(projects: projects)
 
-        try workspace.projects.forEach {
+        for project in workspace.projects {
             try loadProject(
-                path: $0,
+                path: project,
                 cache: cache
             )
         }
@@ -76,10 +76,10 @@ public final class GraphLoader: GraphLoading {
         }
         cache.add(project: project)
 
-        try project.targets.forEach {
+        for target in project.targets {
             try loadTarget(
                 path: path,
-                name: $0.name,
+                name: target.name,
                 cache: cache
             )
         }
@@ -120,6 +120,7 @@ public final class GraphLoader: GraphLoading {
         }
     }
 
+    // swiftlint:disable:next function_body_length
     private func loadDependency(
         path: AbsolutePath,
         forPlatforms platforms: Set<Platform>,
@@ -259,14 +260,15 @@ public final class GraphLoader: GraphLoading {
             at: path,
             status: status
         )
-        let xcframework: GraphDependency = .xcframework(
+        let xcframework: GraphDependency = .xcframework(GraphDependency.XCFramework(
             path: metadata.path,
             infoPlist: metadata.infoPlist,
             primaryBinaryPath: metadata.primaryBinaryPath,
             linking: metadata.linking,
             mergeable: metadata.mergeable,
-            status: metadata.status
-        )
+            status: metadata.status,
+            macroPath: metadata.macroPath
+        ))
         cache.add(xcframework: xcframework, at: path)
         return xcframework
     }
@@ -330,8 +332,8 @@ public final class GraphLoader: GraphLoading {
 
         func add(project: Project) {
             loadedProjects[project.path] = project
-            project.packages.forEach {
-                packages[project.path, default: [:]][$0.name] = $0
+            for package in project.packages {
+                packages[project.path, default: [:]][package.name] = package
             }
         }
 

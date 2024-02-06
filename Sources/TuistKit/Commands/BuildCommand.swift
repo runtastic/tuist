@@ -1,6 +1,7 @@
 import ArgumentParser
 import Foundation
 import TSCBasic
+import TSCUtility
 import TuistSupport
 
 /// Command that builds a target from the project in the current directory.
@@ -77,10 +78,10 @@ public struct BuildCommand: AsyncParsableCommand {
     var derivedDataPath: String?
 
     @Flag(
-        name: [.customLong("raw-xcodebuild-logs")],
-        help: "When passed, it outputs the raw xcodebuild logs without formatting them."
+        name: .long,
+        help: "When passed, it generates the project and skips building. This is useful for debugging purposes."
     )
-    var rawXcodebuildLogs: Bool = false
+    var generateOnly: Bool = false
 
     public func run() async throws {
         let absolutePath: AbsolutePath
@@ -102,7 +103,7 @@ public struct BuildCommand: AsyncParsableCommand {
             platform: platform,
             osVersion: os,
             rosetta: rosetta,
-            rawXcodebuildLogs: rawXcodebuildLogs
+            generateOnly: generateOnly
         )
     }
 }

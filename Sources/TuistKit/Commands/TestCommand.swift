@@ -125,10 +125,10 @@ public struct TestCommand: AsyncParsableCommand, HasTrackableParameters {
     var skipConfigurations: [String] = []
 
     @Flag(
-        name: [.customLong("raw-xcodebuild-logs")],
-        help: "When passed, it outputs the raw xcodebuild logs without formatting them."
+        name: .long,
+        help: "When passed, it generates the project and skips testing. This is useful for debugging purposes."
     )
-    var rawXcodebuildLogs: Bool = false
+    var generateOnly: Bool = false
 
     public func validate() throws {
         try TestService().validateParameters(
@@ -174,7 +174,7 @@ public struct TestCommand: AsyncParsableCommand, HasTrackableParameters {
                 )
             },
             validateTestTargetsParameters: false,
-            rawXcodebuildLogs: rawXcodebuildLogs
+            generateOnly: generateOnly
         )
     }
 }

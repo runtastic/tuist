@@ -97,13 +97,14 @@ final class BuildServiceTests: TuistUnitTestCase {
             XCTAssertEqual(_skipSigning, skipSigning)
             return buildArguments
         }
-        targetBuilder.buildTargetStub = { _, _workspacePath, _scheme, _clean, _, _, _, _device, _osVersion, _, _, _ in
-            XCTAssertEqual(_workspacePath, workspacePath)
-            XCTAssertEqual(_scheme, scheme)
-            XCTAssertTrue(_clean)
-            XCTAssertNil(_device)
-            XCTAssertNil(_osVersion)
-        }
+        targetBuilder
+            .buildTargetStub = { _, _workspacePath, _scheme, _clean, _, _, _, _device, _osVersion, _, _ in
+                XCTAssertEqual(_workspacePath, workspacePath)
+                XCTAssertEqual(_scheme, scheme)
+                XCTAssertTrue(_clean)
+                XCTAssertNil(_device)
+                XCTAssertNil(_osVersion)
+            }
 
         // Then
         try await subject.testRun(
@@ -144,7 +145,7 @@ final class BuildServiceTests: TuistUnitTestCase {
             XCTAssertEqual(_skipSigning, skipSigning)
             return buildArguments
         }
-        targetBuilder.buildTargetStub = { _, _workspacePath, _scheme, _clean, _, _, _, _, _, _, _, _ in
+        targetBuilder.buildTargetStub = { _, _workspacePath, _scheme, _clean, _, _, _, _, _, _, _ in
             XCTAssertEqual(_workspacePath, workspacePath)
             XCTAssertEqual(_scheme, scheme)
             XCTAssertTrue(_clean)
@@ -190,22 +191,23 @@ final class BuildServiceTests: TuistUnitTestCase {
             XCTAssertEqual(_skipSigning, skipSigning)
             return buildArguments
         }
-        targetBuilder.buildTargetStub = { _, _workspacePath, _scheme, _clean, _, _, _, _device, _osVersion, _, _, _ in
-            XCTAssertEqual(_workspacePath, workspacePath)
-            XCTAssertNil(_device)
-            XCTAssertNil(_osVersion)
+        targetBuilder
+            .buildTargetStub = { _, _workspacePath, _scheme, _clean, _, _, _, _device, _osVersion, _, _ in
+                XCTAssertEqual(_workspacePath, workspacePath)
+                XCTAssertNil(_device)
+                XCTAssertNil(_osVersion)
 
-            if _scheme.name == "A" {
-                XCTAssertEqual(_scheme, schemeA)
-                XCTAssertTrue(_clean)
-            } else if _scheme.name == "B" {
-                // When running the second scheme clean should be false
-                XCTAssertEqual(_scheme, schemeB)
-                XCTAssertFalse(_clean)
-            } else {
-                XCTFail("unexpected scheme \(_scheme.name)")
+                if _scheme.name == "A" {
+                    XCTAssertEqual(_scheme, schemeA)
+                    XCTAssertTrue(_clean)
+                } else if _scheme.name == "B" {
+                    // When running the second scheme clean should be false
+                    XCTAssertEqual(_scheme, schemeB)
+                    XCTAssertFalse(_clean)
+                } else {
+                    XCTFail("unexpected scheme \(_scheme.name)")
+                }
             }
-        }
 
         // Then
         try await subject.testRun(
@@ -246,9 +248,8 @@ final class BuildServiceTests: TuistUnitTestCase {
             XCTAssertEqual(_skipSigning, skipSigning)
             return buildArguments
         }
-        targetBuilder.buildTargetStub = { _, _workspacePath, _scheme, _clean, _, _, _, _, _, _, _, _ in
+        targetBuilder.buildTargetStub = { _, _workspacePath, _scheme, _clean, _, _, _, _, _, _, _ in
             XCTAssertEqual(_workspacePath, workspacePath)
-
             if _scheme.name == "A" {
                 XCTAssertEqual(_scheme, schemeA)
                 XCTAssertTrue(_clean)
@@ -310,7 +311,8 @@ extension BuildService {
         device: String? = nil,
         platform: String? = nil,
         osVersion: String? = nil,
-        rosetta: Bool = false
+        rosetta: Bool = false,
+        generateOnly: Bool = false
     ) async throws {
         try await run(
             schemeName: schemeName,
@@ -324,7 +326,7 @@ extension BuildService {
             platform: platform,
             osVersion: osVersion,
             rosetta: rosetta,
-            rawXcodebuildLogs: false
+            generateOnly: generateOnly
         )
     }
 }

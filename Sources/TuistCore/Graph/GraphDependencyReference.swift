@@ -12,9 +12,12 @@ public enum GraphDependencyReference: Equatable, Comparable, Hashable {
              let .product(_, _, condition),
              let .sdk(_, _, _, condition):
             return condition
+        case .macro:
+            return nil
         }
     }
 
+    case macro(path: AbsolutePath)
     case xcframework(
         path: AbsolutePath,
         infoPlist: XCFrameworkInfoPlist,
@@ -69,13 +72,13 @@ public enum GraphDependencyReference: Equatable, Comparable, Hashable {
                 product: (linking == .static) ? .staticLibrary : .dynamicLibrary,
                 condition: condition
             )
-        case let .xcframework(path, infoPlist, primaryBinaryPath, _, _, status):
+        case let .xcframework(xcframework):
             self = .xcframework(
-                path: path,
-                infoPlist: infoPlist,
-                primaryBinaryPath: primaryBinaryPath,
-                binaryPath: primaryBinaryPath,
-                status: status,
+                path: xcframework.path,
+                infoPlist: xcframework.infoPlist,
+                primaryBinaryPath: xcframework.primaryBinaryPath,
+                binaryPath: xcframework.primaryBinaryPath,
+                status: xcframework.status,
                 condition: condition
             )
         default:
@@ -109,6 +112,7 @@ public enum GraphDependencyReference: Equatable, Comparable, Hashable {
     // Private helper type to auto-synthesize the hashable & comparable implementations
     // where only the required subset of properties are used.
     private enum Synthesized: Comparable, Hashable {
+        case macro(path: AbsolutePath)
         case sdk(path: AbsolutePath, condition: PlatformCondition?)
         case product(target: String, productName: String, condition: PlatformCondition?)
         case library(path: AbsolutePath, condition: PlatformCondition?)
@@ -118,6 +122,8 @@ public enum GraphDependencyReference: Equatable, Comparable, Hashable {
 
         init(dependencyReference: GraphDependencyReference) {
             switch dependencyReference {
+            case let .macro(path):
+                self = .macro(path: path)
             case .xcframework(
                 path: let path,
                 infoPlist: _,

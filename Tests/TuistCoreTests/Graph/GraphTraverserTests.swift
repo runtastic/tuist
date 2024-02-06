@@ -333,8 +333,8 @@ final class GraphTraverserTests: TuistUnitTestCase {
         XCTAssertEqual(
             got,
             [
-                GraphTarget(path: projectA.path, target: a2, project: projectA),
-                GraphTarget(path: projectB.path, target: b1, project: projectB),
+                GraphTargetReference(target: GraphTarget(path: projectA.path, target: a2, project: projectA)),
+                GraphTargetReference(target: GraphTarget(path: projectB.path, target: b1, project: projectB)),
             ]
         )
     }
@@ -1081,7 +1081,8 @@ final class GraphTraverserTests: TuistUnitTestCase {
         let got = subject.appClipDependencies(path: project.path, name: app.name)
 
         // Then
-        XCTAssertEqual(got, .init(path: project.path, target: appClip, project: project))
+        let expectedTarget = GraphTarget(path: project.path, target: appClip, project: project)
+        XCTAssertEqual(got, GraphTargetReference(target: expectedTarget))
     }
 
     func test_buildsForMacCatalyst_returns_false_when_someDependenciesCantBuildForMacCatalyst() {
@@ -1175,6 +1176,44 @@ final class GraphTraverserTests: TuistUnitTestCase {
 
         // Then
         XCTAssertTrue(got)
+    }
+
+    func test_embeddableFrameworks_when_macroExecutableInBetween() throws {
+        /**
+         Target > Macro XCFramework > Macro Executable > Dynamic SwiftSyntax
+
+         Having a macro executable that links dynamic dependencies is an scenario that Tuist might support in the future.
+         This test ensures that our graph traverser is accounting for that already.
+         */
+        // Given
+        let target = Target.test(name: "Main", product: .app)
+        let precompiledMacro = GraphDependency.testXCFramework(linking: .dynamic)
+        let precompiledMacroExecutable = GraphDependency.testMacro()
+        let swiftSyntaxDynamicXCFramework = GraphDependency.testXCFramework(linking: .dynamic)
+
+        let project = Project.test(targets: [target])
+        let graphTarget = GraphDependency.target(name: target.name, path: project.path)
+
+        // Given: Value Graph
+        let graph = Graph.test(
+            projects: [project.path: project],
+            targets: [project.path: [target.name: target]],
+            dependencies: [
+                .target(
+                    name: target.name,
+                    path: project.path
+                ): Set([precompiledMacro]),
+                precompiledMacro: Set([swiftSyntaxDynamicXCFramework]),
+                precompiledMacroExecutable: Set([swiftSyntaxDynamicXCFramework]),
+            ]
+        )
+        let subject = GraphTraverser(graph: graph)
+
+        // When
+        let got = subject.embeddableFrameworks(path: project.path, name: target.name).sorted()
+
+        // Then
+        XCTAssertEqual(got, [GraphDependencyReference(precompiledMacro)])
     }
 
     func test_embeddableFrameworks_when_targetIsNotApp() throws {
@@ -1308,41 +1347,50 @@ final class GraphTraverserTests: TuistUnitTestCase {
 
         // Given: Value Graph
         let cDependency = GraphDependency.xcframework(
-            path: "/xcframeworks/c.xcframework",
-            infoPlist: .test(libraries: [.test(
-                identifier: "id",
-                path: try RelativePath(validating: "path"),
-                architectures: [.arm64]
-            )]),
-            primaryBinaryPath: "/xcframeworks/c.xcframework/c",
-            linking: .dynamic,
-            mergeable: false,
-            status: .required
+            GraphDependency.XCFramework(
+                path: "/xcframeworks/c.xcframework",
+                infoPlist: .test(libraries: [.test(
+                    identifier: "id",
+                    path: try RelativePath(validating: "path"),
+                    architectures: [.arm64]
+                )]),
+                primaryBinaryPath: "/xcframeworks/c.xcframework/c",
+                linking: .dynamic,
+                mergeable: false,
+                status: .required,
+                macroPath: nil
+            )
         )
         let dDependency = GraphDependency.xcframework(
-            path: "/xcframeworks/d.xcframework",
-            infoPlist: .test(libraries: [.test(
-                identifier: "id",
-                path: try RelativePath(validating: "path"),
-                architectures: [.arm64]
-            )]),
-            primaryBinaryPath: "/xcframeworks/d.xcframework/d",
-            linking: .dynamic,
-            mergeable: false,
-            status: .required
+            GraphDependency.XCFramework(
+                path: "/xcframeworks/d.xcframework",
+                infoPlist: .test(libraries: [.test(
+                    identifier: "id",
+                    path: try RelativePath(validating: "path"),
+                    architectures: [.arm64]
+                )]),
+                primaryBinaryPath: "/xcframeworks/d.xcframework/d",
+                linking: .dynamic,
+                mergeable: false,
+                status: .required,
+                macroPath: nil
+            )
         )
         let eDependency = GraphDependency.xcframework(
-            path: "/xcframeworks/e.xcframework",
-            infoPlist: .test(libraries: [.test(
-                identifier: "id",
-                path: try RelativePath(validating: "path"),
+            GraphDependency.XCFramework(
+                path: "/xcframeworks/e.xcframework",
+                infoPlist: .test(libraries: [.test(
+                    identifier: "id",
+                    path: try RelativePath(validating: "path"),
+                    mergeable: true,
+                    architectures: [.arm64]
+                )]),
+                primaryBinaryPath: "/xcframeworks/e.xcframework/e",
+                linking: .dynamic,
                 mergeable: true,
-                architectures: [.arm64]
-            )]),
-            primaryBinaryPath: "/xcframeworks/e.xcframework/e",
-            linking: .dynamic,
-            mergeable: true,
-            status: .required
+                status: .required,
+                macroPath: nil
+            )
         )
         let dependencies: [GraphDependency: Set<GraphDependency>] = [
             .target(name: app.name, path: project.path): Set(arrayLiteral: cDependency, eDependency),
@@ -1380,41 +1428,50 @@ final class GraphTraverserTests: TuistUnitTestCase {
 
         // Given: Value Graph
         let cDependency = GraphDependency.xcframework(
-            path: "/xcframeworks/c.xcframework",
-            infoPlist: .test(libraries: [.test(
-                identifier: "id",
-                path: try RelativePath(validating: "c.framework"),
-                architectures: [.arm64]
-            )]),
-            primaryBinaryPath: "/xcframeworks/c.xcframework/c",
-            linking: .dynamic,
-            mergeable: false,
-            status: .required
+            GraphDependency.XCFramework(
+                path: "/xcframeworks/c.xcframework",
+                infoPlist: .test(libraries: [.test(
+                    identifier: "id",
+                    path: try RelativePath(validating: "c.framework"),
+                    architectures: [.arm64]
+                )]),
+                primaryBinaryPath: "/xcframeworks/c.xcframework/c",
+                linking: .dynamic,
+                mergeable: false,
+                status: .required,
+                macroPath: nil
+            )
         )
         let dDependency = GraphDependency.xcframework(
-            path: "/xcframeworks/d.xcframework",
-            infoPlist: .test(libraries: [.test(
-                identifier: "id",
-                path: try RelativePath(validating: "d.framework"),
-                architectures: [.arm64]
-            )]),
-            primaryBinaryPath: "/xcframeworks/d.xcframework/d",
-            linking: .dynamic,
-            mergeable: false,
-            status: .required
+            GraphDependency.XCFramework(
+                path: "/xcframeworks/d.xcframework",
+                infoPlist: .test(libraries: [.test(
+                    identifier: "id",
+                    path: try RelativePath(validating: "d.framework"),
+                    architectures: [.arm64]
+                )]),
+                primaryBinaryPath: "/xcframeworks/d.xcframework/d",
+                linking: .dynamic,
+                mergeable: false,
+                status: .required,
+                macroPath: nil
+            )
         )
         let eDependency = GraphDependency.xcframework(
-            path: "/xcframeworks/e.xcframework",
-            infoPlist: .test(libraries: [.test(
-                identifier: "id",
-                path: try RelativePath(validating: "e.framework"),
+            GraphDependency.XCFramework(
+                path: "/xcframeworks/e.xcframework",
+                infoPlist: .test(libraries: [.test(
+                    identifier: "id",
+                    path: try RelativePath(validating: "e.framework"),
+                    mergeable: true,
+                    architectures: [.arm64]
+                )]),
+                primaryBinaryPath: "/xcframeworks/e.xcframework/e",
+                linking: .dynamic,
                 mergeable: true,
-                architectures: [.arm64]
-            )]),
-            primaryBinaryPath: "/xcframeworks/e.xcframework/e",
-            linking: .dynamic,
-            mergeable: true,
-            status: .required
+                status: .required,
+                macroPath: nil
+            )
         )
         let dependencies: [GraphDependency: Set<GraphDependency>] = [
             .target(name: app.name, path: project.path): Set(arrayLiteral: cDependency, eDependency),
@@ -1809,6 +1866,40 @@ final class GraphTraverserTests: TuistUnitTestCase {
 
         // Then
         XCTAssertEqual(got, try [AbsolutePath(validating: "/test")])
+    }
+
+    func test_linkableDependencies_whenMacros() throws {
+        // Given
+        let target = Target.test(name: "Main", product: .app)
+        let macroXCFramework = GraphDependency.testXCFramework(
+            path: .root.appending(component: "Macro.xcframework"),
+            linking: .static
+        )
+        let macroExecutable = GraphDependency.testMacro()
+        let swiftSyntax = GraphDependency.testXCFramework(
+            path: .root.appending(component: "SwiftSyntax.xcframework"),
+            linking: .static
+        )
+        let project = Project.test(targets: [target])
+
+        // Given: Value Graph
+        let dependencies: [GraphDependency: Set<GraphDependency>] = [
+            .target(name: target.name, path: project.path): Set([macroXCFramework]),
+            macroXCFramework: Set([macroExecutable]),
+            macroExecutable: Set([swiftSyntax]),
+        ]
+        let graph = Graph.test(
+            projects: [project.path: project],
+            targets: [project.path: [target.name: target]],
+            dependencies: dependencies
+        )
+        let subject = GraphTraverser(graph: graph)
+
+        // When
+        let got = try subject.linkableDependencies(path: project.path, name: target.name).sorted()
+
+        // Then
+        XCTAssertEqual(got.first, GraphDependencyReference(macroXCFramework))
     }
 
     func test_linkableDependencies_whenPrecompiled() throws {
@@ -3979,16 +4070,19 @@ final class GraphTraverserTests: TuistUnitTestCase {
 
         let project = Project.test(targets: [staticLibrary])
         let directXCFramework = GraphDependency.xcframework(
-            path: "/xcframeworks/direct.xcframework",
-            infoPlist: .test(libraries: [.test(
-                identifier: "id",
-                path: try RelativePath(validating: "path"),
-                architectures: [.arm64]
-            )]),
-            primaryBinaryPath: "/xcframeworks/direct.xcframework/direct",
-            linking: .static,
-            mergeable: false,
-            status: .required
+            GraphDependency.XCFramework(
+                path: "/xcframeworks/direct.xcframework",
+                infoPlist: .test(libraries: [.test(
+                    identifier: "id",
+                    path: try RelativePath(validating: "path"),
+                    architectures: [.arm64]
+                )]),
+                primaryBinaryPath: "/xcframeworks/direct.xcframework/direct",
+                linking: .static,
+                mergeable: false,
+                status: .required,
+                macroPath: nil
+            )
         )
         let directFramework = GraphDependency.framework(
             path: "/frameworks/direct.framework",
@@ -4002,40 +4096,49 @@ final class GraphTraverserTests: TuistUnitTestCase {
         )
         let directFrameworkTarget = GraphDependency.target(name: staticFramework.name, path: project.path)
         let transitiveFrameworkTargetXCFramework = GraphDependency.xcframework(
-            path: "/xcframeworks/transitive-framework-target-xcframework.xcframework",
-            infoPlist: .test(libraries: [.test(
-                identifier: "id",
-                path: try RelativePath(validating: "path"),
-                architectures: [.arm64]
-            )]),
-            primaryBinaryPath: "/xcframeworks/transitive-framework-target-xcframework.xcframework/transitive",
-            linking: .static,
-            mergeable: false,
-            status: .required
+            GraphDependency.XCFramework(
+                path: "/xcframeworks/transitive-framework-target-xcframework.xcframework",
+                infoPlist: .test(libraries: [.test(
+                    identifier: "id",
+                    path: try RelativePath(validating: "path"),
+                    architectures: [.arm64]
+                )]),
+                primaryBinaryPath: "/xcframeworks/transitive-framework-target-xcframework.xcframework/transitive",
+                linking: .static,
+                mergeable: false,
+                status: .required,
+                macroPath: nil
+            )
         )
         let transitiveXCFramework = GraphDependency.xcframework(
-            path: "/xcframeworks/transitive.xcframework",
-            infoPlist: .test(libraries: [.test(
-                identifier: "id",
-                path: try RelativePath(validating: "path"),
-                architectures: [.arm64]
-            )]),
-            primaryBinaryPath: "/xcframeworks/transitive.xcframework/transitive",
-            linking: .static,
-            mergeable: false,
-            status: .required
+            GraphDependency.XCFramework(
+                path: "/xcframeworks/transitive.xcframework",
+                infoPlist: .test(libraries: [.test(
+                    identifier: "id",
+                    path: try RelativePath(validating: "path"),
+                    architectures: [.arm64]
+                )]),
+                primaryBinaryPath: "/xcframeworks/transitive.xcframework/transitive",
+                linking: .static,
+                mergeable: false,
+                status: .required,
+                macroPath: nil
+            )
         )
         let frameworkTransitiveXCFramework = GraphDependency.xcframework(
-            path: "/xcframeworks/framework-transitive.xcframework",
-            infoPlist: .test(libraries: [.test(
-                identifier: "id",
-                path: try RelativePath(validating: "path"),
-                architectures: [.arm64]
-            )]),
-            primaryBinaryPath: "/xcframeworks/framework-transitive.xcframework/framework-transitive",
-            linking: .static,
-            mergeable: false,
-            status: .required
+            GraphDependency.XCFramework(
+                path: "/xcframeworks/framework-transitive.xcframework",
+                infoPlist: .test(libraries: [.test(
+                    identifier: "id",
+                    path: try RelativePath(validating: "path"),
+                    architectures: [.arm64]
+                )]),
+                primaryBinaryPath: "/xcframeworks/framework-transitive.xcframework/framework-transitive",
+                linking: .static,
+                mergeable: false,
+                status: .required,
+                macroPath: nil
+            )
         )
 
         let dependencies: [GraphDependency: Set<GraphDependency>] = [
@@ -4500,15 +4603,34 @@ final class GraphTraverserTests: TuistUnitTestCase {
         XCTAssertEqual(got.sorted(), [])
     }
 
-    func test_directSwiftMacroFrameworkTargets_when_targetHasADirectMacroStaticFrameworkDependency() {
+    func test_directSwiftMacroTargets_when_targetHasADirectMacroStaticFrameworkDependency() {
         // Given
         let app = Target.test(name: "App", destinations: [.iPhone], product: .app)
-        let macroFramework = Target.test(name: "StaticFramework", destinations: [.iPhone], product: .staticFramework)
+        let staticFrameworkMacro = Target.test(name: "StaticFrameworkMacro", destinations: [.iPhone], product: .staticFramework)
+        let dynamicFrameworkMacro = Target.test(name: "DynamicFrameworkMacro", destinations: [.iPhone], product: .framework)
+        let staticLibraryMacro = Target.test(name: "StaticLibraryMacro", destinations: [.iPhone], product: .staticLibrary)
+        let dynamicLibraryMacro = Target.test(name: "DynamicLibraryMacro", destinations: [.iPhone], product: .dynamicLibrary)
+
         let macro = Target.test(name: "Macro", destinations: [.mac], product: .macro)
-        let project = Project.test(targets: [app, macroFramework, macro])
+        let project = Project.test(targets: [
+            app,
+            staticFrameworkMacro,
+            dynamicFrameworkMacro,
+            staticLibraryMacro,
+            dynamicLibraryMacro,
+            macro,
+        ])
         let dependencies: [GraphDependency: Set<GraphDependency>] = [
-            .target(name: app.name, path: project.path): Set([.target(name: macroFramework.name, path: project.path)]),
-            .target(name: macroFramework.name, path: project.path): Set([.target(name: macro.name, path: project.path)]),
+            .target(name: app.name, path: project.path): Set([
+                .target(name: staticFrameworkMacro.name, path: project.path),
+                .target(name: dynamicFrameworkMacro.name, path: project.path),
+                .target(name: staticLibraryMacro.name, path: project.path),
+                .target(name: dynamicLibraryMacro.name, path: project.path),
+            ]),
+            .target(name: staticFrameworkMacro.name, path: project.path): Set([.target(name: macro.name, path: project.path)]),
+            .target(name: dynamicFrameworkMacro.name, path: project.path): Set([.target(name: macro.name, path: project.path)]),
+            .target(name: staticLibraryMacro.name, path: project.path): Set([.target(name: macro.name, path: project.path)]),
+            .target(name: dynamicLibraryMacro.name, path: project.path): Set([.target(name: macro.name, path: project.path)]),
         ]
 
         // Given: Value Graph
@@ -4517,7 +4639,10 @@ final class GraphTraverserTests: TuistUnitTestCase {
             projects: [project.path: project],
             targets: [project.path: [
                 app.name: app,
-                macroFramework.name: macroFramework,
+                staticFrameworkMacro.name: staticFrameworkMacro,
+                dynamicFrameworkMacro.name: dynamicFrameworkMacro,
+                staticLibraryMacro.name: staticLibraryMacro,
+                dynamicLibraryMacro.name: dynamicLibraryMacro,
                 macro.name: macro,
             ]],
             dependencies: dependencies
@@ -4525,15 +4650,30 @@ final class GraphTraverserTests: TuistUnitTestCase {
         let subject = GraphTraverser(graph: graph)
 
         // When
-        let got = subject.directSwiftMacroFrameworkTargets(path: project.path, name: app.name)
+        let got = subject.directSwiftMacroTargets(path: project.path, name: app.name)
 
         // Then
         XCTAssertEqual(got.sorted(), [
-            GraphTarget(path: project.path, target: macroFramework, project: project),
+            GraphTargetReference(
+                target: GraphTarget(path: project.path, target: dynamicFrameworkMacro, project: project),
+                condition: nil
+            ),
+            GraphTargetReference(
+                target: GraphTarget(path: project.path, target: dynamicLibraryMacro, project: project),
+                condition: nil
+            ),
+            GraphTargetReference(
+                target: GraphTarget(path: project.path, target: staticFrameworkMacro, project: project),
+                condition: nil
+            ),
+            GraphTargetReference(
+                target: GraphTarget(path: project.path, target: staticLibraryMacro, project: project),
+                condition: nil
+            ),
         ])
     }
 
-    func test_directSwiftMacroFrameworkTargets_doesntReturnAStaticFramework_when_theStaticFrameworkDoesntDependOnAMacroExecutable(
+    func test_directSwiftMacroTargets_doesntReturnATarget_when_theItDoesntDependOnAMacroExecutable(
     ) {
         // Given
         let app = Target.test(name: "App", destinations: [.iPhone], product: .app)
@@ -4557,10 +4697,663 @@ final class GraphTraverserTests: TuistUnitTestCase {
         let subject = GraphTraverser(graph: graph)
 
         // When
-        let got = subject.directSwiftMacroFrameworkTargets(path: project.path, name: app.name)
+        let got = subject.directSwiftMacroTargets(path: project.path, name: app.name)
 
         // Then
         XCTAssertEqual(got.sorted(), [])
+    }
+
+    func test_allSwiftMacroTargets_returnsTransitiveSwiftMacros() {
+        // Given
+        let app = Target.test(name: "App", destinations: [.iPhone], product: .app)
+        let directMacroFramework = Target.test(name: "DirectMacroFramework", destinations: [.iPhone], product: .staticFramework)
+        let directMacro = Target.test(name: "DirectMacro", destinations: [.mac], product: .macro)
+        let transitiveMacroLibrary = Target.test(
+            name: "TransitiveMacroLibrary",
+            destinations: [.iPhone],
+            product: .staticLibrary
+        )
+        let transitiveMacro = Target.test(name: "TransitiveMacro", destinations: [.mac], product: .macro)
+
+        let project = Project.test(targets: [app, directMacroFramework, directMacro])
+        let dependencies: [GraphDependency: Set<GraphDependency>] = [
+            .target(name: app.name, path: project.path): Set([.target(name: directMacroFramework.name, path: project.path)]),
+            .target(name: directMacroFramework.name, path: project.path): Set([
+                .target(name: directMacro.name, path: project.path),
+                .target(name: transitiveMacroLibrary.name, path: project.path),
+            ]),
+            .target(name: transitiveMacroLibrary.name, path: project.path): Set([.target(
+                name: transitiveMacro.name,
+                path: project.path
+            )]),
+        ]
+
+        // Given: Value Graph
+        let graph = Graph.test(
+            path: project.path,
+            projects: [project.path: project],
+            targets: [project.path: [
+                app.name: app,
+                directMacroFramework.name: directMacroFramework,
+                directMacro.name: directMacro,
+                transitiveMacroLibrary.name: transitiveMacroLibrary,
+                transitiveMacro.name: transitiveMacro,
+            ]],
+            dependencies: dependencies
+        )
+        let subject = GraphTraverser(graph: graph)
+
+        // When
+        let got = subject.allSwiftMacroTargets(path: project.path, name: app.name)
+
+        // Then
+        XCTAssertEqual(got.sorted(), [
+            GraphTarget(path: project.path, target: directMacroFramework, project: project),
+            GraphTarget(path: project.path, target: transitiveMacroLibrary, project: project),
+        ])
+    }
+
+    func test_directTargetDependenciesWithConditions() throws {
+        // Given
+        let app = Target.test(name: "App", destinations: [.iPhone], product: .app)
+        let framework = Target.test(name: "Framework", destinations: [.iPhone], product: .framework)
+        let project = Project.test(targets: [app, framework])
+        let appDependency = GraphDependency.target(name: app.name, path: project.path)
+        let frameworkDependency = GraphDependency.target(name: framework.name, path: project.path)
+        let dependencies: [GraphDependency: Set<GraphDependency>] = [
+            appDependency: Set([frameworkDependency]),
+            frameworkDependency: Set([]),
+        ]
+        let platformCondition = try PlatformCondition.test([.ios])
+
+        // Given: Value Graph
+        let graph = Graph.test(
+            path: project.path,
+            projects: [project.path: project],
+            targets: [project.path: [
+                app.name: app,
+                framework.name: framework,
+            ]],
+            dependencies: dependencies,
+            dependencyConditions: [
+                GraphEdge(from: appDependency, to: frameworkDependency): platformCondition,
+            ]
+        )
+        let subject = GraphTraverser(graph: graph)
+
+        // When
+        let got = subject.directTargetDependencies(path: project.path, name: app.name)
+
+        // Then
+        XCTAssertEqual(got.count, 1)
+        let result = try XCTUnwrap(got.first)
+        XCTAssertEqual(result.graphTarget, GraphTarget(path: project.path, target: framework, project: project))
+        XCTAssertEqual(result.condition, platformCondition)
+    }
+
+    // https://github.com/tuist/tuist/issues/5746
+    func test_transitiveTargetDependenciesWhenIntermediateDependenciesHaveConditions() throws {
+        // Given
+        let app = Target.test(name: "App", destinations: [.iPhone, .mac], product: .app)
+        let frameworkA = Target.test(name: "FrameworkA", destinations: [.iPhone, .mac], product: .framework)
+        let frameworkB = Target.test(name: "FrameworkB", destinations: [.iPhone], product: .framework)
+        let frameworkC = Target.test(name: "FrameworkC", destinations: [.iPhone, .mac], product: .framework)
+        let frameworkD = Target.test(name: "FrameworkD", destinations: [.iPhone, .mac], product: .framework)
+
+        let project = Project.test(targets: [app, frameworkA, frameworkB, frameworkC, frameworkD])
+        let appDependency = GraphDependency.target(name: app.name, path: project.path)
+        let frameworkADependency = GraphDependency.target(name: frameworkA.name, path: project.path)
+        let frameworkBDependency = GraphDependency.target(name: frameworkB.name, path: project.path)
+        let frameworkCDependency = GraphDependency.target(name: frameworkC.name, path: project.path)
+        let frameworkDDependency = GraphDependency.target(name: frameworkD.name, path: project.path)
+
+        let dependencies: [GraphDependency: Set<GraphDependency>] = [
+            appDependency: Set([
+                frameworkADependency,
+                frameworkBDependency,
+            ]),
+            frameworkADependency: Set([frameworkCDependency]),
+            frameworkBDependency: Set([frameworkCDependency]),
+            frameworkCDependency: Set([frameworkDDependency]),
+        ]
+        let platformCondition = try PlatformCondition.test([.ios])
+
+        // Given: Value Graph
+        let graph = Graph.test(
+            path: project.path,
+            projects: [project.path: project],
+            targets: [project.path: [
+                app.name: app,
+                frameworkA.name: frameworkA,
+                frameworkB.name: frameworkB,
+                frameworkC.name: frameworkC,
+                frameworkD.name: frameworkD,
+            ]],
+            dependencies: dependencies,
+            dependencyConditions: [
+                GraphEdge(from: frameworkBDependency, to: frameworkCDependency): platformCondition,
+            ]
+        )
+
+        for _ in 0 ..< 50 {
+            let subject = GraphTraverser(graph: graph)
+
+            // When
+            let appToFrameworkC = subject.combinedCondition(
+                to: frameworkCDependency,
+                from: appDependency
+            )
+
+            let appToFrameworkD = subject.combinedCondition(
+                to: frameworkDDependency,
+                from: appDependency
+            )
+
+            // Then
+            XCTAssertEqual(appToFrameworkC, .condition(nil))
+            XCTAssertEqual(appToFrameworkD, .condition(nil))
+        }
+    }
+
+    func test_orphanExternalDependencies() throws {
+        // Given
+        let app = Target.test(name: "App", destinations: [.iPhone], product: .app)
+        let project = Project.test(path: try! AbsolutePath(validating: "/App"), targets: [app])
+        let appDependency = GraphDependency.target(name: app.name, path: project.path)
+        let directPackageProduct = Target.test(name: "DirectPackage", destinations: [.iPhone], product: .app)
+        let transitivePackageProduct = Target.test(name: "TransitivePackage", destinations: [.iPhone], product: .app)
+        let packageDevProduct = Target.test(name: "DevPackage", destinations: [.iPhone], product: .app)
+        let packageProject = Project.test(
+            path: try! AbsolutePath(validating: "/Package"),
+            name: "Package",
+            targets: [directPackageProduct, transitivePackageProduct, packageDevProduct],
+            isExternal: true
+        )
+        let directPackageProductDependency = GraphDependency.target(name: directPackageProduct.name, path: packageProject.path)
+        let transitivePackageProductDependency = GraphDependency.target(
+            name: transitivePackageProduct.name,
+            path: packageProject.path
+        )
+
+        let graph = Graph.test(
+            path: project.path,
+            projects: [project.path: project, packageProject.path: packageProject],
+            targets: [project.path: [
+                app.name: app,
+            ], packageProject.path: [
+                directPackageProduct.name: directPackageProduct,
+                transitivePackageProduct.name: transitivePackageProduct,
+                packageDevProduct.name: packageDevProduct,
+            ]],
+            dependencies: [
+                appDependency: Set([directPackageProductDependency]),
+                directPackageProductDependency: Set([transitivePackageProductDependency]),
+            ]
+        )
+
+        // When
+        let got = GraphTraverser(graph: graph).allOrphanExternalTargets()
+
+        // Then
+        XCTAssertEqual(got, Set([GraphTarget(path: packageProject.path, target: packageDevProduct, project: packageProject)]))
+    }
+
+    func test_targetsWithExternalDependencies() {
+        // Given
+        let app = Target.test(name: "App", destinations: [.iPhone], product: .app)
+        let framework = Target.test(name: "Framework", destinations: [.iPhone], product: .framework)
+        let project = Project.test(path: try! AbsolutePath(validating: "/App"), targets: [app, framework])
+        let appDependency = GraphDependency.target(name: app.name, path: project.path)
+        let frameworkDependency = GraphDependency.target(name: framework.name, path: project.path)
+
+        let directPackageProduct = Target.test(name: "DirectPackage", destinations: [.iPhone], product: .app)
+        let packageProject = Project.test(
+            path: try! AbsolutePath(validating: "/Package"),
+            name: "Package",
+            targets: [directPackageProduct],
+            isExternal: true
+        )
+        let directPackageProductDependency = GraphDependency.target(name: directPackageProduct.name, path: packageProject.path)
+
+        let graph = Graph.test(
+            path: project.path,
+            projects: [project.path: project, packageProject.path: packageProject],
+            targets: [project.path: [
+                app.name: app,
+                framework.name: framework,
+            ], packageProject.path: [
+                directPackageProduct.name: directPackageProduct,
+            ]],
+            dependencies: [
+                appDependency: Set([frameworkDependency]),
+                frameworkDependency: Set([directPackageProductDependency]),
+            ]
+        )
+
+        // When
+        let got = GraphTraverser(graph: graph).targetsWithExternalDependencies()
+
+        // Then
+        XCTAssertEqual(got, Set([GraphTarget(path: project.path, target: framework, project: project)]))
+    }
+
+    func test_allExternalTargets() {
+        // Given
+        let app = Target.test(name: "App", destinations: [.iPhone], product: .app)
+        let framework = Target.test(name: "Framework", destinations: [.iPhone], product: .framework)
+        let project = Project.test(path: try! AbsolutePath(validating: "/App"), targets: [app, framework])
+        let appDependency = GraphDependency.target(name: app.name, path: project.path)
+        let frameworkDependency = GraphDependency.target(name: framework.name, path: project.path)
+
+        let directPackageProduct = Target.test(name: "DirectPackage", destinations: [.iPhone], product: .app)
+        let packageProject = Project.test(
+            path: try! AbsolutePath(validating: "/Package"),
+            name: "Package",
+            targets: [directPackageProduct],
+            isExternal: true
+        )
+        let directPackageProductDependency = GraphDependency.target(name: directPackageProduct.name, path: packageProject.path)
+
+        let graph = Graph.test(
+            path: project.path,
+            projects: [project.path: project, packageProject.path: packageProject],
+            targets: [project.path: [
+                app.name: app,
+                framework.name: framework,
+            ], packageProject.path: [
+                directPackageProduct.name: directPackageProduct,
+            ]],
+            dependencies: [
+                appDependency: Set([frameworkDependency]),
+                frameworkDependency: Set([directPackageProductDependency]),
+            ]
+        )
+
+        // When
+        let got = GraphTraverser(graph: graph).allExternalTargets()
+
+        // Then
+        XCTAssertEqual(got, Set([GraphTarget(path: packageProject.path, target: directPackageProduct, project: packageProject)]))
+    }
+
+    func test_externalTargetSupportedPlatforms_when_external_dependency_without_platform_filter() async throws {
+        // Given
+        let directory = try temporaryPath()
+        let packagesDirectory = directory.appending(component: "Dependencies")
+
+        let appTarget = Target.test(name: "App", destinations: [.iPad, .iPhone])
+        let externalPackage = Target.test(
+            name: "Package",
+            destinations: [.iPad, .iPhone, .appleWatch, .appleTv, .mac],
+            product: .framework
+        )
+
+        let project = Project.test(path: directory, targets: [appTarget])
+        let externalProject = Project.test(path: packagesDirectory, targets: [externalPackage], isExternal: true)
+
+        let appTargetDependency = GraphDependency.target(name: appTarget.name, path: project.path)
+        let externalPackageDependency = GraphDependency.target(name: externalPackage.name, path: externalProject.path)
+
+        let graph = Graph.test(
+            projects: [
+                directory: project,
+                packagesDirectory: externalProject,
+            ],
+            targets: [
+                project.path: [
+                    appTarget.name: appTarget,
+                ],
+                externalProject.path: [
+                    externalPackage.name: externalPackage,
+                ],
+            ],
+            dependencies: [
+                appTargetDependency: Set([externalPackageDependency]),
+            ]
+        )
+
+        // When
+        let got = GraphTraverser(graph: graph).externalTargetSupportedPlatforms()
+
+        // Then
+        XCTAssertNil(got[GraphTarget(path: project.path, target: appTarget, project: project)])
+        XCTAssertEqual(
+            got[GraphTarget(path: externalProject.path, target: externalPackage, project: externalProject)],
+            Set([.iOS])
+        )
+    }
+
+    func test_test_externalTargetSupportedPlatforms_when_external_transitive_dependency_without_platform_filter() async throws {
+        // Given
+        let directory = try temporaryPath()
+        let packagesDirectory = directory.appending(component: "Dependencies")
+
+        let appTarget = Target.test(name: "App", destinations: [.iPad, .iPhone])
+        let directExternalPackage = Target.test(
+            name: "Direct",
+            destinations: [.iPad, .iPhone],
+            product: .framework
+        )
+        let transitiveExternalPackage = Target.test(
+            name: "Transitive",
+            destinations: [.iPad, .iPhone, .appleWatch, .appleTv, .mac, .macWithiPadDesign, .macCatalyst],
+            product: .framework
+        )
+
+        let project = Project.test(path: directory, targets: [appTarget])
+        let externalProject = Project.test(
+            path: packagesDirectory,
+            targets: [directExternalPackage, transitiveExternalPackage],
+            isExternal: true
+        )
+
+        let appTargetDependency = GraphDependency.target(name: appTarget.name, path: project.path)
+        let directExternalPackageDependency = GraphDependency.target(name: directExternalPackage.name, path: externalProject.path)
+        let transitiveExternalPackageDependency = GraphDependency.target(
+            name: transitiveExternalPackage.name,
+            path: externalProject.path
+        )
+
+        let graph = Graph.test(
+            projects: [
+                directory: project,
+                packagesDirectory: externalProject,
+            ],
+            targets: [
+                project.path: [
+                    appTarget.name: appTarget,
+                ],
+                externalProject.path: [
+                    directExternalPackage.name: directExternalPackage,
+                    transitiveExternalPackage.name: transitiveExternalPackage,
+                ],
+            ],
+            dependencies: [
+                appTargetDependency: Set([directExternalPackageDependency]),
+                directExternalPackageDependency: Set([transitiveExternalPackageDependency]),
+            ]
+        )
+
+        // When
+        let got = GraphTraverser(graph: graph).externalTargetSupportedPlatforms()
+
+        // Then
+        XCTAssertNil(got[GraphTarget(path: project.path, target: appTarget, project: project)])
+        XCTAssertEqual(
+            got[GraphTarget(path: externalProject.path, target: directExternalPackage, project: externalProject)],
+            Set([.iOS])
+        )
+        XCTAssertEqual(
+            got[GraphTarget(path: externalProject.path, target: transitiveExternalPackage, project: externalProject)],
+            Set([.iOS])
+        )
+    }
+
+    func test_externalTargetSupportedPlatforms_when_external_macro_dependency() async throws {
+        // Given
+        let directory = try temporaryPath()
+        let packagesDirectory = directory.appending(component: "Dependencies")
+
+        let appTarget = Target.test(name: "App", destinations: [.iPad, .iPhone])
+        let externalMacroFramework = Target.test(
+            name: "MacroFramework",
+            destinations: [.iPad, .iPhone],
+            product: .staticFramework
+        )
+        let externalMacroExecutable = Target.test(name: "MacroExcutable", destinations: [.mac], product: .macro)
+
+        let project = Project.test(path: directory, targets: [appTarget])
+        let externalProject = Project.test(
+            path: packagesDirectory,
+            targets: [externalMacroFramework, externalMacroExecutable],
+            isExternal: true
+        )
+
+        let appTargetDependency = GraphDependency.target(name: appTarget.name, path: project.path)
+        let externalMacroFrameworkDependency = GraphDependency.target(
+            name: externalMacroFramework.name,
+            path: externalProject.path
+        )
+        let externalMacroExecutableDependency = GraphDependency.target(
+            name: externalMacroExecutable.name,
+            path: externalProject.path
+        )
+
+        let graph = Graph.test(
+            projects: [
+                directory: project,
+                packagesDirectory: externalProject,
+            ],
+            targets: [
+                project.path: [
+                    appTarget.name: appTarget,
+                ],
+                externalProject.path: [
+                    externalMacroFramework.name: externalMacroFramework,
+                    externalMacroExecutable.name: externalMacroExecutable,
+                ],
+            ],
+            dependencies: [
+                appTargetDependency: Set([externalMacroFrameworkDependency]),
+                externalMacroFrameworkDependency: Set([externalMacroExecutableDependency]),
+            ]
+        )
+
+        // When
+        let got = GraphTraverser(graph: graph).externalTargetSupportedPlatforms()
+
+        // Then
+        XCTAssertNil(got[GraphTarget(path: project.path, target: appTarget, project: project)])
+        XCTAssertEqual(
+            got[GraphTarget(path: externalProject.path, target: externalMacroFramework, project: externalProject)],
+            Set([.iOS])
+        )
+        XCTAssertEqual(
+            got[GraphTarget(path: externalProject.path, target: externalMacroExecutable, project: externalProject)],
+            Set([.macOS])
+        )
+    }
+
+    func test_directTargetExternalDependencies() throws {
+        // Given
+        let directory = try temporaryPath()
+        let packagesDirectory = directory.appending(component: "Dependencies")
+
+        let appTarget = Target.test(name: "App", destinations: [.iPad, .iPhone])
+        let externalFramework = Target.test(
+            name: "Framework",
+            destinations: [.iPad, .iPhone],
+            product: .staticFramework
+        )
+
+        let project = Project.test(path: directory, targets: [appTarget])
+        let externalProject = Project.test(
+            path: packagesDirectory,
+            targets: [externalFramework],
+            isExternal: true
+        )
+
+        let appTargetDependency = GraphDependency.target(name: appTarget.name, path: project.path)
+        let externalFrameworkDependency = GraphDependency.target(
+            name: externalFramework.name,
+            path: externalProject.path
+        )
+
+        let graph = Graph.test(
+            projects: [
+                directory: project,
+                packagesDirectory: externalProject,
+            ],
+            targets: [
+                project.path: [
+                    appTarget.name: appTarget,
+                ],
+                externalProject.path: [
+                    externalFramework.name: externalFramework,
+                ],
+            ],
+            dependencies: [
+                appTargetDependency: Set([externalFrameworkDependency]),
+            ]
+        )
+
+        // When
+        let got = GraphTraverser(graph: graph).directTargetExternalDependencies(path: project.path, name: appTarget.name)
+
+        // Then
+        XCTAssertEqual(got, Set([
+            GraphTargetReference(target: GraphTarget(
+                path: externalProject.path,
+                target: externalFramework,
+                project: externalProject
+            )),
+        ]))
+    }
+
+    func test_allSwiftPluginExecutables_includesAllXCFrameworkMacros_when_theyAreDirectOrTransitiveDependencies() throws {
+        // Given
+        let directory = try temporaryPath()
+        let appTarget = Target.test(name: "App", destinations: [.appleWatch])
+        let project = Project.test(path: directory, targets: [appTarget])
+        let appTargetDependency = GraphDependency.target(name: appTarget.name, path: project.path)
+        let precompiledMacroXCFramework = GraphDependency.testXCFramework()
+        let macroPath = AbsolutePath.root.appending(components: ["macros", "macro.macro"])
+        let precompiledMacroExecutable = GraphDependency.testMacro(path: macroPath)
+
+        let graph = Graph.test(
+            projects: [
+                directory: project,
+            ],
+            targets: [
+                project.path: [
+                    appTarget.name: appTarget,
+                ],
+            ],
+            dependencies: [
+                appTargetDependency: Set([precompiledMacroXCFramework]),
+                precompiledMacroXCFramework: Set([precompiledMacroExecutable]),
+            ]
+        )
+
+        // When
+        let got = GraphTraverser(graph: graph).allSwiftPluginExecutables(path: project.path, name: appTarget.name)
+
+        XCTAssertEqual(got.sorted(), [
+            "\(macroPath.pathString)#\(macroPath.basename.replacingOccurrences(of: ".macro", with: ""))",
+        ])
+    }
+
+    func test_allSwiftPluginExecutables_staticFrameworksThatDependOnMacroTargets_when_theyAreDirectOrTransitiveDependencies(
+    ) throws {
+        // Given
+        let directory = try temporaryPath()
+        let appTarget = Target.test(name: "App", destinations: [.appleWatch])
+        let directMacroStaticFrameworkTarget = Target.test(
+            name: "DirectMacroStaticFramework",
+            destinations: [.appleWatch],
+            product: .staticFramework
+        )
+        let directMacroMacroTarget = Target.test(name: "DirectMacro", destinations: [.appleWatch], product: .macro)
+        let transitiveMacroStaticFrameworkTarget = Target.test(
+            name: "TransitiveMacroStaticFramework",
+            destinations: [.appleWatch],
+            product: .staticFramework
+        )
+        let transitiveMacroMacroTarget = Target.test(name: "TransitiveMacro", destinations: [.appleWatch], product: .macro)
+
+        let project = Project.test(path: directory, targets: [appTarget])
+        let appTargetDependency = GraphDependency.target(name: appTarget.name, path: project.path)
+        let directMacroStaticFrameworkTargetDependency = GraphDependency.target(
+            name: directMacroStaticFrameworkTarget.name,
+            path: project.path
+        )
+        let directMacroMacroTargetDependency = GraphDependency.target(name: directMacroMacroTarget.name, path: project.path)
+        let transitiveMacroStaticFrameworkTargetDependency = GraphDependency.target(
+            name: transitiveMacroStaticFrameworkTarget.name,
+            path: project.path
+        )
+        let transitiveMacroMacroTargetDependency = GraphDependency.target(
+            name: transitiveMacroMacroTarget.name,
+            path: project.path
+        )
+
+        let graph = Graph.test(
+            projects: [
+                directory: project,
+            ],
+            targets: [
+                project.path: [
+                    appTarget.name: appTarget,
+                    directMacroStaticFrameworkTarget.name: directMacroStaticFrameworkTarget,
+                    directMacroMacroTarget.name: directMacroMacroTarget,
+                    transitiveMacroStaticFrameworkTarget.name: transitiveMacroStaticFrameworkTarget,
+                    transitiveMacroMacroTarget.name: transitiveMacroMacroTarget,
+                ],
+            ],
+            dependencies: [
+                appTargetDependency: Set([directMacroStaticFrameworkTargetDependency]),
+                directMacroStaticFrameworkTargetDependency: Set([
+                    directMacroMacroTargetDependency,
+                    transitiveMacroStaticFrameworkTargetDependency,
+                ]),
+                transitiveMacroStaticFrameworkTargetDependency: Set([transitiveMacroMacroTargetDependency]),
+            ]
+        )
+
+        // When
+        let got = GraphTraverser(graph: graph).allSwiftPluginExecutables(path: project.path, name: appTarget.name)
+
+        XCTAssertEqual(got.sorted(), [
+            "$BUILD_DIR/Debug$EFFECTIVE_PLATFORM_NAME/DirectMacro#DirectMacro",
+            "$BUILD_DIR/Debug$EFFECTIVE_PLATFORM_NAME/TransitiveMacro#TransitiveMacro",
+        ])
+    }
+
+    func test_allSwiftPluginExecutables_when_staticMacroFrameworkThatDependOnMacroPrecompiledExecutable(
+    ) throws {
+        // Given
+        let directory = try temporaryPath()
+        let appTarget = Target.test(name: "App", destinations: [.appleWatch])
+        let directMacroStaticFrameworkTarget = Target.test(
+            name: "DirectMacroStaticFramework",
+            destinations: [.appleWatch],
+            product: .staticFramework
+        )
+        let precompiledMacroPath: AbsolutePath = .root.appending(component: "macro.macro")
+        let directMacroMacroPrecompiledExecutable = GraphDependency.macro(path: precompiledMacroPath)
+
+        let project = Project.test(path: directory, targets: [appTarget])
+        let appTargetDependency = GraphDependency.target(name: appTarget.name, path: project.path)
+        let directMacroStaticFrameworkTargetDependency = GraphDependency.target(
+            name: directMacroStaticFrameworkTarget.name,
+            path: project.path
+        )
+
+        let graph = Graph.test(
+            projects: [
+                directory: project,
+            ],
+            targets: [
+                project.path: [
+                    appTarget.name: appTarget,
+                    directMacroStaticFrameworkTarget.name: directMacroStaticFrameworkTarget,
+                ],
+            ],
+            dependencies: [
+                appTargetDependency: Set([directMacroStaticFrameworkTargetDependency]),
+                directMacroStaticFrameworkTargetDependency: Set([
+                    directMacroMacroPrecompiledExecutable,
+                ]),
+            ]
+        )
+
+        // When
+        let got = GraphTraverser(graph: graph).allSwiftPluginExecutables(path: project.path, name: appTarget.name)
+
+        // Then
+        XCTAssertEqual(got.sorted(), [
+            "\(precompiledMacroPath.pathString)#\(precompiledMacroPath.basename.replacingOccurrences(of: ".macro", with: ""))",
+        ])
     }
 
     // MARK: - Helpers

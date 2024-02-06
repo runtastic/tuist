@@ -10,6 +10,7 @@
   <img src="https://img.shields.io/opencollective/backers/tuistapp?style=flat-square" alt="Backers">
   <img src="https://img.shields.io/github/license/tuist/tuist?style=flat-square" alt="License">
   <img src="https://img.shields.io/badge/Powered%20by-Tuist-blue" alt="Powered by Tuist">
+  <a href="https://polar.sh/tuist"><img src="https://polar.sh/embed/seeks-funding-shield.svg?org=tuist" /></a>
 </div>
 
 <div align="center">
@@ -24,11 +25,15 @@ It's open source and written in Swift.
 
 ## Install ⬇️
 
-### Running script (Recommended)
+### Recommended: [mise](https://github.com/jdx/mise)
 
-```shell
-curl -Ls https://install.tuist.io | bash
+Install [mise](https://mise.jdx.dev/getting-started.html#quickstart) and then run the following command to install Tuist:
+
+```bash
+mise install tuist
 ```
+
+You can check out [the documentation](https://docs.tuist.io/documentation/tuist/installation) to learn more about the rationale behind our installation approach and alternative approaches.
 
 ## Bootstrap your first project 🌀
 
@@ -38,7 +43,7 @@ tuist generate # Generates Xcode project & workspace
 tuist build # Builds your project
 ```
 
-[Check out](https://docs.tuist.io) the project "Get Started" guide to learn more about Tuist and all its features.
+[Check out](https://docs.tuist.io/documentation/tuist) the project "Get Started" guide to learn more about Tuist and all its features.
 
 ## Sample projects 🔬
 
@@ -46,7 +51,7 @@ You can find some sample projects in the [fixtures folder](fixtures) or the [awe
 
 ## Want to contribute?
 
-You can use our [contribution docs](https://docs.tuist.io/contributors/get-started) to get started. If you don't have a specific issue in mind, we are more than happy to help you, just ask for help in a given issue or on our [Slack](https://join.slack.com/t/tuistapp/shared_invite/zt-1lqw355mp-zElRwLeoZ2EQsgGEkyaFgg). You can find good issues for first-time contributors [here](https://github.com/tuist/tuist/issues?q=is%3Aissue+is%3Aopen+label%3A%22good+first+issue%22). We also offer [issue bounties](https://github.com/tuist/tuist/discussions/4982) for some highly-valued issues.
+You can use our [contribution docs](https://docs.tuist.io/documentation/tuist/get-started-as-contributor) to get started. If you don't have a specific issue in mind, we are more than happy to help you, just ask for help in a given issue or on our [Slack](https://join.slack.com/t/tuistapp/shared_invite/zt-1lqw355mp-zElRwLeoZ2EQsgGEkyaFgg). You can find good issues for first-time contributors [here](https://github.com/tuist/tuist/issues?q=is%3Aissue+is%3Aopen+label%3A%22good+first+issue%22). We also offer [issue bounties](https://github.com/tuist/tuist/discussions/4982) for some highly-valued issues.
 
 ## Sponsors
 
@@ -214,11 +219,14 @@ The financial sustainability of the project is possible thanks to the ongoing co
   <a href="https://telepass.com/" target="_blank">
     <img src="assets/companies/telepass.svg" style="width: 112px;" hspace="8"/>
   </a>
+  <a href="https://crunchyroll.com/" target="_blank">
+    <img src="assets/companies/crunchyroll_logo_vertical.svg" style="width: 50px;" hspace="8"/>
+  </a>
 </div>
 
 ## Documentation 📝
 
-Do you want to know more about what Tuist can offer you? Or perhaps want to contribute to the project and you need a starting point? You can check out the [project documentation](https://docs.tuist.io/tutorial/get-started/).
+Do you want to know more about what Tuist can offer you? Or perhaps want to contribute to the project and you need a starting point? You can check out the [project documentation](https://docs.tuist.io/documentation/tuist/).
 
 ## Supported by great companies
 
@@ -232,7 +240,7 @@ Do you want to know more about what Tuist can offer you? Or perhaps want to cont
 
 ## Contribute 👩‍💻
 
-If you are interested in contributing to the project, our documentation has a section with resources for contributors. We recommend starting from [this page](https://docs.tuist.io/contributors/get-started).
+If you are interested in contributing to the project, our documentation has a section with resources for contributors. We recommend starting from [this page](https://docs.tuist.io/documentation/tuist/get-started-as-contributor).
 
 ## Core Team ✨
 
@@ -408,44 +416,48 @@ Thanks goes to these wonderful people:
     </tr>
     <tr>
       <td align="center" valign="top" width="14.28%"><a href="https://github.com/MontakOleg"><img src="https://avatars.githubusercontent.com/u/1800899?v=4" width="100px;" alt=""/><br /><sub><b>MontakOleg</b></sub></a></td>
-      <td align="center" valign="top" width="14.28%"><a href="http://blog.jihoon.me"><img src="https://avatars.githubusercontent.com/u/68891494?v=4" width="100px;" alt=""/><br /><sub><b>안지훈</b></sub></a></td>
       <td align="center" valign="top" width="14.28%"><a href="https://github.com/oozoofrog"><img src="https://avatars.githubusercontent.com/u/3011832?v=4" width="100px;" alt=""/><br /><sub><b>oozoofrog</b></sub></a></td>
       <td align="center" valign="top" width="14.28%"><a href="https://github.com/MartinStrambach"><img src="https://avatars.githubusercontent.com/u/11178869?v=4" width="100px;" alt=""/><br /><sub><b>Martin Strambach</b></sub></a></td>
       <td align="center" valign="top" width="14.28%"><a href="https://github.com/sh-a-n"><img src="https://avatars.githubusercontent.com/u/2219548?v=4" width="100px;" alt=""/><br /><sub><b>sh-a-n</b></sub></a></td>
       <td align="center" valign="top" width="14.28%"><a href="http://linkedin.com/in/batuhansaka"><img src="https://avatars.githubusercontent.com/u/9626765?v=4" width="100px;" alt=""/><br /><sub><b>Batuhan Saka</b></sub></a></td>
       <td align="center" valign="top" width="14.28%"><a href="http://jcsoohwancho.github.io"><img src="https://avatars.githubusercontent.com/u/51935215?v=4" width="100px;" alt=""/><br /><sub><b>SooHwanCho</b></sub></a></td>
+      <td align="center" valign="top" width="14.28%"><a href="http://www.bouncingball.mobi"><img src="https://avatars.githubusercontent.com/u/798117?v=4" width="100px;" alt=""/><br /><sub><b>Gary Riches</b></sub></a></td>
     </tr>
     <tr>
-      <td align="center" valign="top" width="14.28%"><a href="http://www.bouncingball.mobi"><img src="https://avatars.githubusercontent.com/u/798117?v=4" width="100px;" alt=""/><br /><sub><b>Gary Riches</b></sub></a></td>
       <td align="center" valign="top" width="14.28%"><a href="https://mustiikhalil.github.io/mustiikhalil/"><img src="https://avatars.githubusercontent.com/u/26250654?v=4" width="100px;" alt=""/><br /><sub><b>mustiikhalil</b></sub></a></td>
       <td align="center" valign="top" width="14.28%"><a href="https://github.com/serejahh"><img src="https://avatars.githubusercontent.com/u/2575555?v=4" width="100px;" alt=""/><br /><sub><b>Serhii Butenko</b></sub></a></td>
       <td align="center" valign="top" width="14.28%"><a href="https://github.com/petrukha-ivan"><img src="https://avatars.githubusercontent.com/u/93926277?v=4" width="100px;" alt=""/><br /><sub><b>Petrukha Ivan</b></sub></a></td>
       <td align="center" valign="top" width="14.28%"><a href="https://github.com/lo1tuma"><img src="https://avatars.githubusercontent.com/u/169170?v=4" width="100px;" alt=""/><br /><sub><b>Mathias Schreck</b></sub></a></td>
       <td align="center" valign="top" width="14.28%"><a href="https://github.com/Buju77"><img src="https://avatars.githubusercontent.com/u/266349?v=4" width="100px;" alt=""/><br /><sub><b>Yen-Chia Lin</b></sub></a></td>
       <td align="center" valign="top" width="14.28%"><a href="https://coolmathgames.tech"><img src="https://avatars.githubusercontent.com/u/6877780?v=4" width="100px;" alt=""/><br /><sub><b>Mary </b></sub></a></td>
+      <td align="center" valign="top" width="14.28%"><a href="https://github.com/woohyunjin06"><img src="https://avatars.githubusercontent.com/u/30452977?v=4" width="100px;" alt=""/><br /><sub><b>Hyunjin</b></sub></a></td>
     </tr>
     <tr>
-      <td align="center" valign="top" width="14.28%"><a href="https://github.com/woohyunjin06"><img src="https://avatars.githubusercontent.com/u/30452977?v=4" width="100px;" alt=""/><br /><sub><b>Hyunjin</b></sub></a></td>
       <td align="center" valign="top" width="14.28%"><a href="https://github.com/kevin58332"><img src="https://avatars.githubusercontent.com/u/47673410?v=4" width="100px;" alt=""/><br /><sub><b>Kevin Aguilar</b></sub></a></td>
       <td align="center" valign="top" width="14.28%"><a href="http://andrewroan.com"><img src="https://avatars.githubusercontent.com/u/9873566?v=4" width="100px;" alt=""/><br /><sub><b>Andrew Roan</b></sub></a></td>
       <td align="center" valign="top" width="14.28%"><a href="https://www.linkedin.com/in/ibrahim-oktay-518b4939/"><img src="https://avatars.githubusercontent.com/u/36792481?v=4" width="100px;" alt=""/><br /><sub><b>ibrahim oktay</b></sub></a></td>
       <td align="center" valign="top" width="14.28%"><a href="https://github.com/navartis"><img src="https://avatars.githubusercontent.com/u/7813723?v=4" width="100px;" alt=""/><br /><sub><b>Dmitriy Kulakov</b></sub></a></td>
       <td align="center" valign="top" width="14.28%"><a href="https://github.com/woin2ee"><img src="https://avatars.githubusercontent.com/u/81426024?v=4" width="100px;" alt=""/><br /><sub><b>Jaewon-Yun</b></sub></a></td>
       <td align="center" valign="top" width="14.28%"><a href="https://github.com/tatagrigory"><img src="https://avatars.githubusercontent.com/u/5187973?v=4" width="100px;" alt=""/><br /><sub><b>tatagrigory</b></sub></a></td>
+      <td align="center" valign="top" width="14.28%"><a href="http://linkedin.com/in/denilchungath"><img src="https://avatars.githubusercontent.com/u/95201442?v=4" width="100px;" alt=""/><br /><sub><b>Denil Chungath</b></sub></a></td>
     </tr>
     <tr>
-      <td align="center" valign="top" width="14.28%"><a href="http://linkedin.com/in/denilchungath"><img src="https://avatars.githubusercontent.com/u/95201442?v=4" width="100px;" alt=""/><br /><sub><b>Denil Chungath</b></sub></a></td>
       <td align="center" valign="top" width="14.28%"><a href="https://www.linkedin.com/in/victor-sarda/"><img src="https://avatars.githubusercontent.com/u/6460866?v=4" width="100px;" alt=""/><br /><sub><b>Victor Sarda</b></sub></a></td>
       <td align="center" valign="top" width="14.28%"><a href="https://github.com/tzxdtc"><img src="https://avatars.githubusercontent.com/u/19767846?v=4" width="100px;" alt=""/><br /><sub><b>tzxdtc10</b></sub></a></td>
       <td align="center" valign="top" width="14.28%"><a href="https://github.com/ThiemeFM"><img src="https://avatars.githubusercontent.com/u/143395823?v=4" width="100px;" alt=""/><br /><sub><b>Thieme</b></sub></a></td>
       <td align="center" valign="top" width="14.28%"><a href="https://github.com/Lilfaen"><img src="https://avatars.githubusercontent.com/u/39119695?v=4" width="100px;" alt=""/><br /><sub><b>Clemens Beck</b></sub></a></td>
       <td align="center" valign="top" width="14.28%"><a href="https://macpaw.com/"><img src="https://avatars.githubusercontent.com/u/119268?v=4" width="100px;" alt=""/><br /><sub><b>Paul Taykalo</b></sub></a></td>
       <td align="center" valign="top" width="14.28%"><a href="https://github.com/in4lio"><img src="https://avatars.githubusercontent.com/u/976061?v=4" width="100px;" alt=""/><br /><sub><b>Vitaly Kravtsov</b></sub></a></td>
+      <td align="center" valign="top" width="14.28%"><a href="http://dc.wtf"><img src="https://avatars.githubusercontent.com/u/643865?v=4" width="100px;" alt=""/><br /><sub><b>dc</b></sub></a></td>
     </tr>
     <tr>
-      <td align="center" valign="top" width="14.28%"><a href="http://dc.wtf"><img src="https://avatars.githubusercontent.com/u/643865?v=4" width="100px;" alt=""/><br /><sub><b>dc</b></sub></a></td>
       <td align="center" valign="top" width="14.28%"><a href="https://github.com/baekteun"><img src="https://avatars.githubusercontent.com/u/74440939?v=4" width="100px;" alt=""/><br /><sub><b>baegteun</b></sub></a></td>
       <td align="center" valign="top" width="14.28%"><a href="http://vcoutasso.com"><img src="https://avatars.githubusercontent.com/u/44986513?v=4" width="100px;" alt=""/><br /><sub><b>Vinícius Couto Tasso</b></sub></a></td>
+      <td align="center" valign="top" width="14.28%"><a href="http://blog.jihoon.me"><img src="https://avatars.githubusercontent.com/u/68891494?v=4" width="100px;" alt=""/><br /><sub><b>안지훈</b></sub></a></td>
+      <td align="center" valign="top" width="14.28%"><a href="https://github.com/dxmvsh"><img src="https://avatars.githubusercontent.com/u/44325936?v=4" width="100px;" alt=""/><br /><sub><b>Dimash</b></sub></a></td>
+      <td align="center" valign="top" width="14.28%"><a href="https://github.com/danibachar"><img src="https://avatars.githubusercontent.com/u/6380777?v=4" width="100px;" alt=""/><br /><sub><b>danibachar</b></sub></a></td>
+      <td align="center" valign="top" width="14.28%"><a href="https://github.com/dp221125"><img src="https://avatars.githubusercontent.com/u/10572119?v=4" width="100px;" alt=""/><br /><sub><b>한석호(MilKyo)</b></sub></a></td>
+      <td align="center" valign="top" width="14.28%"><a href="https://medium.com/@haifengkaohaifengkao&usg=AOvVaw2_xG-ZLdBawBIyS7m-99RQ"><img src="https://avatars.githubusercontent.com/u/4080524?v=4" width="100px;" alt=""/><br /><sub><b>Hai Feng Kao</b></sub></a></td>
     </tr>
   </tbody>
 </table>

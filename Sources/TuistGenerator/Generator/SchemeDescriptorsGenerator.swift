@@ -218,7 +218,7 @@ final class SchemeDescriptorsGenerator: SchemeDescriptorsGenerating {
         var preActions: [XCScheme.ExecutionAction] = []
         var postActions: [XCScheme.ExecutionAction] = []
 
-        try buildAction.targets.forEach { buildActionTarget in
+        for buildActionTarget in buildAction.targets {
             guard let buildActionGraphTarget = graphTraverser.target(
                 path: buildActionTarget.projectPath,
                 name: buildActionTarget.name
@@ -230,7 +230,7 @@ final class SchemeDescriptorsGenerator: SchemeDescriptorsGenerating {
                     generatedProjects: generatedProjects
                 )
             else {
-                return
+                continue
             }
             entries.append(XCScheme.BuildAction.Entry(buildableReference: buildableReference, buildFor: buildFor))
         }
@@ -294,7 +294,11 @@ final class SchemeDescriptorsGenerator: SchemeDescriptorsGenerating {
             )
         }
 
-        try testAction.targets.forEach { testableTarget in
+        let skippedTests = testAction.skippedTests?.map { value in
+            XCScheme.TestItem(identifier: value)
+        } ?? []
+
+        for testableTarget in testAction.targets {
             guard let testableGraphTarget = graphTraverser.target(
                 path: testableTarget.target.projectPath,
                 name: testableTarget.target.name
@@ -306,13 +310,14 @@ final class SchemeDescriptorsGenerator: SchemeDescriptorsGenerating {
                     generatedProjects: generatedProjects
                 )
             else {
-                return
+                continue
             }
             let testable = XCScheme.TestableReference(
                 skipped: testableTarget.isSkipped,
                 parallelizable: testableTarget.isParallelizable,
                 randomExecutionOrdering: testableTarget.isRandomExecutionOrdering,
-                buildableReference: reference
+                buildableReference: reference,
+                skippedTests: skippedTests
             )
             testables.append(testable)
         }

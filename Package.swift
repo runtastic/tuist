@@ -140,7 +140,9 @@ var targets: [Target] = [
         dependencies: [
             "TuistKit",
             "TuistCore",
+            "TuistSupport",
             "TuistSupportTesting",
+            "XcodeProj",
             swiftToolsSupportDependency,
         ],
         linkerSettings: [.linkedFramework("XCTest")]
@@ -343,6 +345,10 @@ let package = Package(
             targets: ["TuistSigning"]
         ),
         .library(
+            name: "TuistDependencies",
+            targets: ["TuistDependencies"]
+        ),
+        .library(
             name: "TuistAcceptanceTesting",
             targets: ["TuistAcceptanceTesting"]
         ),
@@ -364,7 +370,6 @@ let package = Package(
     ],
     dependencies: [
         .package(url: "https://github.com/apple/swift-argument-parser", from: "1.2.3"),
-        .package(url: "https://github.com/apple/swift-docc-plugin", from: "1.3.0"),
         .package(url: "https://github.com/apple/swift-log", from: "1.5.3"),
         .package(url: "https://github.com/apple/swift-tools-support-core", from: "0.6.1"),
         .package(url: "https://github.com/CombineCommunity/CombineExt", from: "1.8.1"),
@@ -379,7 +384,7 @@ let package = Package(
         .package(url: "https://github.com/SwiftGen/StencilSwiftKit", exact: "2.10.1"),
         .package(url: "https://github.com/SwiftGen/SwiftGen", exact: "6.6.2"),
         .package(url: "https://github.com/tuist/XcodeProj", exact: "8.15.0"),
-        .package(url: "https://github.com/tuist/xcbeautify", from: "1.0.1"),
+        .package(url: "https://github.com/cpisciotta/xcbeautify", from: "1.4.0"),
     ],
     targets: targets
 )

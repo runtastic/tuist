@@ -34,10 +34,10 @@ public final class FocusTargetsGraphMappers: GraphMapping {
 
         let filteredTargets = Set(try topologicalSort(
             Array(userSpecifiedSourceTargets),
-            successors: { Array(graphTraverser.directTargetDependencies(path: $0.path, name: $0.target.name)) }
+            successors: { Array(graphTraverser.directTargetDependencies(path: $0.path, name: $0.target.name)).map(\.graphTarget) }
         ))
 
-        graphTraverser.allTargets().forEach { graphTarget in
+        for graphTarget in graphTraverser.allTargets() {
             if !filteredTargets.contains(graphTarget) {
                 var target = graphTarget.target
                 target.prune = true

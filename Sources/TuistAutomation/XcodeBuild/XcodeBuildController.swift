@@ -5,6 +5,7 @@ import TuistCore
 import TuistSupport
 
 public final class XcodeBuildController: XcodeBuildControlling {
+
     // MARK: - Attributes
 
     /// Matches lines of the forms:
@@ -38,8 +39,7 @@ public final class XcodeBuildController: XcodeBuildControlling {
         rosetta: Bool,
         derivedDataPath: AbsolutePath?,
         clean: Bool = false,
-        arguments: [XcodeBuildArgument],
-        rawXcodebuildLogs: Bool
+        arguments: [XcodeBuildArgument]
     ) throws -> AsyncThrowingStream<SystemEvent<XcodeBuildOutput>, Error> {
         var command = ["/usr/bin/xcrun", "xcodebuild"]
 
@@ -77,7 +77,7 @@ public final class XcodeBuildController: XcodeBuildControlling {
             command.append(contentsOf: ["-derivedDataPath", derivedDataPath.pathString])
         }
 
-        return try run(command: command, rawXcodebuildLogs: rawXcodebuildLogs)
+        return try run(command: command)
     }
 
     public func test(
@@ -92,8 +92,7 @@ public final class XcodeBuildController: XcodeBuildControlling {
         retryCount: Int,
         testTargets: [TestIdentifier],
         skipTestTargets: [TestIdentifier],
-        testPlanConfiguration: TestPlanConfiguration?,
-        rawXcodebuildLogs: Bool
+        testPlanConfiguration: TestPlanConfiguration?
     ) throws -> AsyncThrowingStream<SystemEvent<XcodeBuildOutput>, Error> {
         var command = ["/usr/bin/xcrun", "xcodebuild"]
 
@@ -158,7 +157,7 @@ public final class XcodeBuildController: XcodeBuildControlling {
             }
         }
 
-        return try run(command: command, rawXcodebuildLogs: rawXcodebuildLogs)
+        return try run(command: command)
     }
 
     public func archive(
@@ -167,7 +166,7 @@ public final class XcodeBuildController: XcodeBuildControlling {
         clean: Bool,
         archivePath: AbsolutePath,
         arguments: [XcodeBuildArgument],
-        rawXcodebuildLogs: Bool
+        derivedDataPath: AbsolutePath?
     ) throws -> AsyncThrowingStream<SystemEvent<XcodeBuildOutput>, Error> {
         var command = ["/usr/bin/xcrun", "xcodebuild"]
 
@@ -186,31 +185,27 @@ public final class XcodeBuildController: XcodeBuildControlling {
         // Archive path
         command.append(contentsOf: ["-archivePath", archivePath.pathString])
 
+        // Derived data path
+        if let derivedDataPath = derivedDataPath {
+            command.append(contentsOf: ["-derivedDataPath", derivedDataPath.pathString])
+        }
+        
         // Arguments
         command.append(contentsOf: arguments.flatMap(\.arguments))
 
-        return try run(command: command, rawXcodebuildLogs: rawXcodebuildLogs)
+        return try run(command: command)
     }
 
     public func createXCFramework(
-        frameworks: [AbsolutePath],
-        output: AbsolutePath,
-        rawXcodebuildLogs: Bool
+        arguments: [XcodeBuildControllerCreateXCFrameworkArgument],
+        output: AbsolutePath
     ) throws -> AsyncThrowingStream<SystemEvent<XcodeBuildOutput>, Error> {
         var command = ["/usr/bin/xcrun", "xcodebuild", "-create-xcframework"]
-        command.append(contentsOf: frameworks.flatMap {
-            let pathString = $0.pathString
-            return [
-                "-framework",
-                // It's workaround for Xcode 15 RC bug
-                // remove it since bug will be fixed
-                // more details here: https://github.com/tuist/tuist/issues/5354
-                pathString.hasPrefix("/var/") ? pathString.replacingOccurrences(of: "/var/", with: "/private/var/") : pathString
-            ]
-        })
+        command.append(contentsOf: arguments.flatMap(\.xcodebuildArguments))
         command.append(contentsOf: ["-output", output.pathString])
         command.append("-allow-internal-distribution")
-        return try run(command: command, rawXcodebuildLogs: rawXcodebuildLogs)
+        
+        return try run(command: command)
     }
 
     enum ShowBuildSettingsError: Error {
@@ -221,7 +216,8 @@ public final class XcodeBuildController: XcodeBuildControlling {
     public func showBuildSettings(
         _ target: XcodeBuildTarget,
         scheme: String,
-        configuration: String
+        configuration: String,
+        derivedDataPath: AbsolutePath?
     ) async throws -> [String: XcodeBuildSettings] {
         var command = ["/usr/bin/xcrun", "xcodebuild", "archive", "-showBuildSettings", "-skipUnavailableActions"]
 
@@ -231,6 +227,11 @@ public final class XcodeBuildController: XcodeBuildControlling {
         // Scheme
         command.append(contentsOf: ["-scheme", scheme])
 
+        // Derived data path
+        if let derivedDataPath = derivedDataPath {
+            command.append(contentsOf: ["-derivedDataPath", derivedDataPath.pathString])
+        }
+        
         // Target
         command.append(contentsOf: target.xcodebuildArguments)
 
@@ -289,20 +290,22 @@ public final class XcodeBuildController: XcodeBuildControlling {
         return buildSettingsByTargetName
     }
 
-    fileprivate func run(command: [String], rawXcodebuildLogs: Bool) throws -> AsyncThrowingStream<SystemEvent<XcodeBuildOutput>, Error> {
-        System.shared.publisher(command)
+    fileprivate func run(command: [String]) throws -> AsyncThrowingStream<SystemEvent<XcodeBuildOutput>, Error> {
+        
+        logger.debug("Running xcodebuild command: \(command.joined(separator: " "))")
+        return System.shared.publisher(command)
             .compactMap { [weak self] event -> SystemEvent<XcodeBuildOutput>? in
                 switch event {
                 case let .standardError(errorData):
                     guard let line = String(data: errorData, encoding: .utf8) else { return nil }
-                    if rawXcodebuildLogs || self?.environment.isVerbose == true {
+                    if self?.environment.isVerbose == true {
                         return SystemEvent.standardError(XcodeBuildOutput(raw: line))
                     } else {
                         return SystemEvent.standardError(XcodeBuildOutput(raw: self?.formatter.format(line) ?? ""))
                     }
                 case let .standardOutput(outputData):
                     guard let line = String(data: outputData, encoding: .utf8) else { return nil }
-                    if rawXcodebuildLogs || self?.environment.isVerbose == true {
+                    if self?.environment.isVerbose == true {
                         return SystemEvent.standardOutput(XcodeBuildOutput(raw: line))
                     } else {
                         return SystemEvent.standardOutput(XcodeBuildOutput(raw: self?.formatter.format(line) ?? ""))

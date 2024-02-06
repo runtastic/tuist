@@ -79,7 +79,7 @@ public class RecursiveManifestLoader: RecursiveManifestLoading {
                 return try manifestLoader.loadProject(at: $0, rootPath: rootPath)
             }
             var newDependenciesPaths = Set<AbsolutePath>()
-            try zip(paths, projects).forEach { path, project in
+            for (path, project) in zip(paths, projects) {
                 cache[path] = project
                 newDependenciesPaths.formUnion(try dependencyPaths(for: project, path: path))
             }

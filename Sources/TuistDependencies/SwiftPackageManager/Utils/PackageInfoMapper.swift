@@ -265,7 +265,7 @@ public final class PackageInfoMapper: PackageInfoMapping {
         var externalDependencies: [String: [ProjectDescription.TargetDependency]] = .init()
         externalDependencies = try packageInfos
             .reduce(into: [:]) { result, packageInfo in
-                try packageInfo.value.products.forEach { product in
+                for product in packageInfo.value.products {
                     result[product.name] = try product.targets.flatMap { target in
                         try ResolvedDependency.fromTarget(
                             name: target,
@@ -299,7 +299,7 @@ public final class PackageInfoMapper: PackageInfoMapping {
 
         let targetToModuleMap: [String: ModuleMap]
         targetToModuleMap = try packageInfos.reduce(into: [:]) { result, packageInfo in
-            try packageInfo.value.targets.forEach { target in
+            for target in packageInfo.value.targets {
                 switch target.type {
                 case .system:
                     /// System library targets assume the module map is located at the source directory root
@@ -322,7 +322,7 @@ public final class PackageInfoMapper: PackageInfoMapping {
                         publicHeadersPath: target.publicHeadersPath(packageFolder: packageToFolder[packageInfo.key]!)
                     )
                 default:
-                    return
+                    continue
                 }
             }
         }
@@ -354,7 +354,7 @@ public final class PackageInfoMapper: PackageInfoMapping {
         packageInfos: [String: PackageInfo]
     ) -> Set<String> {
         let targetTypes = packageInfos.reduce(into: [String: PackageInfo.Target.TargetType]()) { partialResult, item in
-            item.value.targets.forEach { target in
+            for target in item.value.targets {
                 partialResult[target.name] = target.type
             }
         }
@@ -432,6 +432,7 @@ public final class PackageInfoMapper: PackageInfoMapping {
                     "TempuraTesting", // https://github.com/BendingSpoons/tempura-swift
                     "TSCTestSupport", // https://github.com/apple/swift-tools-support-core
                     "ViewInspector", // https://github.com/nalexn/ViewInspector
+                    "XCTVapor", // https://github.com/vapor/vapor
                 ].map {
                     ($0, ["ENABLE_TESTING_SEARCH_PATHS": "YES"])
                 }
@@ -537,12 +538,6 @@ extension ProjectDescription.Target {
         var destinations: ProjectDescription.Destinations
         if target.type == .macro {
             destinations = Set<ProjectDescription.Destination>([.mac])
-        } else if packageName == "Firebase" {
-            // Some firebase targets need certain platforms removed in order for caching to work corractly
-            let supportedPlatforms = try ProjectDescription.Destinations.fromFirebase(
-                targetNamed: target.name
-            )
-            destinations = packageDestinations.intersection(supportedPlatforms)
         } else {
             // All packages implicitly support all platforms, we constrain this with the platforms defined in `Dependencies.swift`
             destinations = packageDestinations.intersection(Set(Destination.allCases))
@@ -862,36 +857,6 @@ extension ResourceFileElements {
         ResourceFileElements.defaultSpmResourceFileExtensions.flatMap {
             FileHandler.shared.glob(path, glob: "**/*.\($0)")
         }
-    }
-}
-
-extension ProjectDescription.Destinations {
-    fileprivate static func fromFirebase(targetNamed name: String) throws -> Self {
-        let platforms = ProjectDescription.PackagePlatform.allCases
-        return Set(
-            try platforms.filter { platform in
-                switch name {
-                case "FirebaseAnalyticsWrapper",
-                     "FirebaseAnalyticsSwift",
-                     "FirebaseAnalyticsWithoutAdIdSupportWrapper",
-                     "FirebaseFirestoreSwift",
-                     "FirebaseFirestore": // These dont support watchOS
-                    platform != .watchOS
-                case "FirebaseAppDistribution",
-                     "FirebaseDynamicLinks": // iOS only
-                    platform == .iOS
-                case "FirebaseInAppMessaging":
-                    platform == .iOS ||
-                        platform == .tvOS ||
-                        platform == .visionOS
-                case "FirebasePerformance":
-                    platform != .macOS &&
-                        platform != .watchOS
-                default: true
-                }
-            }
-            .flatMap { try $0.destinations() }
-        )
     }
 }
 
@@ -1352,7 +1317,7 @@ extension PackageInfoMapper {
                         targetDependencyToFramework: targetDependencyToFramework,
                         condition: condition
                     )
-                case let .product(name, package, condition):
+                case let .product(name, package, _, condition):
                     return try Self.fromProduct(
                         package: idToPackage[package.lowercased()] ?? package,
                         product: name,

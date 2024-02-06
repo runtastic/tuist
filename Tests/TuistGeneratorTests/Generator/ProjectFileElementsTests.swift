@@ -247,9 +247,9 @@ final class ProjectFileElementsTests: TuistUnitTestCase {
         }
 
         // When
-        try elements.forEach {
+        for element in elements {
             try subject.generate(
-                fileElement: $0,
+                fileElement: element,
                 groups: groups,
                 pbxproj: pbxproj,
                 sourceRootPath: temporaryPath
@@ -298,9 +298,9 @@ final class ProjectFileElementsTests: TuistUnitTestCase {
         }
 
         // When
-        try elements.forEach {
+        for element in elements {
             try subject.generate(
-                fileElement: $0,
+                fileElement: element,
                 groups: groups,
                 pbxproj: pbxproj,
                 sourceRootPath: temporaryPath
@@ -349,9 +349,9 @@ final class ProjectFileElementsTests: TuistUnitTestCase {
         }
 
         // When
-        try elements.forEach {
+        for element in elements {
             try subject.generate(
-                fileElement: $0,
+                fileElement: element,
                 groups: groups,
                 pbxproj: pbxproj,
                 sourceRootPath: temporaryPath
@@ -792,7 +792,7 @@ final class ProjectFileElementsTests: TuistUnitTestCase {
         )
 
         // Then
-        XCTAssertEqual(groups.compiled.flattenedChildren, [
+        XCTAssertEqual(groups.frameworks.flattenedChildren, [
             "ARKit.framework",
         ])
 
@@ -841,7 +841,7 @@ final class ProjectFileElementsTests: TuistUnitTestCase {
         )
 
         // Then
-        XCTAssertEqual(groups.compiled.flattenedChildren, [
+        XCTAssertEqual(groups.frameworks.flattenedChildren, [
             "Test.framework",
         ])
 

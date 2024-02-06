@@ -50,8 +50,7 @@ final class XcodeBuildControllerTests: TuistUnitTestCase {
             rosetta: false,
             derivedDataPath: nil,
             clean: true,
-            arguments: [],
-            rawXcodebuildLogs: false
+            arguments: []
         )
 
         let result = try await events.toArray()
@@ -79,8 +78,7 @@ final class XcodeBuildControllerTests: TuistUnitTestCase {
             rosetta: true,
             derivedDataPath: nil,
             clean: true,
-            arguments: [],
-            rawXcodebuildLogs: false
+            arguments: []
         )
 
         let result = try await events.toArray()
@@ -109,8 +107,7 @@ final class XcodeBuildControllerTests: TuistUnitTestCase {
             rosetta: false,
             derivedDataPath: nil,
             clean: true,
-            arguments: [],
-            rawXcodebuildLogs: false
+            arguments: []
         )
 
         let result = try await events.toArray()
@@ -139,8 +136,7 @@ final class XcodeBuildControllerTests: TuistUnitTestCase {
             rosetta: true,
             derivedDataPath: nil,
             clean: true,
-            arguments: [],
-            rawXcodebuildLogs: false
+            arguments: []
         )
 
         let result = try await events.toArray()
@@ -181,8 +177,7 @@ final class XcodeBuildControllerTests: TuistUnitTestCase {
             retryCount: 0,
             testTargets: [],
             skipTestTargets: [],
-            testPlanConfiguration: nil,
-            rawXcodebuildLogs: false
+            testPlanConfiguration: nil
         )
 
         let result = try await events.toArray()
@@ -223,8 +218,7 @@ final class XcodeBuildControllerTests: TuistUnitTestCase {
             retryCount: 0,
             testTargets: [],
             skipTestTargets: [],
-            testPlanConfiguration: nil,
-            rawXcodebuildLogs: false
+            testPlanConfiguration: nil
         )
 
         let result = try await events.toArray()
@@ -267,8 +261,7 @@ final class XcodeBuildControllerTests: TuistUnitTestCase {
             retryCount: 0,
             testTargets: [],
             skipTestTargets: [],
-            testPlanConfiguration: nil,
-            rawXcodebuildLogs: false
+            testPlanConfiguration: nil
         )
 
         let result = try await events.toArray()
@@ -311,8 +304,7 @@ final class XcodeBuildControllerTests: TuistUnitTestCase {
             retryCount: 0,
             testTargets: [],
             skipTestTargets: [],
-            testPlanConfiguration: nil,
-            rawXcodebuildLogs: false
+            testPlanConfiguration: nil
         )
 
         let result = try await events.toArray()
@@ -355,8 +347,7 @@ final class XcodeBuildControllerTests: TuistUnitTestCase {
             retryCount: 0,
             testTargets: [],
             skipTestTargets: [],
-            testPlanConfiguration: nil,
-            rawXcodebuildLogs: false
+            testPlanConfiguration: nil
         )
 
         let result = try await events.toArray()

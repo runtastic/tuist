@@ -30,11 +30,23 @@ extension XCTestCase {
 
     // swiftlint:disable:next large_tuple
     public func XCTAssertEqualPairs<T: Equatable>(_ subjects: [(T, T, Bool)], file: StaticString = #file, line: UInt = #line) {
-        subjects.forEach {
-            if $0.2 {
-                XCTAssertEqual($0.0, $0.1, "Expected \($0.0) to be equal to \($0.1) but they are not.", file: file, line: line)
+        for subject in subjects {
+            if subject.2 {
+                XCTAssertEqual(
+                    subject.0,
+                    subject.1,
+                    "Expected \(subject.0) to be equal to \(subject.1) but they are not.",
+                    file: file,
+                    line: line
+                )
             } else {
-                XCTAssertNotEqual($0.0, $0.1, "Expected \($0.0) to not be equal to \($0.1) but they are.", file: file, line: line)
+                XCTAssertNotEqual(
+                    subject.0,
+                    subject.1,
+                    "Expected \(subject.0) to not be equal to \(subject.1) but they are.",
+                    file: file,
+                    line: line
+                )
             }
         }
     }
@@ -64,6 +76,22 @@ extension XCTestCase {
         """
 
         XCTAssertTrue(standardOutput.contains(pattern), message, file: file, line: line)
+    }
+
+    public func XCTAssertStandardError(pattern: String, file: StaticString = #file, line: UInt = #line) {
+        let standardError = TestingLogHandler.collected[.error, ==]
+
+        let message = """
+        The standard error:
+        ===========
+        \(standardError)
+
+        Doesn't contain the expected output:
+        ===========
+        \(pattern)
+        """
+
+        XCTAssertTrue(standardError.contains(pattern), message, file: file, line: line)
     }
 
     public func XCTTry<T>(_ closure: @autoclosure @escaping () throws -> T, file: StaticString = #file, line: UInt = #line) -> T {

@@ -71,35 +71,29 @@ public protocol GraphTraversing {
     /// - Returns: The test plans with the given name.
     func testPlan(name: String) -> TestPlan?
 
+    /// - Returns: All direct and transitive target dependencies
+    func allTargetDependencies(path: AbsolutePath, name: String) -> Set<GraphTarget>
+
     /// Given a project directory and target name, it returns **all**l its direct target dependencies present in the same project.
     /// If you want only direct target dependencies present in the same project as the target, use `directLocalTargetDependencies`
     /// instead
     /// - Parameters:
     ///   - path: Path to the directory that contains the target's project.
     ///   - name: Target name.
-    func directTargetDependencies(path: AbsolutePath, name: String) -> Set<GraphTarget>
+    func directTargetDependencies(path: AbsolutePath, name: String) -> Set<GraphTargetReference>
 
     /// Given a project directory and target name, it returns all its direct target dependencies present in the same project.
     /// To get **all** direct target dependencies use the method `directTargetDependencies` instead
     /// - Parameters:
     ///   - path: Path to the directory that contains the project.
     ///   - name: Target name.
-    func directLocalTargetDependencies(path: AbsolutePath, name: String) -> Set<GraphTarget>
-
-    /// Given a project directory and a target name, it returns all direct dependencies with their conditions
-    /// - Parameters:
-    ///   - path: Path to the directory that contains the project.
-    ///   - name: Target name.
-    func directLocalTargetDependenciesWithConditions(path: AbsolutePath, name: String) -> [(
-        GraphTarget,
-        PlatformCondition?
-    )]
+    func directLocalTargetDependencies(path: AbsolutePath, name: String) -> Set<GraphTargetReference>
 
     /// Given a project directory and a target name, it returns all the dependencies that are extensions.
     /// - Parameters:
     ///   - path: Path to the directory that contains the project.
     ///   - name: Target name.
-    func appExtensionDependencies(path: AbsolutePath, name: String) -> Set<GraphTarget>
+    func appExtensionDependencies(path: AbsolutePath, name: String) -> Set<GraphTargetReference>
 
     /// Returns the transitive resource bundle dependencies for the given target.
     /// - Parameters:
@@ -126,7 +120,7 @@ public protocol GraphTraversing {
     /// - Parameters:
     ///   - path: Path to the directory that contains the project.
     ///   - name: Target name.
-    func appClipDependencies(path: AbsolutePath, name: String) -> GraphTarget?
+    func appClipDependencies(path: AbsolutePath, name: String) -> GraphTargetReference?
 
     /// Given a project directory and a target name, it returns the list of dependencies that need to be embedded into the target
     /// product.
@@ -204,7 +198,7 @@ public protocol GraphTraversing {
     /// - Parameters:
     ///   - path: Path to the directory that contains the project.
     ///   - name: Target name.
-    func extensionKitExtensionDependencies(path: AbsolutePath, name: String) -> Set<GraphTarget>
+    func extensionKitExtensionDependencies(path: AbsolutePath, name: String) -> Set<GraphTargetReference>
 
     /// Given a project and a target name, it returns all the direct target dependencies of the target that represent Swift Macro
     /// executables.
@@ -213,12 +207,59 @@ public protocol GraphTraversing {
     ///   - name: Target name.
     func directSwiftMacroExecutables(path: AbsolutePath, name: String) -> Set<GraphDependencyReference>
 
-    /// Given a project and a target name, it returns all the direct target dependencies that are a static framework representing
+    /// Given a project and a target name, it returns all the direct target dependencies that are a target representing
     /// a Swift Macro
     /// - Parameters:
     ///   - path: Path to the directory that contains the project.
     ///   - name: Target name.
-    func directSwiftMacroFrameworkTargets(path: AbsolutePath, name: String) -> Set<GraphTarget>
+    func directSwiftMacroTargets(path: AbsolutePath, name: String) -> Set<GraphTargetReference>
+
+    /// Given a project and a target name, it returns all the target dependencies that are a target representing
+    /// a Swift Macro
+    /// - Parameters:
+    ///   - path: Path to the directory that contains the project.
+    ///   - name: Target name.
+    func allSwiftMacroTargets(path: AbsolutePath, name: String) -> Set<GraphTarget>
+
+    /// It returns a set containing the external dependencies that are not referenced by the projects either directly nor
+    /// transitively.
+    /// - Returns: The list of dependencies.
+    func allOrphanExternalTargets() -> Set<GraphTarget>
+
+    /// Returns all the non-external targets of the graph that depend on a external target.
+    /// - Returns: A set containing all the targets.
+    func targetsWithExternalDependencies() -> Set<GraphTarget>
+
+    /// Returns all the targets that are part of external projects.
+    /// - Returns: A set containing all the external project targets
+    func allExternalTargets() -> Set<GraphTarget>
+
+    /// External targets (e.g. from packages) might indicate that they support platforms that
+    /// they don't really support. To prevent this from causing compilation issues, Tuist cascades
+    /// the supported platforms down to the external dependencies.
+    /// This function narrows down the platforms of the external dependencies and returns a
+    /// dictionary containing the graph target as a key, and the supported platforms as the value.
+    /// - Returns: A dictionary with the graph targets as keys, and the platforms that they support
+    /// as values
+    func externalTargetSupportedPlatforms() -> [GraphTarget: Set<Platform>]
+
+    /// Given a target's project path and name, it returns its target dependencies that are external.
+    /// - Parameters:
+    ///   - path: Project path.
+    ///   - name: Target name.
+    /// - Returns: A set containing all the direct target dependencies that are external.
+    func directTargetExternalDependencies(path: AbsolutePath, name: String) -> Set<GraphTargetReference>
+
+    /// It returns all the plugin executables to use for a given target. A plugin executable can represent a Swift Macro
+    /// executable to resolve macros.
+    ///
+    /// Executables are passed through the build setting "OTHER_SWIFT_FLAGS" and the flag "-load-plugin-executable {value}"
+    ///
+    ///
+    /// - Parameters:
+    ///   - path: Path to the directory that contains the project.
+    ///   - name: Target name.
+    func allSwiftPluginExecutables(path: AbsolutePath, name: String) -> Set<String>
 }
 
 extension GraphTraversing {
