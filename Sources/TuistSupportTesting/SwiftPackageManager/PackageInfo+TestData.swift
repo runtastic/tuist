@@ -1,12 +1,13 @@
-import TSCBasic
+import Path
 import TSCUtility
-import TuistGraph
+import XcodeGraph
 @testable import TuistSupport
 
 // MARK: - Test package
 
 extension PackageInfo {
     public static func test(
+        name: String = "Package",
         products: [Product] = [],
         targets: [Target] = [],
         platforms: [Platform] = [],
@@ -15,6 +16,7 @@ extension PackageInfo {
         swiftLanguageVersions: [TSCUtility.Version]? = nil
     ) -> Self {
         .init(
+            name: name,
             products: products,
             targets: targets,
             platforms: platforms,
@@ -111,6 +113,7 @@ extension PackageInfo {
                   "product" : [
                     "ALibrary",
                     "a-dependency",
+                    null,
                     {
                       "platformNames" : [
                         "ios"
@@ -225,6 +228,7 @@ extension PackageInfo {
                   "product" : [
                     "AnotherLibrary",
                     "another-dependency",
+                    null,
                     null
                   ]
                 }
@@ -378,6 +382,7 @@ extension PackageInfo {
                   "product" : [
                     "ALibrary",
                     "a-dependency",
+                    null,
                     {
                       "platformNames" : [
                         "ios"
@@ -504,6 +509,7 @@ extension PackageInfo {
                   "product" : [
                     "AnotherLibrary",
                     "another-dependency",
+                    null,
                     null
                   ]
                 }
@@ -572,6 +578,7 @@ extension PackageInfo {
 
     public static var test: PackageInfo {
         .init(
+            name: "tuist",
             products: [
                 .init(name: "Tuist", type: .library(.static), targets: ["Tuist"]),
             ],
@@ -594,6 +601,7 @@ extension PackageInfo {
                         .product(
                             name: "ALibrary",
                             package: "a-dependency",
+                            moduleAliases: nil,
                             condition: .init(platformNames: ["ios"], config: nil)
                         ),
                     ],
@@ -636,7 +644,7 @@ extension PackageInfo {
                     resources: [],
                     exclude: [],
                     dependencies: [
-                        .product(name: "AnotherLibrary", package: "another-dependency", condition: nil),
+                        .product(name: "AnotherLibrary", package: "another-dependency", moduleAliases: nil, condition: nil),
                     ],
                     publicHeadersPath: nil,
                     type: .regular,
@@ -686,6 +694,7 @@ extension PackageInfo {
 
     public static var aDependency: PackageInfo {
         .init(
+            name: "ALibrary",
             products: [
                 .init(name: "ALibrary", type: .library(.automatic), targets: ["ALibrary", "ALibraryUtils"]),
             ],
@@ -732,6 +741,7 @@ extension PackageInfo {
 
     static var anotherDependency: PackageInfo {
         .init(
+            name: "AnotherLibrary",
             products: [
                 .init(name: "AnotherLibrary", type: .library(.automatic), targets: ["AnotherLibrary"]),
             ],
@@ -888,6 +898,7 @@ extension PackageInfo {
 
     public static var alamofire: PackageInfo {
         .init(
+            name: "Alamofire",
             products: [
                 .init(name: "Alamofire", type: .library(.automatic), targets: ["Alamofire"]),
             ],
@@ -1033,6 +1044,7 @@ extension PackageInfo {
                   "product" : [
                     "GULAppDelegateSwizzler",
                     "GoogleUtilities",
+                    null,
                     null
                   ]
                 },
@@ -1040,6 +1052,7 @@ extension PackageInfo {
                   "product" : [
                     "GULMethodSwizzler",
                     "GoogleUtilities",
+                    null,
                     null
                   ]
                 },
@@ -1047,6 +1060,7 @@ extension PackageInfo {
                   "product" : [
                     "GULNSData",
                     "GoogleUtilities",
+                    null,
                     null
                   ]
                 },
@@ -1054,6 +1068,7 @@ extension PackageInfo {
                   "product" : [
                     "GULNetwork",
                     "GoogleUtilities",
+                    null,
                     null
                   ]
                 },
@@ -1061,6 +1076,7 @@ extension PackageInfo {
                   "product" : [
                     "nanopb",
                     "nanopb",
+                    null,
                     null
                   ]
                 }
@@ -1135,6 +1151,7 @@ extension PackageInfo {
                   "product" : [
                     "GULAppDelegateSwizzler",
                     "GoogleUtilities",
+                    null,
                     null
                   ]
                 },
@@ -1142,6 +1159,7 @@ extension PackageInfo {
                   "product" : [
                     "GULMethodSwizzler",
                     "GoogleUtilities",
+                    null,
                     null
                   ]
                 },
@@ -1149,6 +1167,7 @@ extension PackageInfo {
                   "product" : [
                     "GULNSData",
                     "GoogleUtilities",
+                    null,
                     null
                   ]
                 },
@@ -1156,6 +1175,7 @@ extension PackageInfo {
                   "product" : [
                     "GULNetwork",
                     "GoogleUtilities",
+                    null,
                     null
                   ]
                 },
@@ -1163,6 +1183,7 @@ extension PackageInfo {
                   "product" : [
                     "nanopb",
                     "nanopb",
+                    null,
                     null
                   ]
                 }
@@ -1236,6 +1257,7 @@ extension PackageInfo {
 
     public static var googleAppMeasurement: PackageInfo {
         .init(
+            name: "GoogleAppMeasurement",
             products: [
                 .init(
                     name: "GoogleAppMeasurement",
@@ -1258,11 +1280,11 @@ extension PackageInfo {
                     exclude: [],
                     dependencies: [
                         .byName(name: "GoogleAppMeasurement", condition: nil),
-                        .product(name: "GULAppDelegateSwizzler", package: "GoogleUtilities", condition: nil),
-                        .product(name: "GULMethodSwizzler", package: "GoogleUtilities", condition: nil),
-                        .product(name: "GULNSData", package: "GoogleUtilities", condition: nil),
-                        .product(name: "GULNetwork", package: "GoogleUtilities", condition: nil),
-                        .product(name: "nanopb", package: "nanopb", condition: nil),
+                        .product(name: "GULAppDelegateSwizzler", package: "GoogleUtilities", moduleAliases: nil, condition: nil),
+                        .product(name: "GULMethodSwizzler", package: "GoogleUtilities", moduleAliases: nil, condition: nil),
+                        .product(name: "GULNSData", package: "GoogleUtilities", moduleAliases: nil, condition: nil),
+                        .product(name: "GULNetwork", package: "GoogleUtilities", moduleAliases: nil, condition: nil),
+                        .product(name: "nanopb", package: "nanopb", moduleAliases: nil, condition: nil),
                     ],
                     publicHeadersPath: nil,
                     type: .regular,
@@ -1316,11 +1338,11 @@ extension PackageInfo {
                     exclude: [],
                     dependencies: [
                         .byName(name: "GoogleAppMeasurementWithoutAdIdSupport", condition: nil),
-                        .product(name: "GULAppDelegateSwizzler", package: "GoogleUtilities", condition: nil),
-                        .product(name: "GULMethodSwizzler", package: "GoogleUtilities", condition: nil),
-                        .product(name: "GULNSData", package: "GoogleUtilities", condition: nil),
-                        .product(name: "GULNetwork", package: "GoogleUtilities", condition: nil),
-                        .product(name: "nanopb", package: "nanopb", condition: nil),
+                        .product(name: "GULAppDelegateSwizzler", package: "GoogleUtilities", moduleAliases: nil, condition: nil),
+                        .product(name: "GULMethodSwizzler", package: "GoogleUtilities", moduleAliases: nil, condition: nil),
+                        .product(name: "GULNSData", package: "GoogleUtilities", moduleAliases: nil, condition: nil),
+                        .product(name: "GULNetwork", package: "GoogleUtilities", moduleAliases: nil, condition: nil),
+                        .product(name: "nanopb", package: "nanopb", moduleAliases: nil, condition: nil),
                     ],
                     publicHeadersPath: nil,
                     type: .regular,
@@ -1377,6 +1399,7 @@ extension PackageInfo {
 
     public static var googleUtilities: PackageInfo {
         .init(
+            name: "GoogleUtilities",
             products: [
                 .init(name: "GULAppDelegateSwizzler", type: .library(.automatic), targets: ["GULAppDelegateSwizzler"]),
                 .init(name: "GULMethodSwizzler", type: .library(.automatic), targets: ["GULMethodSwizzler"]),
@@ -1448,6 +1471,7 @@ extension PackageInfo {
 
     public static var nanopb: PackageInfo {
         .init(
+            name: "nanopb",
             products: [
                 .init(name: "nanopb", type: .library(.automatic), targets: ["nanopb"]),
             ],

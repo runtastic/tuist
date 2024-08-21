@@ -1,8 +1,8 @@
 import Foundation
-import TSCBasic
+import Path
 import TuistCore
-import TuistGraph
 import TuistSupport
+import XcodeGraph
 import XcodeProj
 
 protocol TargetGenerating: AnyObject {
@@ -31,20 +31,17 @@ final class TargetGenerator: TargetGenerating {
     let configGenerator: ConfigGenerating
     let buildPhaseGenerator: BuildPhaseGenerating
     let linkGenerator: LinkGenerating
-    let fileGenerator: FileGenerating
     let buildRulesGenerator: BuildRulesGenerating
 
     // MARK: - Init
 
     init(
         configGenerator: ConfigGenerating = ConfigGenerator(),
-        fileGenerator: FileGenerating = FileGenerator(),
         buildPhaseGenerator: BuildPhaseGenerating = BuildPhaseGenerator(),
         linkGenerator: LinkGenerating = LinkGenerator(),
         buildRulesGenerator: BuildRulesGenerating = BuildRulesGenerator()
     ) {
         self.configGenerator = configGenerator
-        self.fileGenerator = fileGenerator
         self.buildPhaseGenerator = buildPhaseGenerator
         self.linkGenerator = linkGenerator
         self.buildRulesGenerator = buildRulesGenerator
@@ -145,18 +142,17 @@ final class TargetGenerator: TargetGenerating {
         nativeTargets: [String: PBXNativeTarget],
         graphTraverser: GraphTraversing
     ) throws {
-        try targets.forEach { targetSpec in
-
-            let dependenciesAndConditions = graphTraverser.directLocalTargetDependenciesWithConditions(
+        for targetSpec in targets {
+            let dependenciesAndConditions = graphTraverser.directLocalTargetDependencies(
                 path: path,
                 name: targetSpec.name
-            )
+            ).sorted()
 
-            try dependenciesAndConditions.forEach { dependency, condition in
+            for dependency in dependenciesAndConditions {
                 let nativeTarget = nativeTargets[targetSpec.name]!
                 let nativeDependency = nativeTargets[dependency.target.name]!
                 let pbxTargetDependency = try nativeTarget.addDependency(target: nativeDependency)
-                pbxTargetDependency?.applyCondition(condition, applicableTo: dependency.target)
+                pbxTargetDependency?.applyCondition(dependency.condition, applicableTo: targetSpec)
             }
         }
     }

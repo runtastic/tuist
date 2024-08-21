@@ -1,9 +1,8 @@
 import Foundation
-import TSCBasic
+import Path
 import TuistCore
 import TuistCoreTesting
-import TuistGraph
-import TuistGraphTesting
+import XcodeGraph
 import XcodeProj
 import XCTest
 @testable import TuistGenerator
@@ -107,22 +106,33 @@ final class TargetGeneratorTests: XCTestCase {
 
     func test_generateTargetDependencies() throws {
         // Given
-        let targetA = Target.test(name: "TargetA")
-        let targetB = Target.test(name: "TargetB")
+        let targetA = Target.test(
+            name: "TargetA",
+            destinations: [.mac, .iPhone]
+        )
+        let targetB = Target.test(
+            name: "TargetB",
+            destinations: [.mac, .iPhone]
+        )
+        let targetC = Target.test(name: "TargetC")
+        let project: Project = .test(path: path, targets: [targetA, targetB, targetC])
         let nativeTargetA = createNativeTarget(for: targetA)
         let nativeTargetB = createNativeTarget(for: targetB)
+        let nativeTargetC = createNativeTarget(for: targetC)
         let graph = Graph.test(
-            projects: [path: .test(path: path)],
-            targets: [
-                path: [
-                    targetA.name: targetA,
-                    targetB.name: targetB,
-                ],
-            ],
+            projects: [path: project],
             dependencies: [
                 .target(name: targetA.name, path: path): [
                     .target(name: targetB.name, path: path),
+                    .target(name: targetC.name, path: path),
                 ],
+            ],
+            dependencyConditions: [
+                GraphEdge(
+                    from: .target(name: targetA.name, path: path),
+                    to: .target(name: targetC.name, path: path)
+                ):
+                    try XCTUnwrap(.when([.ios])),
             ]
         )
         let graphTraverser = GraphTraverser(graph: graph)
@@ -130,18 +140,26 @@ final class TargetGeneratorTests: XCTestCase {
         // When
         try subject.generateTargetDependencies(
             path: path,
-            targets: [targetA, targetB],
+            targets: [targetA, targetB, targetC],
             nativeTargets: [
                 "TargetA": nativeTargetA,
                 "TargetB": nativeTargetB,
+                "TargetC": nativeTargetC,
             ],
             graphTraverser: graphTraverser
         )
 
         // Then
-        XCTAssertEqual(nativeTargetA.dependencies.map(\.name), [
-            "TargetB",
-        ])
+        let expected: [PBXTargetDependency] = [
+            PBXTargetDependency(name: "TargetB"),
+            PBXTargetDependency(name: "TargetC", platformFilter: "ios"),
+        ]
+
+        for (index, dependency) in nativeTargetA.dependencies.enumerated() {
+            XCTAssertEqual(dependency.name, expected[index].name)
+            XCTAssertEqual(dependency.platformFilter, expected[index].platformFilter)
+            XCTAssertEqual(dependency.platformFilters, expected[index].platformFilters)
+        }
     }
 
     func test_generateTarget_actions() throws {
@@ -150,7 +168,7 @@ final class TargetGeneratorTests: XCTestCase {
         let graphTraverser = GraphTraverser(graph: graph)
         let target = Target.test(
             sources: [],
-            resources: [],
+            resources: .init([]),
             scripts: [
                 TargetScript(
                     name: "post",

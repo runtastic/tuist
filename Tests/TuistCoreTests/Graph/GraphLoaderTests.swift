@@ -1,7 +1,7 @@
 import Foundation
-import TSCBasic
-import TuistGraph
+import Path
 import TuistSupport
+import XcodeGraph
 import XCTest
 
 @testable import TuistCore
@@ -45,7 +45,7 @@ final class GraphLoaderTests: TuistUnitTestCase {
         XCTAssertEqual(graph.projects, [
             "/A": projectA,
         ])
-        XCTAssertTrue(graph.targets.isEmpty)
+        XCTAssertTrue(graph.projects.values.flatMap(\.targets).isEmpty)
         XCTAssertTrue(graph.dependencies.isEmpty)
     }
 
@@ -71,7 +71,7 @@ final class GraphLoaderTests: TuistUnitTestCase {
             "/A": projectA,
             "/B": projectB,
         ])
-        XCTAssertTrue(graph.targets.isEmpty)
+        XCTAssertTrue(graph.projects.values.flatMap(\.targets).isEmpty)
         XCTAssertTrue(graph.dependencies.isEmpty)
     }
 
@@ -98,10 +98,6 @@ final class GraphLoaderTests: TuistUnitTestCase {
         XCTAssertEqual(graph.projects, [
             "/A": projectA,
             "/B": projectB,
-        ])
-        XCTAssertEqual(graph.targets, [
-            "/A": ["A": targetA],
-            "/B": ["B": targetB],
         ])
         XCTAssertEqual(graph.dependencies, [
             .target(name: "A", path: "/A"): Set([
@@ -132,7 +128,7 @@ final class GraphLoaderTests: TuistUnitTestCase {
         XCTAssertEqual(graph.projects, [
             "/A": projectA,
         ])
-        XCTAssertTrue(graph.targets.isEmpty)
+        XCTAssertTrue(graph.projects.values.flatMap(\.targets).isEmpty)
         XCTAssertTrue(graph.dependencies.isEmpty)
     }
 
@@ -158,10 +154,6 @@ final class GraphLoaderTests: TuistUnitTestCase {
         XCTAssertEqual(graph.projects, [
             "/A": projectA,
             "/B": projectB,
-        ])
-        XCTAssertEqual(graph.targets, [
-            "/A": ["A": targetA],
-            "/B": ["B": targetB],
         ])
         XCTAssertEqual(graph.dependencies, [
             .target(name: "A", path: "/A"): Set([
@@ -216,7 +208,6 @@ final class GraphLoaderTests: TuistUnitTestCase {
                     bcsymbolmapPaths: [],
                     linking: .dynamic,
                     architectures: [.arm64],
-                    isCarthage: false,
                     status: .required
                 ),
             ]),
@@ -228,7 +219,6 @@ final class GraphLoaderTests: TuistUnitTestCase {
                     bcsymbolmapPaths: [],
                     linking: .static,
                     architectures: [.x8664],
-                    isCarthage: false,
                     status: .required
                 ),
             ]),
@@ -270,7 +260,6 @@ final class GraphLoaderTests: TuistUnitTestCase {
             bcsymbolmapPaths: [],
             linking: .dynamic,
             architectures: [.arm64],
-            isCarthage: false,
             status: .required
         )
         XCTAssertEqual(graph.dependencies, [
@@ -368,7 +357,8 @@ final class GraphLoaderTests: TuistUnitTestCase {
                 primaryBinaryPath: "/XCFrameworks/XF1.xcframework/ios-arm64/XF1",
                 linking: .dynamic,
                 mergeable: false,
-                status: .required
+                status: .required,
+                macroPath: nil
             )
         )
 
@@ -386,12 +376,15 @@ final class GraphLoaderTests: TuistUnitTestCase {
         XCTAssertEqual(graph.dependencies, [
             .target(name: "A", path: "/A"): Set([
                 .xcframework(
-                    path: "/XCFrameworks/XF1.xcframework",
-                    infoPlist: .test(),
-                    primaryBinaryPath: "/XCFrameworks/XF1.xcframework/ios-arm64/XF1",
-                    linking: .dynamic,
-                    mergeable: false,
-                    status: .required
+                    GraphDependency.XCFramework(
+                        path: "/XCFrameworks/XF1.xcframework",
+                        infoPlist: .test(),
+                        primaryBinaryPath: "/XCFrameworks/XF1.xcframework/ios-arm64/XF1",
+                        linking: .dynamic,
+                        mergeable: false,
+                        status: .required,
+                        macroPath: nil
+                    )
                 ),
             ]),
         ])
@@ -413,7 +406,8 @@ final class GraphLoaderTests: TuistUnitTestCase {
                 primaryBinaryPath: "/XCFrameworks/XF1.xcframework/ios-arm64/XF1",
                 linking: .dynamic,
                 mergeable: true,
-                status: .required
+                status: .required,
+                macroPath: nil
             )
         )
 
@@ -431,12 +425,15 @@ final class GraphLoaderTests: TuistUnitTestCase {
         XCTAssertEqual(graph.dependencies, [
             .target(name: "A", path: "/A"): Set([
                 .xcframework(
-                    path: "/XCFrameworks/XF1.xcframework",
-                    infoPlist: .test(),
-                    primaryBinaryPath: "/XCFrameworks/XF1.xcframework/ios-arm64/XF1",
-                    linking: .dynamic,
-                    mergeable: true,
-                    status: .required
+                    GraphDependency.XCFramework(
+                        path: "/XCFrameworks/XF1.xcframework",
+                        infoPlist: .test(),
+                        primaryBinaryPath: "/XCFrameworks/XF1.xcframework/ios-arm64/XF1",
+                        linking: .dynamic,
+                        mergeable: true,
+                        status: .required,
+                        macroPath: nil
+                    )
                 ),
             ]),
         ])
@@ -688,7 +685,6 @@ final class GraphLoaderTests: TuistUnitTestCase {
                 bcsymbolmapPaths: [],
                 linking: metadata.linkage,
                 architectures: metadata.architectures,
-                isCarthage: false,
                 status: .required
             )
         }

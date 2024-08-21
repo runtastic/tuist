@@ -1,8 +1,8 @@
-import TSCBasic
+import Path
 import TSCUtility
 import TuistAutomation
 import TuistCore
-import TuistGraph
+import XcodeGraph
 
 public final class MockTargetBuilder: TargetBuilding {
     public init() {}
@@ -16,15 +16,15 @@ public final class MockTargetBuilder: TargetBuilding {
         AbsolutePath?,
         AbsolutePath?,
         String?,
-        Version?,
+        XcodeGraph.Version?,
         Bool,
         GraphTraversing,
-        Bool
+        [String]
     ) throws -> Void)?
 
     public func buildTarget(
         _ target: GraphTarget,
-        platform _: TuistGraph.Platform,
+        platform _: XcodeGraph.Platform,
         workspacePath: AbsolutePath,
         scheme: Scheme,
         clean: Bool,
@@ -32,10 +32,10 @@ public final class MockTargetBuilder: TargetBuilding {
         buildOutputPath: AbsolutePath?,
         derivedDataPath: AbsolutePath?,
         device: String?,
-        osVersion: Version?,
+        osVersion: XcodeGraph.Version?,
         rosetta: Bool,
         graphTraverser: GraphTraversing,
-        rawXcodebuildLogs: Bool
+        passthroughXcodeBuildArguments: [String]
     ) throws {
         try buildTargetStub?(
             target,
@@ -49,7 +49,7 @@ public final class MockTargetBuilder: TargetBuilding {
             osVersion,
             rosetta,
             graphTraverser,
-            rawXcodebuildLogs
+            passthroughXcodeBuildArguments
         )
     }
 }

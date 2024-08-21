@@ -1,18 +1,21 @@
 import Foundation
 
 /// A collection of resource file.
-public struct ResourceFileElements: Codable, Equatable {
+public struct ResourceFileElements: Codable, Equatable, Sendable {
     /// List of resource file elements
-    public let resources: [ResourceFileElement]
+    public var resources: [ResourceFileElement]
 
-    public init(resources: [ResourceFileElement]) {
-        self.resources = resources
+    /// Define your apps privacy manifest
+    public var privacyManifest: PrivacyManifest?
+
+    public static func resources(_ resources: [ResourceFileElement], privacyManifest: PrivacyManifest? = nil) -> Self {
+        self.init(resources: resources, privacyManifest: privacyManifest)
     }
 }
 
 extension ResourceFileElements: ExpressibleByStringInterpolation {
     public init(stringLiteral value: String) {
-        self.init(resources: [.glob(pattern: Path(value))])
+        self.init(resources: [.glob(pattern: .path(value))])
     }
 }
 

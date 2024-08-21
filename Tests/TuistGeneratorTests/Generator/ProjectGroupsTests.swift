@@ -1,10 +1,9 @@
 import Foundation
+import Path
 import PathKit
-import TSCBasic
 import TuistCore
 import TuistCoreTesting
-import TuistGraph
-import TuistGraphTesting
+import XcodeGraph
 import XcodeProj
 import XCTest
 @testable import TuistGenerator
@@ -27,14 +26,15 @@ final class ProjectGroupsTests: XCTestCase {
             xcodeProjPath: path.appending(component: "Project.xcodeproj"),
             name: "Project",
             organizationName: nil,
+            classPrefix: nil,
             defaultKnownRegions: nil,
             developmentRegion: nil,
             options: .test(),
             settings: .default,
             filesGroup: .group(name: "Project"),
             targets: [
-                .test(filesGroup: .group(name: "Target")),
-                .test(),
+                .test(name: "A", filesGroup: .group(name: "Target")),
+                .test(name: "B"),
             ],
             packages: [],
             schemes: [],
@@ -64,7 +64,7 @@ final class ProjectGroupsTests: XCTestCase {
         let main = subject.sortedMain
         XCTAssertNil(main.path)
         XCTAssertEqual(main.sourceTree, .group)
-        XCTAssertEqual(main.children.count, 4)
+        XCTAssertEqual(main.children.count, 5)
 
         XCTAssertNotNil(main.group(named: "Project"))
         XCTAssertNil(main.group(named: "Project")?.path)
@@ -74,10 +74,15 @@ final class ProjectGroupsTests: XCTestCase {
         XCTAssertNil(main.group(named: "Target")?.path)
         XCTAssertEqual(main.group(named: "Target")?.sourceTree, .group)
 
-        XCTAssertTrue(main.children.contains(subject.compiled))
-        XCTAssertEqual(subject.compiled.name, "Compiled")
-        XCTAssertNil(subject.compiled.path)
-        XCTAssertEqual(subject.compiled.sourceTree, .group)
+        XCTAssertTrue(main.children.contains(subject.frameworks))
+        XCTAssertEqual(subject.frameworks.name, "Frameworks")
+        XCTAssertNil(subject.frameworks.path)
+        XCTAssertEqual(subject.frameworks.sourceTree, .group)
+
+        XCTAssertTrue(main.children.contains(subject.cachedFrameworks))
+        XCTAssertEqual(subject.cachedFrameworks.name, "Cache")
+        XCTAssertNil(subject.cachedFrameworks.path)
+        XCTAssertEqual(subject.cachedFrameworks.sourceTree, .group)
 
         XCTAssertTrue(main.children.contains(subject.products))
         XCTAssertEqual(subject.products.name, "Products")
@@ -87,10 +92,10 @@ final class ProjectGroupsTests: XCTestCase {
 
     func test_generate_groupsOrder() throws {
         // Given
-        let target1 = Target.test(filesGroup: .group(name: "B"))
-        let target2 = Target.test(filesGroup: .group(name: "C"))
-        let target3 = Target.test(filesGroup: .group(name: "A"))
-        let target4 = Target.test(filesGroup: .group(name: "C"))
+        let target1 = Target.test(name: "Target1", filesGroup: .group(name: "B"))
+        let target2 = Target.test(name: "Target2", filesGroup: .group(name: "C"))
+        let target3 = Target.test(name: "Target3", filesGroup: .group(name: "A"))
+        let target4 = Target.test(name: "Target4", filesGroup: .group(name: "C"))
         let project = Project.test(
             filesGroup: .group(name: "P"),
             targets: [target1, target2, target3, target4]
@@ -103,16 +108,58 @@ final class ProjectGroupsTests: XCTestCase {
         )
 
         // Then
-        // swiftformat:disable preferKeyPath
-        let paths = subject.sortedMain.children.compactMap { $0.nameOrPath }
-        // swiftformat:enable preferKeyPath
+        let paths = subject.sortedMain.children.map(\.nameOrPath).sorted()
         XCTAssertEqual(paths, [
-            "P",
+            "A",
             "B",
             "C",
-            "A",
-            "Compiled",
+            "Cache",
+            "Frameworks",
+            "P",
             "Products",
+        ])
+    }
+
+    func test_removeEmptyAuxiliaryGroups_removesEmptyGroups() throws {
+        // Given
+        let project = Project.test()
+        subject = ProjectGroups.generate(
+            project: project,
+            pbxproj: pbxproj
+        )
+
+        // When
+        subject.removeEmptyAuxiliaryGroups()
+
+        // Then
+        let paths = subject.sortedMain.children.map(\.nameOrPath)
+        XCTAssertEqual(paths, [
+            "Project",
+            "Products",
+        ])
+    }
+
+    func test_removeEmptyAuxiliaryGroups_preservesNonEmptyGroups() throws {
+        // Given
+        let project = Project.test()
+        subject = ProjectGroups.generate(
+            project: project,
+            pbxproj: pbxproj
+        )
+
+        addFile(to: subject.frameworks)
+        addFile(to: subject.cachedFrameworks)
+
+        // When
+        subject.removeEmptyAuxiliaryGroups()
+
+        // Then
+        let paths = subject.sortedMain.children.map(\.nameOrPath)
+        XCTAssertEqual(paths, [
+            "Project",
+            "Products",
+            "Frameworks",
+            "Cache",
         ])
     }
 
@@ -125,7 +172,7 @@ final class ProjectGroupsTests: XCTestCase {
         let got = try subject.targetFrameworks(target: "Test")
         XCTAssertEqual(got.name, "Test")
         XCTAssertEqual(got.sourceTree, .group)
-        XCTAssertTrue(subject.compiled.children.contains(got))
+        XCTAssertTrue(subject.frameworks.children.contains(got))
     }
 
     func test_projectGroup_unknownProjectGroups() throws {
@@ -144,9 +191,9 @@ final class ProjectGroupsTests: XCTestCase {
 
     func test_projectGroup_knownProjectGroups() throws {
         // Given
-        let target1 = Target.test(filesGroup: .group(name: "A"))
-        let target2 = Target.test(filesGroup: .group(name: "B"))
-        let target3 = Target.test(filesGroup: .group(name: "B"))
+        let target1 = Target.test(name: "1", filesGroup: .group(name: "A"))
+        let target2 = Target.test(name: "2", filesGroup: .group(name: "B"))
+        let target3 = Target.test(name: "3", filesGroup: .group(name: "B"))
         let project = Project.test(
             path: .root,
             sourceRootPath: .root,
@@ -208,5 +255,13 @@ final class ProjectGroupsTests: XCTestCase {
         XCTAssertNil(main.indentWidth)
         XCTAssertNil(main.tabWidth)
         XCTAssertNil(main.wrapsLines)
+    }
+
+    // MARK: - Helpers
+
+    private func addFile(to group: PBXGroup) {
+        let file = PBXFileReference()
+        pbxproj.add(object: file)
+        group.children.append(file)
     }
 }

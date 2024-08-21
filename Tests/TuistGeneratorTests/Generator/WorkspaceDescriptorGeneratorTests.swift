@@ -1,10 +1,11 @@
 import Foundation
-import TSCBasic
+import MockableTest
+import Path
+import struct TSCUtility.Version
 import TuistCore
 import TuistCoreTesting
-import TuistGraph
-import TuistGraphTesting
 import TuistSupport
+import XcodeGraph
 import XcodeProj
 import XCTest
 @testable import TuistGenerator
@@ -15,7 +16,15 @@ final class WorkspaceDescriptorGeneratorTests: TuistUnitTestCase {
 
     override func setUp() {
         super.setUp()
-        system.swiftVersionStub = { "5.2" }
+
+        given(swiftVersionProvider)
+            .swiftVersion()
+            .willReturn("5.2")
+
+        given(xcodeController)
+            .selectedVersion()
+            .willReturn(Version(15, 0, 0))
+
         subject = WorkspaceDescriptorGenerator(config: .init(projectGenerationContext: .serial))
     }
 
@@ -104,12 +113,7 @@ final class WorkspaceDescriptorGeneratorTests: TuistUnitTestCase {
 
         let graph = Graph.test(
             workspace: workspace,
-            projects: [project.path: project],
-            targets: [
-                project.path: [
-                    target.name: target,
-                ],
-            ]
+            projects: [project.path: project]
         )
         let graphTraverser = GraphTraverser(graph: graph)
 

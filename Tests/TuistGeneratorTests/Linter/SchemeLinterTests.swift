@@ -1,9 +1,8 @@
 import Foundation
-import TSCBasic
+import Path
 import TuistCore
-import TuistGraph
-import TuistGraphTesting
 import TuistSupport
+import XcodeGraph
 import XCTest
 @testable import TuistGenerator
 @testable import TuistSupportTesting
@@ -115,7 +114,7 @@ class SchemeLinterTests: TuistTestCase {
                         expandVariableFromTarget: nil,
                         preActions: [],
                         postActions: [],
-                        diagnosticsOptions: []
+                        diagnosticsOptions: SchemeDiagnosticsOptions()
                     )
                 ),
             ]

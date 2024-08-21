@@ -1,9 +1,9 @@
 import Foundation
+import Path
 import PathKit
-import TSCBasic
 import TuistCore
-import TuistGraph
 import TuistSupport
+import XcodeGraph
 import XcodeProj
 
 enum LinkGeneratorError: FatalError, Equatable {
@@ -116,23 +116,6 @@ final class LinkGenerator: LinkGenerating { // swiftlint:disable:this type_body_
             fileElements: fileElements
         )
 
-        /**
-         Targets that depend on a Swift Macro have the following dependency graph:
-
-         Target -> MyMacro (Static framework) -> MyMacro (Executable)
-
-         The executable is compiled transitively through the static library, and we place it inside the framework to make it available to the target depending on the framework
-         to point it with the `-load-plugin-executable $BUILT_PRODUCTS_DIR/ExecutableName\#ExecutableName` build setting.
-         */
-        let directSwiftMacroExecutables = graphTraverser.directSwiftMacroExecutables(path: path, name: target.name).sorted()
-        try generateCopySwiftMacroExecutableScriptBuildPhase(
-            directSwiftMacroExecutables: directSwiftMacroExecutables,
-            target: target,
-            pbxTarget: pbxTarget,
-            pbxproj: pbxproj,
-            fileElements: fileElements
-        )
-
         try generatePackages(
             target: target,
             pbxTarget: pbxTarget,
@@ -229,7 +212,7 @@ final class LinkGenerator: LinkGenerating { // swiftlint:disable:this type_body_
 
         var frameworkReferences: [GraphDependencyReference] = []
 
-        try embeddableFrameworks.forEach { dependency in
+        for dependency in embeddableFrameworks {
             switch dependency {
             case .framework:
                 frameworkReferences.append(dependency)
@@ -255,7 +238,7 @@ final class LinkGenerator: LinkGenerating { // swiftlint:disable:this type_body_
                 buildFile.applyCondition(condition, applicableTo: target)
                 pbxproj.add(object: buildFile)
                 embedPhase.files?.append(buildFile)
-            case .library, .bundle, .sdk:
+            case .library, .bundle, .sdk, .macro:
                 // Do nothing
                 break
             }
@@ -391,7 +374,7 @@ final class LinkGenerator: LinkGenerating { // swiftlint:disable:this type_body_
             .array(["$(inherited)"] + paths.map { $0.xcodeValue(sourceRootPath: sourceRootPath) }.uniqued().sorted())
         let newSetting = [name: value]
         let helper = SettingsHelper()
-        try configurationList.buildConfigurations.forEach { configuration in
+        for configuration in configurationList.buildConfigurations {
             try helper.extend(buildSettings: &configuration.buildSettings, with: newSetting)
         }
     }
@@ -428,36 +411,35 @@ final class LinkGenerator: LinkGenerating { // swiftlint:disable:this type_body_
             buildPhase.files?.append(buildFile)
         }
 
-        try linkableDependencies
-            .forEach { dependency in
-                switch dependency {
-                case let .framework(path, _, _, _, _, _, _, _, status, condition):
-                    try addBuildFile(path, condition: condition, status: status)
-                case let .library(path, _, _, _, condition):
-                    try addBuildFile(path, condition: condition)
-                case let .xcframework(path, _, _, _, status, condition):
-                    try addBuildFile(path, condition: condition, status: status)
-                case .bundle:
-                    break
-                case let .product(dependencyTarget, _, condition):
-                    guard let fileRef = fileElements.product(target: dependencyTarget) else {
-                        throw LinkGeneratorError.missingProduct(name: dependencyTarget)
-                    }
-                    let buildFile = PBXBuildFile(file: fileRef)
-                    buildFile.applyCondition(condition, applicableTo: target)
-                    pbxproj.add(object: buildFile)
-                    buildPhase.files?.append(buildFile)
-                case let .sdk(sdkPath, sdkStatus, _, condition):
-                    guard let fileRef = fileElements.sdk(path: sdkPath) else {
-                        throw LinkGeneratorError.missingReference(path: sdkPath)
-                    }
-
-                    let buildFile = createSDKBuildFile(for: fileRef, status: sdkStatus)
-                    buildFile.applyCondition(condition, applicableTo: target)
-                    pbxproj.add(object: buildFile)
-                    buildPhase.files?.append(buildFile)
+        for dependency in linkableDependencies {
+            switch dependency {
+            case let .framework(path, _, _, _, _, _, _, status, condition):
+                try addBuildFile(path, condition: condition, status: status)
+            case let .library(path, _, _, _, condition):
+                try addBuildFile(path, condition: condition)
+            case let .xcframework(path, _, _, _, status, condition):
+                try addBuildFile(path, condition: condition, status: status)
+            case .bundle, .macro:
+                break
+            case let .product(dependencyTarget, _, condition):
+                guard let fileRef = fileElements.product(target: dependencyTarget) else {
+                    throw LinkGeneratorError.missingProduct(name: dependencyTarget)
                 }
+                let buildFile = PBXBuildFile(file: fileRef)
+                buildFile.applyCondition(condition, applicableTo: target)
+                pbxproj.add(object: buildFile)
+                buildPhase.files?.append(buildFile)
+            case let .sdk(sdkPath, sdkStatus, _, condition):
+                guard let fileRef = fileElements.sdk(path: sdkPath) else {
+                    throw LinkGeneratorError.missingReference(path: sdkPath)
+                }
+
+                let buildFile = createSDKBuildFile(for: fileRef, status: sdkStatus)
+                buildFile.applyCondition(condition, applicableTo: target)
+                pbxproj.add(object: buildFile)
+                buildPhase.files?.append(buildFile)
             }
+        }
     }
 
     func generateCopyProductsBuildPhase(
@@ -492,7 +474,7 @@ final class LinkGenerator: LinkGenerating { // swiftlint:disable:this type_body_
         )
 
         // For static framewor/library XCFrameworks, we need Xcode to process it to extract the
-        // the relevant product within it within it based on the architecture and place in
+        // the relevant product within it based on the architecture and place in
         // the products directory. This allows the current target to see the symbols from the XCFramework.
         //
         // Copying to products is not a nop like it is for regular static targets due to the processing step,
@@ -512,34 +494,6 @@ final class LinkGenerator: LinkGenerating { // swiftlint:disable:this type_body_
             target: target,
             fileElements: fileElements
         )
-    }
-
-    func generateCopySwiftMacroExecutableScriptBuildPhase(
-        directSwiftMacroExecutables: [GraphDependencyReference],
-        target _: Target,
-        pbxTarget: PBXTarget,
-        pbxproj: PBXProj,
-        fileElements _: ProjectFileElements
-    ) throws {
-        if directSwiftMacroExecutables.isEmpty { return }
-
-        let copySwiftMacrosBuildPhase = PBXShellScriptBuildPhase(name: "Copy Swift Macro executable into /Macros")
-
-        let filesToCopy = directSwiftMacroExecutables.compactMap {
-            switch $0 {
-            case let .product(_, productName, _):
-                return productName
-            default:
-                return nil
-            }
-        }.map { ("$SYMROOT/$CONFIGURATION/\($0)", "$BUILT_PRODUCTS_DIR/$FULL_PRODUCT_NAME/Macros/\($0)") }
-
-        copySwiftMacrosBuildPhase.shellScript = filesToCopy.map { "cp \"\($0.0)\" \"\($0.1)\"" }.joined(separator: "\n")
-        copySwiftMacrosBuildPhase.inputPaths = filesToCopy.map(\.0)
-        copySwiftMacrosBuildPhase.outputPaths = filesToCopy.map(\.1)
-
-        pbxproj.add(object: copySwiftMacrosBuildPhase)
-        pbxTarget.buildPhases.append(copySwiftMacrosBuildPhase)
     }
 
     private func generateDependenciesBuildPhase(
@@ -562,7 +516,7 @@ final class LinkGenerator: LinkGenerating { // swiftlint:disable:this type_body_
                 buildFile.applyCondition(condition, applicableTo: target)
                 pbxproj.add(object: buildFile)
                 files.append(buildFile)
-            case let .framework(path: path, _, _, _, _, _, _, _, _, condition),
+            case let .framework(path: path, _, _, _, _, _, _, _, condition),
                  let .library(path: path, _, _, _, condition):
                 guard let fileRef = fileElements.file(path: path) else {
                     throw LinkGeneratorError.missingReference(path: path)

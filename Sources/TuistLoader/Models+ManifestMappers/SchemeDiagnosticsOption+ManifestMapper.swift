@@ -1,17 +1,18 @@
 import Foundation
+import Path
 import ProjectDescription
-import TSCBasic
 import TuistCore
-import TuistGraph
+import XcodeGraph
 
-extension TuistGraph.SchemeDiagnosticsOption {
-    static func from(manifest: ProjectDescription.SchemeDiagnosticsOption) -> TuistGraph.SchemeDiagnosticsOption {
-        switch manifest {
-        case .enableAddressSanitizer: return .enableAddressSanitizer
-        case .enableDetectStackUseAfterReturn: return .enableASanStackUseAfterReturn
-        case .enableThreadSanitizer: return .enableThreadSanitizer
-        case .mainThreadChecker: return .mainThreadChecker
-        case .performanceAntipatternChecker: return .performanceAntipatternChecker
-        }
+extension XcodeGraph.SchemeDiagnosticsOptions {
+    static func from(manifest: ProjectDescription.SchemeDiagnosticsOptions) -> XcodeGraph.SchemeDiagnosticsOptions {
+        return XcodeGraph.SchemeDiagnosticsOptions(
+            addressSanitizerEnabled: manifest.addressSanitizerEnabled,
+            detectStackUseAfterReturnEnabled: manifest.detectStackUseAfterReturnEnabled,
+            threadSanitizerEnabled: manifest.threadSanitizerEnabled,
+            mainThreadCheckerEnabled: manifest.mainThreadCheckerEnabled,
+            performanceAntipatternCheckerEnabled: manifest
+                .performanceAntipatternCheckerEnabled
+        )
     }
 }

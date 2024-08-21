@@ -1,11 +1,12 @@
 import Foundation
-import TSCBasic
+import Mockable
+import Path
 import TuistCore
 import TuistGenerator
-import TuistGraph
 import TuistLoader
 import TuistScaffold
 import TuistSupport
+import XcodeGraph
 
 enum ProjectEditorError: FatalError, Equatable {
     /// This error is thrown when we try to edit in a project in a directory that has no editable files.
@@ -25,6 +26,7 @@ enum ProjectEditorError: FatalError, Equatable {
     }
 }
 
+@Mockable
 protocol ProjectEditing: AnyObject {
     /// Generates an Xcode project to edit the Project defined in the given directory.
     /// - Parameters:
@@ -38,7 +40,7 @@ protocol ProjectEditing: AnyObject {
         in destinationDirectory: AbsolutePath,
         onlyCurrentDirectory: Bool,
         plugins: Plugins
-    ) throws -> AbsolutePath
+    ) async throws -> AbsolutePath
 }
 
 final class ProjectEditor: ProjectEditing {
@@ -105,7 +107,7 @@ final class ProjectEditor: ProjectEditing {
         in destinationDirectory: AbsolutePath,
         onlyCurrentDirectory: Bool,
         plugins: Plugins
-    ) throws -> AbsolutePath {
+    ) async throws -> AbsolutePath {
         let tuistIgnoreContent = (try? FileHandler.shared.readTextFile(editingPath.appending(component: ".tuistignore"))) ?? ""
         let tuistIgnoreEntries = try tuistIgnoreContent
             .split(separator: "\n")
@@ -121,8 +123,7 @@ final class ProjectEditor: ProjectEditing {
             }
 
         let pathsToExclude = [
-            "**/\(Constants.tuistDirectoryName)/\(Constants.DependenciesDirectory.name)/**",
-            "**/\(Constants.DependenciesDirectory.packageBuildDirectoryName)/**",
+            "**/\(Constants.SwiftPackageManager.packageBuildDirectoryName)/**",
         ] + tuistIgnoreEntries
 
         let projectDescriptionPath = try resourceLocator.projectDescription()
@@ -132,11 +133,11 @@ final class ProjectEditor: ProjectEditing {
             onlyCurrentDirectory: onlyCurrentDirectory
         )
         let configPath = manifestFilesLocator.locateConfig(at: editingPath)
-        let cacheDirectory = try cacheDirectoryProviderFactory.cacheDirectories(config: nil)
+        let cacheDirectory = try cacheDirectoryProviderFactory.cacheDirectories()
         let projectDescriptionHelpersBuilder = projectDescriptionHelpersBuilderFactory.projectDescriptionHelpersBuilder(
-            cacheDirectory: cacheDirectory.cacheDirectory(for: .projectDescriptionHelpers)
+            cacheDirectory: try cacheDirectory.cacheDirectory(for: .projectDescriptionHelpers)
         )
-        let dependenciesPath = manifestFilesLocator.locateDependencies(at: editingPath)
+        let packageManifestPath = manifestFilesLocator.locatePackageManifest(at: editingPath)
 
         let helpers = helpersDirectoryLocator.locate(at: editingPath).map {
             [
@@ -167,7 +168,7 @@ final class ProjectEditor: ProjectEditing {
             plugins: plugins,
             onlyCurrentDirectory: onlyCurrentDirectory
         )
-        let builtPluginHelperModules = try buildRemotePluginModules(
+        let builtPluginHelperModules = try await buildRemotePluginModules(
             in: editingPath,
             projectDescriptionPath: projectDescriptionPath,
             plugins: plugins,
@@ -176,7 +177,7 @@ final class ProjectEditor: ProjectEditing {
 
         /// We error if the user tries to edit a project in a directory where there are no editable files.
         if projectManifests.isEmpty, editablePluginManifests.isEmpty, helpers.isEmpty, templateSources.isEmpty,
-           resourceSynthesizers.isEmpty, stencils.isEmpty
+           resourceSynthesizers.isEmpty, stencils.isEmpty, packageManifestPath == nil
         {
             throw ProjectEditorError.noEditableFiles(editingPath)
         }
@@ -191,7 +192,7 @@ final class ProjectEditor: ProjectEditing {
             sourceRootPath: editingPath,
             destinationDirectory: destinationDirectory,
             configPath: configPath,
-            dependenciesPath: dependenciesPath,
+            packageManifestPath: packageManifestPath,
             projectManifests: projectManifests.map(\.path),
             editablePluginManifests: editablePluginManifests,
             pluginProjectDescriptionHelpersModule: builtPluginHelperModules,
@@ -205,7 +206,7 @@ final class ProjectEditor: ProjectEditing {
 
         let graphTraverser = GraphTraverser(graph: graph)
         let descriptor = try generator.generateWorkspace(graphTraverser: graphTraverser)
-        try writer.write(workspace: descriptor)
+        try await writer.write(workspace: descriptor)
         return descriptor.xcworkspacePath
     }
 
@@ -236,9 +237,9 @@ final class ProjectEditor: ProjectEditing {
         projectDescriptionPath: AbsolutePath,
         plugins: Plugins,
         projectDescriptionHelpersBuilder: ProjectDescriptionHelpersBuilding
-    ) throws -> [ProjectDescriptionHelpersModule] {
+    ) async throws -> [ProjectDescriptionHelpersModule] {
         let loadedPluginHelpers = plugins.projectDescriptionHelpers.filter { $0.location == .remote }
-        return try projectDescriptionHelpersBuilder.buildPlugins(
+        return try await projectDescriptionHelpersBuilder.buildPlugins(
             at: path,
             projectDescriptionSearchPaths: ProjectDescriptionSearchPaths.paths(for: projectDescriptionPath),
             projectDescriptionHelperPlugins: loadedPluginHelpers

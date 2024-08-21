@@ -1,8 +1,8 @@
 import Foundation
-import TSCBasic
+import Path
 import TuistCore
-import TuistGraph
 import TuistSupport
+import XcodeGraph
 
 protocol SettingsLinting: AnyObject {
     func lint(project: Project) -> [LintingIssue]
@@ -41,7 +41,7 @@ final class SettingsLinter: SettingsLinting {
             }
         }
 
-        settings.configurations.xcconfigs().forEach { configFilePath in
+        for configFilePath in settings.configurations.xcconfigs() {
             lintPath(configFilePath)
         }
 

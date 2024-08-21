@@ -8,22 +8,23 @@ protocol Formatting {
 }
 
 final class Formatter: Formatting {
-    private let parser: Parser
+    private let formatter: XCBeautifier
 
-    init() {
-        parser = Parser(
-            colored: Environment.shared.shouldOutputBeColoured,
-            renderer: Self.renderer(),
+    init(environment: Environmenting = Environment.shared) {
+        formatter = XCBeautifier(
+            colored: environment.shouldOutputBeColoured,
+            renderer: Self.renderer(for: environment),
+            preserveUnbeautifiedLines: false,
             additionalLines: { nil }
         )
     }
 
     func format(_ line: String) -> String? {
-        parser.parse(line: line)
+        formatter.format(line: line)
     }
 
-    private static func renderer() -> Renderer {
-        if Environment.shared.isGitHubActions {
+    private static func renderer(for environment: Environmenting) -> Renderer {
+        if environment.isGitHubActions {
             return .gitHubActions
         } else {
             return .terminal

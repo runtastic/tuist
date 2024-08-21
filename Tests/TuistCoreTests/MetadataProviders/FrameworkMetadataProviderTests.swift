@@ -1,5 +1,5 @@
-import TSCBasic
-import TuistGraph
+import Path
+import XcodeGraph
 import XCTest
 @testable import TuistCore
 @testable import TuistSupportTesting
@@ -34,7 +34,6 @@ final class FrameworkMetadataProviderTests: XCTestCase {
             bcsymbolmapPaths: [],
             linking: .dynamic,
             architectures: [.x8664, .arm64],
-            isCarthage: false,
             status: .required
         ))
     }

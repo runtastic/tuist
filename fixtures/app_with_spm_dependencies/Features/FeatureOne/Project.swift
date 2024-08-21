@@ -5,23 +5,27 @@ let project = Project(
     name: "FeatureOne",
     settings: .projectSettings,
     targets: [
-        Target(
+        .target(
             name: "FeatureOneFramework_iOS",
-            platform: .iOS,
+            destinations: .iOS,
             product: .framework,
             bundleId: "io.tuist.featureOne",
-            sources: ["Sources/**"],
+            sources: ["Sources/*.{swift,m}"],
+            headers: .headers(public: "Sources/*.h"),
+            dependencies: [
+                .external(name: "Alamofire"),
+                .external(name: "UICKeyChainStore"),
+            ],
             settings: .targetSettings
         ),
-        Target(
+        .target(
             name: "FeatureOneFramework_watchOS",
-            platform: .watchOS,
+            destinations: [.appleWatch],
             product: .framework,
             bundleId: "io.tuist.featureOne",
             sources: ["Sources/**"],
             dependencies: [
                 .external(name: "Alamofire"),
-                .external(name: "Styles"),
             ],
             settings: .targetSettings
         ),

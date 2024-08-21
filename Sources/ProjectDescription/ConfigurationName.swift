@@ -13,9 +13,9 @@ import Foundation
 ///   }
 /// }
 /// ```
-public struct ConfigurationName: ExpressibleByStringLiteral, Codable, Equatable {
+public struct ConfigurationName: ExpressibleByStringLiteral, Codable, Equatable, Sendable {
     /// The configuration name.
-    public let rawValue: String
+    public var rawValue: String
 
     init(_ rawValue: String) {
         self.rawValue = rawValue

@@ -1,7 +1,7 @@
 import Foundation
-import TSCBasic
+import Path
 import TuistCore
-import TuistGraph
+import XcodeGraph
 
 /// Static Products Graph Linter
 ///
@@ -26,10 +26,10 @@ class StaticProductsGraphLinter: StaticProductsGraphLinting {
     ) -> Set<StaticDependencyWarning> {
         var warnings = Set<StaticDependencyWarning>()
         let cache = Cache()
-        dependencies.forEach { dependency in
+        for dependency in dependencies {
             // Skip already evaluated nodes
             guard cache.results(for: dependency) == nil else {
-                return
+                continue
             }
             let results = buildStaticProductsMap(
                 visiting: dependency,
@@ -91,6 +91,10 @@ class StaticProductsGraphLinter: StaticProductsGraphLinting {
               let dependencyTarget = graphTraverser.target(path: targetPath, name: targetName),
               dependencyTarget.target.canLinkStaticProducts()
         else {
+            cache.cache(
+                results: results,
+                for: dependency
+            )
             return results
         }
 
@@ -158,9 +162,9 @@ class StaticProductsGraphLinter: StaticProductsGraphLinting {
 
     private func isStaticProduct(_ dependency: GraphDependency, graphTraverser: GraphTraversing) -> Bool {
         switch dependency {
-        case let .xcframework(_, _, _, linking, _, _):
-            return linking == .static
-        case let .framework(_, _, _, _, linking, _, _, _):
+        case let .xcframework(xcframework):
+            return xcframework.linking == .static
+        case let .framework(_, _, _, _, linking, _, _):
             return linking == .static
         case let .library(_, _, linking, _, _):
             return linking == .static
@@ -176,7 +180,7 @@ class StaticProductsGraphLinter: StaticProductsGraphLinting {
         case let .target(name, path):
             guard let target = graphTraverser.target(path: path, name: name) else { return false }
             return target.target.product.isStatic
-        case .sdk:
+        case .sdk, .macro:
             return false
         }
     }
@@ -227,6 +231,10 @@ class StaticProductsGraphLinter: StaticProductsGraphLinting {
         case (.app, .systemExtension):
             // System Extension can safely link the same static products as apps
             // as they are an independent product
+            return false
+        case (_, .macro):
+            // Macro executables can safely link the same static products as the targets
+            // depending on the executable's parent target (e.g. framework or library).
             return false
         default:
             return true

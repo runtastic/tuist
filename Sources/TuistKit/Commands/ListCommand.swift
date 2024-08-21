@@ -1,8 +1,10 @@
 import ArgumentParser
 import Foundation
 
-struct ListCommand: AsyncParsableCommand {
-    static var configuration: CommandConfiguration {
+public struct ListCommand: AsyncParsableCommand {
+    public init() {}
+
+    public static var configuration: CommandConfiguration {
         CommandConfiguration(
             commandName: "list",
             _superCommandName: "scaffold",
@@ -12,18 +14,20 @@ struct ListCommand: AsyncParsableCommand {
     }
 
     @Flag(
-        help: "The output in JSON format"
+        help: "The output in JSON format",
+        envKey: .scaffoldListJson
     )
     var json: Bool = false
 
     @Option(
         name: .shortAndLong,
         help: "The path where you want to list templates from",
-        completion: .directory
+        completion: .directory,
+        envKey: .scaffoldListPath
     )
     var path: String?
 
-    func run() async throws {
+    public func run() async throws {
         let format: ListService.OutputFormat = json ? .json : .table
         try await ListService().run(
             path: path,

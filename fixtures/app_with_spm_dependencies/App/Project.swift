@@ -5,9 +5,9 @@ let project = Project(
     name: "App",
     settings: .projectSettings,
     targets: [
-        Target(
+        .target(
             name: "App",
-            platform: .iOS,
+            destinations: .iOS,
             product: .app,
             bundleId: "io.tuist.app",
             infoPlist: .default,
@@ -16,12 +16,14 @@ let project = Project(
                 .target(name: "AppKit"),
                 .project(target: "FeatureOneFramework_iOS", path: .relativeToRoot("Features/FeatureOne")),
                 .external(name: "Styles"),
+                .external(name: "BrazeKit"),
+                .external(name: "BrazeUI"),
             ],
             settings: .targetSettings
         ),
-        Target(
+        .target(
             name: "AppKit",
-            platform: .iOS,
+            destinations: .iOS,
             product: .staticFramework,
             bundleId: "io.tuist.app.kit",
             infoPlist: .default,
@@ -30,40 +32,67 @@ let project = Project(
                 .sdk(name: "c++", type: .library, status: .required),
                 .external(name: "Alamofire"),
                 .external(name: "ComposableArchitecture"),
-                .external(name: "FacebookCore"),
-                .external(name: "FirebaseAnalytics"),
-                .external(name: "FirebaseCrashlytics"),
-                .external(name: "FirebaseDatabase"),
-                .external(name: "FirebaseFirestore"),
-                .external(name: "GRDB"),
-                .external(name: "IterableSDK"),
-                // Stringify depends on a Swift Macro, which is not yet supported.
-                // .external(name: "Stringify"),
-                .external(name: "Stripe"),
-                .external(name: "StripeCardScan"),
-                .external(name: "TYStatusBarView"),
-                .external(name: "Auth0"),
+                .external(name: "ZipArchive"),
+                .external(name: "Yams"),
+                .external(name: "GoogleSignIn"),
+                .external(name: "Sentry"),
+                .external(name: "RealmSwift"),
+                .external(name: "CocoaLumberjackSwift"),
+                .external(name: "AppCenterAnalytics"),
+                .external(name: "AppCenterCrashes"),
+                .external(name: "libzstd"),
+                .external(name: "NYTPhotoViewer"),
+                .external(name: "SVProgressHUD"),
+                .external(name: "AirshipPreferenceCenter"),
+                .external(name: "MarkdownUI"),
+                .external(name: "GoogleMobileAds"),
+                .external(name: "LookinServer"),
             ],
             settings: .targetSettings
         ),
-        Target(
+        .target(
+            name: "AppKitTests",
+            destinations: .iOS,
+            product: .unitTests,
+            bundleId: "io.tuist.app.kit",
+            infoPlist: .default,
+            sources: "Tests/AppKit/**",
+            dependencies: [
+                .target(name: "AppKit"),
+                .external(name: "Nimble"),
+                .external(name: "Testing"),
+                .external(name: "Cuckoo"),
+            ],
+            settings: .targetSettings
+        ),
+        .target(
+            name: "VisionOSApp",
+            destinations: [.appleVision],
+            product: .app,
+            bundleId: "io.tuist.app.applevision",
+            sources: ["Sources/VisionOS/App/**"],
+            dependencies: [
+                .external(name: "Alamofire"),
+            ]
+        ),
+        .target(
             name: "WatchApp",
-            platform: .watchOS,
+            destinations: [.appleWatch],
             product: .watch2App,
             bundleId: "io.tuist.app.watchapp",
             infoPlist: .extendingDefault(
                 with: [
                     "WKCompanionAppBundleIdentifier": "io.tuist.app",
                 ]
-            ),
-            sources: ["Sources/Watch/App/**"],
+            ), sources: ["Sources/Watch/App/**"],
+
             dependencies: [
                 .target(name: "WatchExtension"),
             ]
         ),
-        Target(
+        .target(
             name: "WatchExtension",
-            platform: .watchOS,
+            destinations: [.appleWatch],
             product: .watch2Extension,
             bundleId: "io.tuist.app.watchapp.extension",
             sources: ["Sources/Watch/Extension/**"],

@@ -10,7 +10,7 @@ extension SynthesizedResourceInterfaceTemplates {
     {% set fontType %}{{param.name}}FontConvertible{% endset %}
     #if os(macOS)
       import AppKit.NSFont
-    #elseif os(iOS) || os(tvOS) || os(watchOS)
+    #elseif os(iOS) || os(tvOS) || os(watchOS) || os(visionOS)
       import UIKit.UIFont
     #endif
     #if canImport(SwiftUI)
@@ -30,9 +30,9 @@ extension SynthesizedResourceInterfaceTemplates {
         {{path|basename}}
       {% endif %}
     {% endfilter %}{% endmacro %}
-    {{accessModifier}} enum {{param.name}}FontFamily {
+    {{accessModifier}} enum {{param.name}}FontFamily: Sendable {
       {% for family in families %}
-      {{accessModifier}} enum {{family.name|swiftIdentifier:"pretty"|escapeReservedKeywords}} {
+      {{accessModifier}} enum {{family.name|swiftIdentifier:"pretty"|escapeReservedKeywords}}: Sendable {
         {% for font in family.fonts %}
         {{accessModifier}} static let {{font.style|swiftIdentifier:"pretty"|lowerFirstWord|escapeReservedKeywords}} = {{fontType}}(name: "{{font.name}}", family: "{{family.name}}", path: "{% call transformPath font.path %}")
         {% endfor %}
@@ -48,14 +48,14 @@ extension SynthesizedResourceInterfaceTemplates {
 
     // MARK: - Implementation Details
 
-    {{accessModifier}} struct {{fontType}} {
+    {{accessModifier}} struct {{fontType}}: Sendable {
       {{accessModifier}} let name: String
       {{accessModifier}} let family: String
       {{accessModifier}} let path: String
 
       #if os(macOS)
       {{accessModifier}} typealias Font = NSFont
-      #elseif os(iOS) || os(tvOS) || os(watchOS)
+      #elseif os(iOS) || os(tvOS) || os(watchOS) || os(visionOS)
       {{accessModifier}} typealias Font = UIFont
       #endif
 
@@ -74,7 +74,7 @@ extension SynthesizedResourceInterfaceTemplates {
         }
         #if os(macOS)
         return SwiftUI.Font.custom(font.fontName, size: font.pointSize)
-        #elseif os(iOS) || os(tvOS) || os(watchOS)
+        #elseif os(iOS) || os(tvOS) || os(watchOS) || os(visionOS)
         return SwiftUI.Font(font)
         #endif
       }
@@ -98,7 +98,7 @@ extension SynthesizedResourceInterfaceTemplates {
 
     {{accessModifier}} extension {{fontType}}.Font {
       convenience init?(font: {{fontType}}, size: CGFloat) {
-        #if os(iOS) || os(tvOS) || os(watchOS)
+        #if os(iOS) || os(tvOS) || os(watchOS) || os(visionOS)
         if !UIFont.fontNames(forFamilyName: font.family).contains(font.name) {
           font.register()
         }

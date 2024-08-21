@@ -1,8 +1,8 @@
-import TSCBasic
+import Path
 import TSCUtility
 import TuistCore
-import TuistGraph
 import TuistSupport
+import XcodeGraph
 import XCTest
 @testable import TuistSupportTesting
 
@@ -12,7 +12,7 @@ final class SwiftPackageManagerControllerTests: TuistUnitTestCase {
     override func setUp() {
         super.setUp()
 
-        subject = SwiftPackageManagerController()
+        subject = SwiftPackageManagerController(system: system, fileHandler: fileHandler)
     }
 
     override func tearDown() {
@@ -66,7 +66,7 @@ final class SwiftPackageManagerControllerTests: TuistUnitTestCase {
         ])
 
         // When / Then
-        XCTAssertNoThrow(try subject.setToolsVersion(at: path, to: version))
+        XCTAssertNoThrow(try subject.setToolsVersion(at: path, to: version!))
     }
 
     func test_loadPackageInfo() throws {
@@ -87,7 +87,7 @@ final class SwiftPackageManagerControllerTests: TuistUnitTestCase {
         let packageInfo = try subject.loadPackageInfo(at: path)
 
         // Then
-        XCTAssertEqual(packageInfo, PackageInfo.test)
+        XCTAssertBetterEqual(packageInfo, PackageInfo.test)
     }
 
     func test_loadPackageInfo_Xcode14() throws {

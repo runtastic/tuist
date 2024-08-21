@@ -1,21 +1,21 @@
 /// A struct representing a semver version.
 /// This is taken from SPMUtility and copied here so we do not create a direct dependency for ProjectDescription. Used for
 /// specifying version number requirements inside of Project.swift
-public struct Version: Hashable, Codable {
+public struct Version: Hashable, Codable, Sendable {
     /// The major version.
-    public let major: Int
+    public var major: Int
 
     /// The minor version.
-    public let minor: Int
+    public var minor: Int
 
     /// The patch version.
-    public let patch: Int
+    public var patch: Int
 
     /// The pre-release identifier.
-    public let prereleaseIdentifiers: [String]
+    public var prereleaseIdentifiers: [String]
 
     /// The build metadata.
-    public let buildMetadataIdentifiers: [String]
+    public var buildMetadataIdentifiers: [String]
 
     /// Create a version object.
     public init(

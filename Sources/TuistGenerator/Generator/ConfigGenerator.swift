@@ -1,8 +1,8 @@
 import Foundation
-import TSCBasic
+import Path
 import TuistCore
-import TuistGraph
 import TuistSupport
+import XcodeGraph
 import XcodeProj
 
 protocol ConfigGenerating: AnyObject {
@@ -28,16 +28,13 @@ protocol ConfigGenerating: AnyObject {
 final class ConfigGenerator: ConfigGenerating {
     // MARK: - Attributes
 
-    private let fileGenerator: FileGenerating
     private let defaultSettingsProvider: DefaultSettingsProviding
 
     // MARK: - Init
 
     init(
-        fileGenerator: FileGenerating = FileGenerator(),
         defaultSettingsProvider: DefaultSettingsProviding = DefaultSettingsProvider()
     ) {
-        self.fileGenerator = fileGenerator
         self.defaultSettingsProvider = defaultSettingsProvider
     }
 
@@ -57,10 +54,10 @@ final class ConfigGenerator: ConfigGenerating {
         )
         pbxproj.add(object: configurationList)
 
-        try project.settings.configurations.sortedByBuildConfigurationName().forEach {
+        for item in project.settings.configurations.sortedByBuildConfigurationName() {
             try generateProjectSettingsFor(
-                buildConfiguration: $0.key,
-                configuration: $0.value,
+                buildConfiguration: item.key,
+                configuration: item.value,
                 project: project,
                 fileElements: fileElements,
                 pbxproj: pbxproj,
@@ -104,12 +101,12 @@ final class ConfigGenerator: ConfigGenerating {
         let configurations = Dictionary(uniqueKeysWithValues: configurationsTuples)
         let nonEmptyConfigurations = !configurations.isEmpty ? configurations : Settings.default.configurations
         let orderedConfigurations = nonEmptyConfigurations.sortedByBuildConfigurationName()
-        try orderedConfigurations.forEach {
+        for orderedConfiguration in orderedConfigurations {
             try generateTargetSettingsFor(
                 target: target,
                 project: project,
-                buildConfiguration: $0.key,
-                configuration: $0.value,
+                buildConfiguration: orderedConfiguration.key,
+                configuration: orderedConfiguration.value,
                 fileElements: fileElements,
                 graphTraverser: graphTraverser,
                 pbxproj: pbxproj,
@@ -181,7 +178,20 @@ final class ConfigGenerator: ConfigGenerating {
         )
 
         settingsHelper.extend(buildSettings: &settings, with: target.settings?.base ?? [:])
+        if buildConfiguration.variant == .debug {
+            settingsHelper.extend(buildSettings: &settings, with: target.settings?.baseDebug ?? [:])
+        }
         settingsHelper.extend(buildSettings: &settings, with: configuration?.settings ?? [:])
+        settingsHelper
+            .extend(
+                buildSettings: &settings,
+                with: swiftMacrosDerivedSettings(
+                    target: target,
+                    graphTraverser: graphTraverser,
+                    projectPath: project.path
+                ),
+                inherit: true
+            )
 
         let variantBuildConfiguration = XCBuildConfiguration(
             name: buildConfiguration.xcodeValue,
@@ -220,10 +230,6 @@ final class ConfigGenerator: ConfigGenerating {
         settings.merge(deploymentTargetDerivedSettings(target: target)) { $1 }
         settings
             .merge(watchTargetDerivedSettings(target: target, graphTraverser: graphTraverser, projectPath: project.path)) { $1 }
-        settings
-            .merge(swiftMacrosDerivedSettings(target: target, graphTraverser: graphTraverser, projectPath: project.path)) {
-                $1
-            }
     }
 
     private func generalTargetDerivedSettings(
@@ -245,12 +251,16 @@ final class ConfigGenerator: ConfigGenerating {
         }
 
         // Entitlements
-        if let entitlements = target.entitlements, let path = entitlements.path {
-            let relativePath = path.relative(to: sourceRootPath).pathString
-            if project.xcodeProjPath.parentDirectory == sourceRootPath {
-                settings["CODE_SIGN_ENTITLEMENTS"] = .string(relativePath)
-            } else {
-                settings["CODE_SIGN_ENTITLEMENTS"] = .string("$(SRCROOT)/\(relativePath)")
+        if let entitlements = target.entitlements {
+            if let path = entitlements.path {
+                let relativePath = path.relative(to: sourceRootPath).pathString
+                if project.xcodeProjPath.parentDirectory == sourceRootPath {
+                    settings["CODE_SIGN_ENTITLEMENTS"] = .string(relativePath)
+                } else {
+                    settings["CODE_SIGN_ENTITLEMENTS"] = .string("$(SRCROOT)/\(relativePath)")
+                }
+            } else if case let .variable(configName) = entitlements {
+                settings["CODE_SIGN_ENTITLEMENTS"] = .string(configName)
             }
         }
 
@@ -274,6 +284,20 @@ final class ConfigGenerator: ConfigGenerating {
         }
 
         settings["PRODUCT_NAME"] = .string(target.productName)
+
+        if target.mergeable {
+            settings["MERGEABLE_LIBRARY"] = .string("YES")
+        }
+
+        switch target.mergedBinaryType {
+        case .disabled:
+            // When `MERGED_BINARY_TYPE` is disabled, `MERGED_BINARY_TYPE` value should be left empty
+            break
+        case .automatic:
+            settings["MERGED_BINARY_TYPE"] = .string("automatic")
+        case .manual:
+            settings["MERGED_BINARY_TYPE"] = .string("manual")
+        }
 
         return settings
     }
@@ -312,23 +336,11 @@ final class ConfigGenerator: ConfigGenerating {
         graphTraverser: GraphTraversing,
         projectPath: AbsolutePath
     ) -> SettingsDictionary {
-        let targets = graphTraverser.directSwiftMacroFrameworkTargets(path: projectPath, name: target.name)
-        if targets.isEmpty { return [:] }
+        let pluginExecutables = graphTraverser.allSwiftPluginExecutables(path: projectPath, name: target.name)
         var settings: SettingsDictionary = [:]
-        settings["OTHER_SWIFT_FLAGS"] = .array(targets.flatMap { target in
-            let macroExecutables = graphTraverser.directSwiftMacroExecutables(path: target.path, name: target.target.name)
-            return macroExecutables.flatMap { macroExecutable in
-                switch macroExecutable {
-                case let .product(_, productName, _):
-                    return [
-                        "-load-plugin-executable",
-                        "$BUILT_PRODUCTS_DIR/\(target.target.productNameWithExtension)/Macros/\(productName)#\(productName)",
-                    ]
-                default:
-                    return []
-                }
-            }
-        })
+        if pluginExecutables.isEmpty { return settings }
+        let swiftCompilerFlags = pluginExecutables.flatMap { ["-load-plugin-executable", $0] }
+        settings["OTHER_SWIFT_FLAGS"] = .array(swiftCompilerFlags)
         return settings
     }
 
@@ -365,6 +377,22 @@ final class ConfigGenerator: ConfigGenerating {
             } else {
                 settings["SUPPORTS_MACCATALYST"] = "NO"
             }
+        }
+
+        if let initialInstallTags = target.onDemandResourcesTags?.initialInstall, !initialInstallTags.isEmpty {
+            settings["ON_DEMAND_RESOURCES_INITIAL_INSTALL_TAGS"] = .string(
+                initialInstallTags.sorted().map {
+                    $0.replacingOccurrences(of: " ", with: "\\ ")
+                }.joined(separator: " ")
+            )
+        }
+
+        if let prefetchOrder = target.onDemandResourcesTags?.prefetchOrder, !prefetchOrder.isEmpty {
+            settings["ON_DEMAND_RESOURCES_PREFETCH_ORDER"] = .string(
+                prefetchOrder.map {
+                    $0.replacingOccurrences(of: " ", with: "\\ ")
+                }.joined(separator: " ")
+            )
         }
 
         return settings

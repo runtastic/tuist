@@ -1,12 +1,13 @@
 import Foundation
+import Mockable
+import Path
 import ProjectDescription
-import TSCBasic
 import TuistCore
 import TuistDependencies
-import TuistGraph
 import TuistLoader
 import TuistPlugin
 import TuistSupport
+import XcodeGraph
 
 /// A utility for loading a graph for a given Manifest path on disk
 ///
@@ -16,10 +17,11 @@ import TuistSupport
 /// - A graph is loaded from the models
 ///
 /// - Note: This is a simplified implementation that loads a graph without applying any mappers or running any linters
+@Mockable
 public protocol ManifestGraphLoading {
     /// Loads a Workspace or Project Graph at a given path based on manifest availability
     /// - Note: This will search for a Workspace manifest first, then fallback to searching for a Project manifest
-    func load(path: AbsolutePath) async throws -> (Graph, [SideEffectDescriptor], [LintingIssue])
+    func load(path: AbsolutePath) async throws -> (Graph, [SideEffectDescriptor], MapperEnvironment, [LintingIssue])
     // swiftlint:disable:previous large_tuple
 }
 
@@ -30,11 +32,13 @@ public final class ManifestGraphLoader: ManifestGraphLoading {
     private let converter: ManifestModelConverting
     private let graphLoader: GraphLoading
     private let pluginsService: PluginServicing
-    private let dependenciesGraphController: DependenciesGraphControlling
+    private let swiftPackageManagerGraphLoader: SwiftPackageManagerGraphLoading
     private let graphLoaderLinter: CircularDependencyLinting
     private let manifestLinter: ManifestLinting
     private let workspaceMapper: WorkspaceMapping
     private let graphMapper: GraphMapping
+    private let packageSettingsLoader: PackageSettingsLoading
+    private let manifestFilesLocator: ManifestFilesLocating
 
     public convenience init(
         manifestLoader: ManifestLoading,
@@ -50,11 +54,13 @@ public final class ManifestGraphLoader: ManifestGraphLoading {
             ),
             graphLoader: GraphLoader(),
             pluginsService: PluginService(manifestLoader: manifestLoader),
-            dependenciesGraphController: DependenciesGraphController(),
+            swiftPackageManagerGraphLoader: SwiftPackageManagerGraphLoader(manifestLoader: manifestLoader),
             graphLoaderLinter: CircularDependencyLinter(),
             manifestLinter: ManifestLinter(),
             workspaceMapper: workspaceMapper,
-            graphMapper: graphMapper
+            graphMapper: graphMapper,
+            packageSettingsLoader: PackageSettingsLoader(manifestLoader: manifestLoader),
+            manifestFilesLocator: ManifestFilesLocator()
         )
     }
 
@@ -65,11 +71,13 @@ public final class ManifestGraphLoader: ManifestGraphLoading {
         converter: ManifestModelConverting,
         graphLoader: GraphLoading,
         pluginsService: PluginServicing,
-        dependenciesGraphController: DependenciesGraphControlling,
+        swiftPackageManagerGraphLoader: SwiftPackageManagerGraphLoading,
         graphLoaderLinter: CircularDependencyLinting,
         manifestLinter: ManifestLinting,
         workspaceMapper: WorkspaceMapping,
-        graphMapper: GraphMapping
+        graphMapper: GraphMapping,
+        packageSettingsLoader: PackageSettingsLoading,
+        manifestFilesLocator: ManifestFilesLocating
     ) {
         self.configLoader = configLoader
         self.manifestLoader = manifestLoader
@@ -77,31 +85,69 @@ public final class ManifestGraphLoader: ManifestGraphLoading {
         self.converter = converter
         self.graphLoader = graphLoader
         self.pluginsService = pluginsService
-        self.dependenciesGraphController = dependenciesGraphController
+        self.swiftPackageManagerGraphLoader = swiftPackageManagerGraphLoader
         self.graphLoaderLinter = graphLoaderLinter
         self.manifestLinter = manifestLinter
         self.workspaceMapper = workspaceMapper
         self.graphMapper = graphMapper
+        self.packageSettingsLoader = packageSettingsLoader
+        self.manifestFilesLocator = manifestFilesLocator
     }
 
-    // swiftlint:disable:next large_tuple
-    public func load(path: AbsolutePath) async throws -> (Graph, [SideEffectDescriptor], [LintingIssue]) {
-        try manifestLoader.validateHasProjectOrWorkspaceManifest(at: path)
+    // swiftlint:disable:next function_body_length large_tuple
+    public func load(path: AbsolutePath) async throws -> (Graph, [SideEffectDescriptor], MapperEnvironment, [LintingIssue]) {
+        try manifestLoader.validateHasRootManifest(at: path)
 
         // Load Plugins
         let plugins = try await loadPlugins(at: path)
 
-        // Load DependenciesGraph
-        let dependenciesGraph = try dependenciesGraphController.load(at: path)
+        // Load Workspace
+        var allManifests = try await recursiveManifestLoader.loadWorkspace(at: path)
+        let isSPMProjectOnly = allManifests.projects.isEmpty
+        let hasExternalDependencies = allManifests.projects.values.contains { $0.containsExternalDependencies }
 
-        let allManifests = try recursiveManifestLoader.loadWorkspace(at: path)
+        // Load DependenciesGraph
+
+        let dependenciesGraph: XcodeGraph.DependenciesGraph
+        let packageSettings: TuistCore.PackageSettings?
+
+        // Load SPM graph only if is SPM Project only or the workspace is using external dependencies
+        if let packagePath = manifestFilesLocator.locatePackageManifest(at: path),
+           isSPMProjectOnly || hasExternalDependencies
+        {
+            let loadedPackageSettings = try await packageSettingsLoader.loadPackageSettings(
+                at: packagePath.parentDirectory,
+                with: plugins
+            )
+
+            let manifest = try await swiftPackageManagerGraphLoader.load(
+                packagePath: packagePath,
+                packageSettings: loadedPackageSettings
+            )
+            dependenciesGraph = try converter.convert(manifest: manifest, path: path)
+            packageSettings = loadedPackageSettings
+        } else {
+            packageSettings = nil
+            dependenciesGraph = .none
+        }
+
+        // Merge SPM graph
+        if let packageSettings {
+            allManifests = try await recursiveManifestLoader.loadAndMergePackageProjects(
+                in: allManifests,
+                packageSettings: packageSettings
+            )
+        }
+
         let (workspaceModels, manifestProjects) = (
             try converter.convert(manifest: allManifests.workspace, path: allManifests.path),
             allManifests.projects
         )
 
         // Lint Manifests
-        let lintingIssues = manifestProjects.flatMap { manifestLinter.lint(project: $0.value) }
+        let workspaceLintingIssues = manifestLinter.lint(workspace: allManifests.workspace)
+        let projectLintingIssues = manifestProjects.flatMap { manifestLinter.lint(project: $0.value) }
+        let lintingIssues = workspaceLintingIssues + projectLintingIssues
         try lintingIssues.printAndThrowErrorsIfNeeded()
 
         // Convert to models
@@ -128,11 +174,15 @@ public final class ManifestGraphLoader: ManifestGraphLoading {
         )
 
         // Apply graph mappers
-        let (mappedGraph, graphMapperSideEffects) = try await graphMapper.map(graph: graph)
+        let (mappedGraph, graphMapperSideEffects, environment) = try await graphMapper.map(
+            graph: graph,
+            environment: MapperEnvironment()
+        )
 
         return (
             mappedGraph,
             modelMapperSideEffects + graphMapperSideEffects,
+            environment,
             lintingIssues
         )
     }
@@ -140,9 +190,9 @@ public final class ManifestGraphLoader: ManifestGraphLoading {
     private func convert(
         projects: [AbsolutePath: ProjectDescription.Project],
         plugins: Plugins,
-        externalDependencies: [String: [TuistGraph.TargetDependency]],
+        externalDependencies: [String: [XcodeGraph.TargetDependency]],
         context: ExecutionContext = .concurrent
-    ) throws -> [TuistGraph.Project] {
+    ) throws -> [XcodeGraph.Project] {
         let tuples = projects.map { (path: $0.key, manifest: $0.value) }
         return try tuples.map(context: context) {
             try converter.convert(
@@ -157,7 +207,7 @@ public final class ManifestGraphLoader: ManifestGraphLoading {
 
     @discardableResult
     func loadPlugins(at path: AbsolutePath) async throws -> Plugins {
-        let config = try configLoader.loadConfig(path: path)
+        let config = try await configLoader.loadConfig(path: path)
         let plugins = try await pluginsService.loadPlugins(using: config)
         try manifestLoader.register(plugins: plugins)
         return plugins

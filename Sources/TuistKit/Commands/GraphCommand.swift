@@ -2,17 +2,20 @@ import AnyCodable
 import ArgumentParser
 import Foundation
 import GraphViz
-import TSCBasic
+import Path
 import TuistGenerator
-import TuistGraph
 import TuistLoader
 import TuistSupport
+import XcodeGraph
 
 /// Command that generates and exports a dot graph from the workspace or project in the current directory.
-struct GraphCommand: AsyncParsableCommand, HasTrackableParameters {
-    static var analyticsDelegate: TrackableParametersDelegate?
+public struct GraphCommand: AsyncParsableCommand, HasTrackableParameters {
+    public init() {}
 
-    static var configuration: CommandConfiguration {
+    public static var analyticsDelegate: TrackableParametersDelegate?
+    public var runId = UUID().uuidString
+
+    public static var configuration: CommandConfiguration {
         CommandConfiguration(
             commandName: "graph",
             abstract: "Generates a graph from the workspace or project in the current directory"
@@ -21,57 +24,68 @@ struct GraphCommand: AsyncParsableCommand, HasTrackableParameters {
 
     @Flag(
         name: [.customShort("t"), .long],
-        help: "Skip Test targets during graph rendering."
+        help: "Skip Test targets during graph rendering.",
+        envKey: .graphSkipTestTargets
     )
     var skipTestTargets: Bool = false
 
     @Flag(
         name: [.customShort("d"), .long],
-        help: "Skip external dependencies."
+        help: "Skip external dependencies.",
+        envKey: .graphSkipExternalDependencies
     )
     var skipExternalDependencies: Bool = false
 
     @Option(
         name: [.customShort("l"), .long],
-        help: "A platform to filter. Only targets for this platform will be showed in the graph. Available platforms: ios, macos, tvos, watchos"
+        help: "A platform to filter. Only targets for this platform will be showed in the graph. Available platforms: ios, macos, tvos, watchos",
+        envKey: .graphPlatform
     )
     var platform: Platform?
 
     @Option(
         name: [.customShort("f"), .long],
-        help: "Available formats: dot, json, png, svg"
+        help: "Available formats: dot, json, png, svg",
+        envKey: .graphFormat
     )
     var format: GraphFormat = .png
 
     @Flag(
-        name: .shortAndLong,
-        help: "Don't open the file after generating it."
+        name: .long,
+        help: "Don't open the file after generating it.",
+        envKey: .graphOpen
     )
-    var noOpen: Bool = false
+    var open: Bool = true
 
     @Option(
         name: [.customShort("a"), .customLong("algorithm")],
-        help: "Available formats: dot, neato, twopi, circo, fdp, sfdp, patchwork"
+        help: "Available formats: dot, neato, twopi, circo, fdp, sfdp, patchwork",
+        envKey: .graphLayoutAlgorithm
     )
     var layoutAlgorithm: GraphViz.LayoutAlgorithm = .dot
 
-    @Argument(help: "A list of targets to filter. Those and their dependent targets will be showed in the graph.")
+    @Argument(
+        help: "A list of targets to filter. Those and their dependent targets will be showed in the graph.",
+        envKey: .graphTargets
+    )
     var targets: [String] = []
 
     @Option(
         name: .shortAndLong,
         help: "The path to the directory that contains the project whose targets will be cached.",
-        completion: .directory
+        completion: .directory,
+        envKey: .graphPath
     )
     var path: String?
 
     @Option(
         name: .shortAndLong,
-        help: "The path where the graph will be generated."
+        help: "The path where the graph will be generated.",
+        envKey: .graphOutputPath
     )
     var outputPath: String?
 
-    func run() async throws {
+    public func run() async throws {
         GraphCommand.analyticsDelegate?.addParameters(
             [
                 "format": AnyCodable(format.rawValue),
@@ -85,7 +99,7 @@ struct GraphCommand: AsyncParsableCommand, HasTrackableParameters {
             layoutAlgorithm: layoutAlgorithm,
             skipTestTargets: skipTestTargets,
             skipExternalDependencies: skipExternalDependencies,
-            open: !noOpen,
+            open: open,
             platformToFilter: platform,
             targetsToFilter: targets,
             path: path.map { try AbsolutePath(validating: $0) } ?? FileHandler.shared.currentPath,
@@ -96,10 +110,20 @@ struct GraphCommand: AsyncParsableCommand, HasTrackableParameters {
     }
 }
 
-enum GraphFormat: String, ExpressibleByArgument {
+enum GraphFormat: String, ExpressibleByArgument, CaseIterable {
     case dot, json, png, svg
 }
 
-extension GraphViz.LayoutAlgorithm: ExpressibleByArgument {}
-
-extension TuistGraph.Platform: ExpressibleByArgument {}
+extension GraphViz.LayoutAlgorithm: ExpressibleByArgument {
+    public static var allValueStrings: [String] {
+        [
+            LayoutAlgorithm.dot.rawValue,
+            LayoutAlgorithm.neato.rawValue,
+            LayoutAlgorithm.twopi.rawValue,
+            LayoutAlgorithm.circo.rawValue,
+            LayoutAlgorithm.fdp.rawValue,
+            LayoutAlgorithm.sfdp.rawValue,
+            LayoutAlgorithm.patchwork.rawValue,
+        ]
+    }
+}

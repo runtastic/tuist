@@ -2,57 +2,40 @@ import ArgumentParser
 import Foundation
 import TuistCore
 
-/// Category that can be cleaned
-enum CleanCategory: ExpressibleByArgument {
-    static let allCases = CacheCategory.allCases.map { .global($0) } + [Self.dependencies]
+public struct CleanCommand: AsyncParsableCommand {
+    public init() {}
 
-    /// The global cache
-    case global(CacheCategory)
-
-    /// The local dependencies cache
-    case dependencies
-
-    var defaultValueDescription: String {
-        switch self {
-        case let .global(cacheCategory):
-            return cacheCategory.rawValue
-        case .dependencies:
-            return "dependencies"
-        }
-    }
-
-    init?(argument: String) {
-        if let cacheCategory = CacheCategory(rawValue: argument) {
-            self = .global(cacheCategory)
-        } else if argument == "dependencies" {
-            self = .dependencies
-        } else {
-            return nil
-        }
-    }
-}
-
-struct CleanCommand: ParsableCommand {
-    static var configuration: CommandConfiguration {
+    public static var configuration: CommandConfiguration {
         CommandConfiguration(
             commandName: "clean",
             abstract: "Clean all the artifacts stored locally"
         )
     }
 
-    @Argument(help: "The cache and artifact categories to be cleaned. If no category is specified, everything is cleaned.")
-    var cleanCategories: [CleanCategory] = CleanCategory.allCases
+    @Argument(
+        help: "The cache and artifact categories to be cleaned. If no category is specified, everything is cleaned.",
+        envKey: .cleanCleanCategories
+    )
+    var cleanCategories: [TuistCleanCategory] = TuistCleanCategory.allCases.map { $0 }
+
+    @Flag(
+        help: "Clean the remote cache",
+        envKey: .cleanRemote
+    )
+    var remote: Bool = false
 
     @Option(
         name: .shortAndLong,
         help: "The path to the directory that contains the project that should be cleaned.",
-        completion: .directory
+        completion: .directory,
+        envKey: .cleanPath
     )
     var path: String?
 
-    func run() throws {
-        try CleanService().run(
+    public func run() async throws {
+        try await CleanService().run(
             categories: cleanCategories,
+            remote: remote,
             path: path
         )
     }

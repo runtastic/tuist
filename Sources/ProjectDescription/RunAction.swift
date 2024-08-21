@@ -3,39 +3,39 @@ import Foundation
 /// An action that runs the built products.
 ///
 /// It's initialized with the .runAction static method.
-public struct RunAction: Equatable, Codable {
+public struct RunAction: Equatable, Codable, Sendable {
     /// Indicates the build configuration the product should run with.
-    public let configuration: ConfigurationName
+    public var configuration: ConfigurationName
 
     /// Whether a debugger should be attached to the run process or not.
-    public let attachDebugger: Bool
+    public var attachDebugger: Bool
 
     /// The path of custom lldbinit file.
-    public let customLLDBInitFile: Path?
+    public var customLLDBInitFile: Path?
 
     /// A list of actions that are executed before starting the run process.
-    public let preActions: [ExecutionAction]
+    public var preActions: [ExecutionAction]
 
     /// A list of actions that are executed after the run process.
-    public let postActions: [ExecutionAction]
+    public var postActions: [ExecutionAction]
 
     /// The name of the executable or target to run.
-    public let executable: TargetReference?
+    public var executable: TargetReference?
 
     /// Command line arguments passed on launch and environment variables.
-    public let arguments: Arguments?
+    public var arguments: Arguments?
 
     /// List of options to set to the action.
-    public let options: RunActionOptions
+    public var options: RunActionOptions
 
     /// List of diagnostics options to set to the action.
-    public let diagnosticsOptions: [SchemeDiagnosticsOption]
+    public var diagnosticsOptions: SchemeDiagnosticsOptions
 
     /// A target that will be used to expand the variables defined inside Environment Variables definition (e.g. $SOURCE_ROOT)
-    public let expandVariableFromTarget: TargetReference?
+    public var expandVariableFromTarget: TargetReference?
 
     /// The launch style of the action
-    public let launchStyle: LaunchStyle
+    public var launchStyle: LaunchStyle
 
     init(
         configuration: ConfigurationName,
@@ -46,7 +46,7 @@ public struct RunAction: Equatable, Codable {
         executable: TargetReference? = nil,
         arguments: Arguments? = nil,
         options: RunActionOptions = .options(),
-        diagnosticsOptions: [SchemeDiagnosticsOption] = [.mainThreadChecker, .performanceAntipatternChecker],
+        diagnosticsOptions: SchemeDiagnosticsOptions = .options(),
         expandVariableFromTarget: TargetReference? = nil,
         launchStyle: LaunchStyle = .automatically
     ) {
@@ -86,7 +86,7 @@ public struct RunAction: Equatable, Codable {
         executable: TargetReference? = nil,
         arguments: Arguments? = nil,
         options: RunActionOptions = .options(),
-        diagnosticsOptions: [SchemeDiagnosticsOption] = [.mainThreadChecker],
+        diagnosticsOptions: SchemeDiagnosticsOptions = .options(),
         expandVariableFromTarget: TargetReference? = nil,
         launchStyle: LaunchStyle = .automatically
     ) -> RunAction {

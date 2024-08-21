@@ -1,9 +1,7 @@
 import Foundation
+import Path
 import ProjectDescription
-import TSCBasic
 import TuistCore
-import struct TuistGraph.Config
-import struct TuistGraph.Plugins
 import TuistSupport
 
 /// Cached Manifest Loader
@@ -22,9 +20,9 @@ public class CachedManifestLoader: ManifestLoading {
     private let tuistVersion: String
     private let decoder = JSONDecoder()
     private let encoder = JSONEncoder()
-    @Atomic private var helpersCache: [AbsolutePath: String?] = [:]
-    @Atomic private var pluginsHashCache: String?
-    @Atomic private var cacheDirectory: AbsolutePath!
+    private let helpersCache: ThreadSafe<[AbsolutePath: String?]> = ThreadSafe([:])
+    private let pluginsHashCache: ThreadSafe<String?> = ThreadSafe(nil)
+    private let cacheDirectory: ThrowableCaching<AbsolutePath>
 
     public convenience init(manifestLoader: ManifestLoading = ManifestLoader()) {
         let environment = TuistSupport.Environment.shared
@@ -55,65 +53,74 @@ public class CachedManifestLoader: ManifestLoading {
         self.environment = environment
         self.cacheDirectoryProviderFactory = cacheDirectoryProviderFactory
         self.tuistVersion = tuistVersion
+        cacheDirectory = ThrowableCaching {
+            try cacheDirectoryProviderFactory.cacheDirectories().cacheDirectory(for: .manifests)
+        }
     }
 
-    public func loadConfig(at path: AbsolutePath) throws -> ProjectDescription.Config {
-        try load(manifest: .config, at: path) {
-            let projectDescriptionConfig = try manifestLoader.loadConfig(at: path)
-            let config = try TuistGraph.Config.from(manifest: projectDescriptionConfig, at: path)
-            cacheDirectory = try cacheDirectoryProviderFactory.cacheDirectories(config: config).cacheDirectory(for: .manifests)
+    public func loadConfig(at path: AbsolutePath) async throws -> ProjectDescription.Config {
+        try await load(manifest: .config, at: path) {
+            let projectDescriptionConfig = try await manifestLoader.loadConfig(at: path)
             return projectDescriptionConfig
         }
     }
 
-    public func loadProject(at path: AbsolutePath) throws -> Project {
-        try load(manifest: .project, at: path) {
-            try manifestLoader.loadProject(at: path)
+    public func loadProject(at path: AbsolutePath) async throws -> Project {
+        try await load(manifest: .project, at: path) {
+            try await manifestLoader.loadProject(at: path)
         }
     }
 
-    public func loadWorkspace(at path: AbsolutePath) throws -> Workspace {
-        try load(manifest: .workspace, at: path) {
-            try manifestLoader.loadWorkspace(at: path)
+    public func loadWorkspace(at path: AbsolutePath) async throws -> Workspace {
+        try await load(manifest: .workspace, at: path) {
+            try await manifestLoader.loadWorkspace(at: path)
         }
     }
 
-    public func loadTemplate(at path: AbsolutePath) throws -> Template {
-        try load(manifest: .template, at: path) {
-            try manifestLoader.loadTemplate(at: path)
+    public func loadTemplate(at path: AbsolutePath) async throws -> ProjectDescription.Template {
+        try await load(manifest: .template, at: path) {
+            try await manifestLoader.loadTemplate(at: path)
         }
     }
 
-    public func loadPlugin(at path: AbsolutePath) throws -> Plugin {
-        try load(manifest: .plugin, at: path) {
-            try manifestLoader.loadPlugin(at: path)
+    public func loadPlugin(at path: AbsolutePath) async throws -> ProjectDescription.Plugin {
+        try await load(manifest: .plugin, at: path) {
+            try await manifestLoader.loadPlugin(at: path)
         }
     }
 
-    public func loadDependencies(at path: AbsolutePath) throws -> Dependencies {
-        try manifestLoader.loadDependencies(at: path)
+    public func loadPackageSettings(at path: AbsolutePath) async throws -> ProjectDescription.PackageSettings {
+        try await load(manifest: .packageSettings, at: path) {
+            try await manifestLoader.loadPackageSettings(at: path)
+        }
+    }
+
+    public func loadPackage(at path: AbsolutePath) async throws -> PackageInfo {
+        try await load(manifest: .package, at: path) {
+            try await manifestLoader.loadPackage(at: path)
+        }
     }
 
     public func manifests(at path: AbsolutePath) -> Set<Manifest> {
         manifestLoader.manifests(at: path)
     }
 
-    public func validateHasProjectOrWorkspaceManifest(at path: AbsolutePath) throws {
-        try manifestLoader.validateHasProjectOrWorkspaceManifest(at: path)
+    public func validateHasRootManifest(at path: AbsolutePath) throws {
+        try manifestLoader.validateHasRootManifest(at: path)
+    }
+
+    public func hasRootManifest(at path: AbsolutePath) -> Bool {
+        manifestLoader.hasRootManifest(at: path)
     }
 
     public func register(plugins: Plugins) throws {
-        pluginsHashCache = try calculatePluginsHash(for: plugins)
+        try pluginsHashCache.mutate { $0 = try calculatePluginsHash(for: plugins) }
         try manifestLoader.register(plugins: plugins)
     }
 
     // MARK: - Private
 
-    private func load<T: Codable>(manifest: Manifest, at path: AbsolutePath, loader: () throws -> T) throws -> T {
-        if cacheDirectory == nil {
-            cacheDirectory = try cacheDirectoryProviderFactory.cacheDirectories(config: nil).cacheDirectory(for: .manifests)
-        }
-
+    private func load<T: Codable>(manifest: Manifest, at path: AbsolutePath, loader: () async throws -> T) async throws -> T {
         let manifestPath = path.appending(component: manifest.fileName(path))
         guard fileHandler.exists(manifestPath) else {
             throw ManifestLoaderError.manifestNotFound(manifest, path)
@@ -127,10 +134,10 @@ public class CachedManifestLoader: ManifestLoading {
 
         guard let hashes = calculatedHashes else {
             logger.warning("Unable to calculate manifest hash at path: \(path)")
-            return try loader()
+            return try await loader()
         }
 
-        let cachedManifestPath = cachedPath(for: manifestPath)
+        let cachedManifestPath = try cachedPath(for: manifestPath)
         if let cached: T = loadCachedManifest(
             at: cachedManifestPath,
             hashes: hashes
@@ -138,7 +145,7 @@ public class CachedManifestLoader: ManifestLoading {
             return cached
         }
 
-        let loadedManifest = try loader()
+        let loadedManifest = try await loader()
 
         try cacheManifest(
             manifest: manifest,
@@ -162,7 +169,7 @@ public class CachedManifestLoader: ManifestLoading {
         return Hashes(
             manifestHash: manifestHash,
             helpersHash: helpersHash,
-            pluginsHash: pluginsHashCache,
+            pluginsHash: pluginsHashCache.value,
             environmentHash: environmentHash
         )
     }
@@ -179,14 +186,16 @@ public class CachedManifestLoader: ManifestLoading {
             return nil
         }
 
-        if let cached = helpersCache[helpersDirectory] {
-            return cached
+        return try helpersCache.mutate { cache in
+            if let cached = cache[helpersDirectory] {
+                return cached
+            }
+
+            let hash = try projectDescriptionHelpersHasher.hash(helpersDirectory: helpersDirectory)
+            cache[helpersDirectory] = hash
+
+            return hash
         }
-
-        let hash = try projectDescriptionHelpersHasher.hash(helpersDirectory: helpersDirectory)
-        helpersCache[helpersDirectory] = hash
-
-        return hash
     }
 
     private func calculatePluginsHash(for plugins: Plugins) throws -> String? {
@@ -204,11 +213,11 @@ public class CachedManifestLoader: ManifestLoading {
         return tuistEnvVariables.joined(separator: "-").md5
     }
 
-    private func cachedPath(for manifestPath: AbsolutePath) -> AbsolutePath {
+    private func cachedPath(for manifestPath: AbsolutePath) throws -> AbsolutePath {
         let pathHash = manifestPath.pathString.md5
         let cacheVersion = CachedManifest.currentCacheVersion.description
         let fileName = [cacheVersion, pathHash].joined(separator: ".")
-        return cacheDirectory.appending(component: fileName)
+        return try cacheDirectory.value.appending(component: fileName)
     }
 
     private func loadCachedManifest<T: Decodable>(

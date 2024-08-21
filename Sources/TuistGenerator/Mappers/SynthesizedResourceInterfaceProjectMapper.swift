@@ -1,9 +1,9 @@
 import Foundation
+import Path
 import SwiftGenKit
-import TSCBasic
 import TuistCore
-import TuistGraph
 import TuistSupport
+import XcodeGraph
 
 // swiftlint:disable:next type_name
 enum SynthesizedResourceInterfaceProjectMapperError: FatalError, Equatable {
@@ -50,14 +50,16 @@ public final class SynthesizedResourceInterfaceProjectMapper: ProjectMapping { /
         guard !project.options.disableSynthesizedResourceAccessors else {
             return (project, [])
         }
+        logger.debug("Transforming project \(project.name): Synthesizing resource accessors")
 
-        let mappings = try project.targets
+        let mappings = try project.targets.values
             .map { try mapTarget($0, project: project) }
 
         let targets: [Target] = mappings.map(\.0)
         let sideEffects: [SideEffectDescriptor] = mappings.map(\.1).flatMap { $0 }
-
-        return (project.with(targets: targets), sideEffects)
+        var project = project
+        project.targets = Dictionary(uniqueKeysWithValues: targets.map { ($0.name, $0) })
+        return (project, sideEffects)
     }
 
     // MARK: - Helpers
@@ -69,7 +71,9 @@ public final class SynthesizedResourceInterfaceProjectMapper: ProjectMapping { /
 
     /// Map and generate resource interfaces for a given `Target` and `Project`
     private func mapTarget(_ target: Target, project: Project) throws -> (Target, [SideEffectDescriptor]) {
-        guard !target.resources.isEmpty, target.supportsSources else { return (target, []) }
+        let resourcesForSynthesizersPaths = target.resources.resources
+            .map(\.path) + target.coreDataModels.map(\.path)
+        guard !resourcesForSynthesizersPaths.isEmpty, target.supportsSources else { return (target, []) }
 
         var target = target
 
@@ -151,8 +155,8 @@ public final class SynthesizedResourceInterfaceProjectMapper: ProjectMapping { /
         target: Target,
         developmentRegion: String?
     ) -> [AbsolutePath] {
-        let resourcesPaths = target.resources
-            .map(\.path)
+        let resourcesPaths = target.resources.resources
+            .map(\.path) + target.coreDataModels.map(\.path)
 
         var paths = resourcesPaths
             .filter { $0.extension.map(resourceSynthesizer.extensions.contains) ?? false }
@@ -161,23 +165,23 @@ public final class SynthesizedResourceInterfaceProjectMapper: ProjectMapping { /
         switch resourceSynthesizer.parser {
         case .strings:
             // This file kind is localizable, let's order files based on it
-            var regionPriorityQueue: [String] = []
+            paths = {
+                guard let developmentRegion else { return paths }
+                return paths.sorted { lhs, rhs in
+                    let lhsBasename = lhs.parentDirectory.basenameWithoutExt
+                    let rhsBasename = rhs.parentDirectory.basenameWithoutExt
 
-            if let developmentRegion {
-                regionPriorityQueue.insert(developmentRegion, at: 0)
-            }
-
-            // Let's sort paths moving the development region localization's one at first
-            let prioritizedPaths = paths.filter { path in
-                regionPriorityQueue.map { path.parentDirectory.basename.contains($0) }.contains(true)
-            }
-
-            let unprioritizedPaths = paths.filter { path in
-                !regionPriorityQueue.map { path.parentDirectory.basename.contains($0) }.contains(true)
-            }
-
-            paths = prioritizedPaths + unprioritizedPaths
-
+                    if lhsBasename == developmentRegion {
+                        return true
+                    } else if rhsBasename == developmentRegion {
+                        return false
+                    } else if lhsBasename.contains(developmentRegion), rhsBasename.contains(developmentRegion) {
+                        return lhsBasename < rhsBasename
+                    } else {
+                        return lhsBasename < rhsBasename
+                    }
+                }
+            }()
         case .assets, .coreData, .fonts, .interfaceBuilder, .json, .plists, .yaml, .files:
             break
         }

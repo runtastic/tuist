@@ -1,5 +1,6 @@
 import Foundation
-import TSCBasic
+import Mockable
+import Path
 import TuistSupport
 
 public enum XcodeBuildDestination: Equatable {
@@ -7,6 +8,7 @@ public enum XcodeBuildDestination: Equatable {
     case mac
 }
 
+@Mockable
 public protocol XcodeBuildControlling {
     /// Returns an observable to build the given project using xcodebuild.
     /// - Parameters:
@@ -16,7 +18,7 @@ public protocol XcodeBuildControlling {
     ///   to determine the destination.
     ///   - clean: True if xcodebuild should clean the project before building.
     ///   - arguments: Extra xcodebuild arguments.
-    ///   - rawXcodebuildLogs: When true, it outputs the raw xcodebuild logs.
+    ///   - passthroughXcodeBuildArguments: Passthrough xcodebuild arguments.
     func build(
         _ target: XcodeBuildTarget,
         scheme: String,
@@ -25,8 +27,8 @@ public protocol XcodeBuildControlling {
         derivedDataPath: AbsolutePath?,
         clean: Bool,
         arguments: [XcodeBuildArgument],
-        rawXcodebuildLogs: Bool
-    ) throws -> AsyncThrowingStream<SystemEvent<XcodeBuildOutput>, Error>
+        passthroughXcodeBuildArguments: [String]
+    ) async throws
 
     /// Returns an observable to test the given project using xcodebuild.
     /// - Parameters:
@@ -40,7 +42,7 @@ public protocol XcodeBuildControlling {
     ///   - testTargets: A list of test identifiers indicating which tests to run
     ///   - skipTestTargets: A list of test identifiers indicating which tests to skip
     ///   - testPlanConfiguration: A configuration object indicating which test plan to use and its configurations
-    ///   - rawXcodebuildLogs: When true, it outputs the raw xcodebuild logs.
+    ///   - passthroughXcodeBuildArguments: Passthrough xcodebuild arguments.
     func test(
         _ target: XcodeBuildTarget,
         scheme: String,
@@ -54,8 +56,8 @@ public protocol XcodeBuildControlling {
         testTargets: [TestIdentifier],
         skipTestTargets: [TestIdentifier],
         testPlanConfiguration: TestPlanConfiguration?,
-        rawXcodebuildLogs: Bool
-    ) throws -> AsyncThrowingStream<SystemEvent<XcodeBuildOutput>, Error>
+        passthroughXcodeBuildArguments: [String]
+    ) async throws
 
     /// Returns an observable that archives the given project using xcodebuild.
     /// - Parameters:
@@ -64,32 +66,35 @@ public protocol XcodeBuildControlling {
     ///   - clean: True if xcodebuild should clean the project before archiving.
     ///   - archivePath: Path where the archive will be exported (with extension .xcarchive)
     ///   - arguments: Extra xcodebuild arguments.
-    ///   - rawXcodebuildLogs: When true, it outputs the raw xcodebuild logs.
+    ///   - derivedDataPath: Custom location for derived data. Use `xcodebuild`'s default if `nil`
     func archive(
         _ target: XcodeBuildTarget,
         scheme: String,
         clean: Bool,
         archivePath: AbsolutePath,
         arguments: [XcodeBuildArgument],
-        rawXcodebuildLogs: Bool
-    ) throws -> AsyncThrowingStream<SystemEvent<XcodeBuildOutput>, Error>
+        derivedDataPath: AbsolutePath?
+    ) async throws
 
     /// Creates an .xcframework combining the list of given frameworks.
     /// - Parameters:
-    ///   - frameworks: Frameworks to be combined.
+    ///   - arguments: A set of arguments to configure the XCFramework creation.
     ///   - output: Path to the output .xcframework.
-    ///   - rawXcodebuildLogs: When true, it outputs the raw xcodebuild logs.
-    func createXCFramework(frameworks: [AbsolutePath], output: AbsolutePath, rawXcodebuildLogs: Bool)
-        throws -> AsyncThrowingStream<SystemEvent<XcodeBuildOutput>, Error>
+    func createXCFramework(
+        arguments: [String],
+        output: AbsolutePath
+    ) async throws
 
     /// Gets the build settings of a scheme targets.
     /// - Parameters:
     ///   - target: Project of workspace where the scheme is defined.
     ///   - scheme: Scheme whose target build settings will be obtained.
     ///   - configuration: Build configuration.
+    ///   - derivedDataPath: Custom location for derived data. Use `xcodebuild`'s default if `nil`
     func showBuildSettings(
         _ target: XcodeBuildTarget,
         scheme: String,
-        configuration: String
+        configuration: String,
+        derivedDataPath: AbsolutePath?
     ) async throws -> [String: XcodeBuildSettings]
 }

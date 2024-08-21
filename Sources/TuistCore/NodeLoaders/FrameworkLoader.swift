@@ -1,7 +1,7 @@
 import Foundation
-import TSCBasic
-import TuistGraph
+import Path
 import TuistSupport
+import XcodeGraph
 
 enum FrameworkLoaderError: FatalError, Equatable {
     case frameworkNotFound(AbsolutePath)
@@ -57,7 +57,6 @@ public final class FrameworkLoader: FrameworkLoading {
             bcsymbolmapPaths: metadata.bcsymbolmapPaths,
             linking: metadata.linking,
             architectures: metadata.architectures,
-            isCarthage: metadata.isCarthage,
             status: metadata.status
         )
     }

@@ -2,30 +2,30 @@ import Foundation
 
 extension Project {
     /// Options to configure a project.
-    public struct Options: Codable, Equatable {
+    public struct Options: Codable, Equatable, Sendable {
         /// Configures automatic target schemes generation.
-        public let automaticSchemesOptions: AutomaticSchemesOptions
+        public var automaticSchemesOptions: AutomaticSchemesOptions
 
         /// Configures the default known regions
-        public let defaultKnownRegions: [String]?
+        public var defaultKnownRegions: [String]?
 
         /// Configures the development region.
-        public let developmentRegion: String?
+        public var developmentRegion: String?
 
         /// Disables generating Bundle accessors.
-        public let disableBundleAccessors: Bool
+        public var disableBundleAccessors: Bool
 
         /// Suppress logging of environment in Run Script build phases.
-        public let disableShowEnvironmentVarsInScriptPhases: Bool
+        public var disableShowEnvironmentVarsInScriptPhases: Bool
 
         /// Disable synthesized resource accessors.
-        public let disableSynthesizedResourceAccessors: Bool
+        public var disableSynthesizedResourceAccessors: Bool
 
         /// Configures text settings.
-        public let textSettings: TextSettings
+        public var textSettings: TextSettings
 
         /// Configures the name of the generated .xcodeproj.
-        public let xcodeProjectName: String?
+        public var xcodeProjectName: String?
 
         public static func options(
             automaticSchemesOptions: AutomaticSchemesOptions = .enabled(),
@@ -55,9 +55,9 @@ extension Project {
 
 extension Project.Options {
     /// Automatic schemes options allow customizing the generation of the target schemes.
-    public enum AutomaticSchemesOptions: Codable, Equatable {
+    public enum AutomaticSchemesOptions: Codable, Equatable, Sendable {
         /// Allows you to define what targets will be enabled for code coverage data gathering.
-        public enum TargetSchemesGrouping: Codable, Equatable {
+        public enum TargetSchemesGrouping: Codable, Equatable, Sendable {
             /// Generate a single scheme for each project.
             case singleScheme
 
@@ -89,18 +89,18 @@ extension Project.Options {
     }
 
     /// The text settings options
-    public struct TextSettings: Codable, Equatable {
+    public struct TextSettings: Codable, Equatable, Sendable {
         /// Whether tabs should be used instead of spaces
-        public let usesTabs: Bool?
+        public var usesTabs: Bool?
 
         /// The width of space indent
-        public let indentWidth: UInt?
+        public var indentWidth: UInt?
 
         /// The width of tab indent
-        public let tabWidth: UInt?
+        public var tabWidth: UInt?
 
         /// Whether lines should be wrapped or not
-        public let wrapsLines: Bool?
+        public var wrapsLines: Bool?
 
         public static func textSettings(
             usesTabs: Bool? = nil,

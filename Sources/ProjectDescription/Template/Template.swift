@@ -1,7 +1,7 @@
 import Foundation
 
 /// A scaffold template model.
-public struct Template: Codable, Equatable {
+public struct Template: Codable, Equatable, Sendable {
     /// Description of template
     public let description: String
     /// Attributes to be passed to template
@@ -21,7 +21,7 @@ public struct Template: Codable, Equatable {
     }
 
     /// Enum containing information about how to generate item
-    public enum Contents: Codable, Equatable {
+    public enum Contents: Codable, Equatable, Sendable {
         /// String Contents is defined in `name_of_template.swift` and contains a simple `String`
         /// Can not contain any additional logic apart from plain `String` from `arguments`
         case string(String)
@@ -34,22 +34,75 @@ public struct Template: Codable, Equatable {
     }
 
     /// File description for generating
-    public struct Item: Codable, Equatable {
+    public struct Item: Codable, Equatable, Sendable {
         public let path: String
         public let contents: Contents
 
-        public init(path: String, contents: Contents) {
-            self.path = path
-            self.contents = contents
+        public static func item(path: String, contents: Contents) -> Self {
+            self.init(path: path, contents: contents)
         }
     }
 
     /// Attribute to be passed to `tuist scaffold` for generating with `Template`
-    public enum Attribute: Codable, Equatable {
+    public enum Attribute: Codable, Equatable, Sendable {
         /// Required attribute with a given name
         case required(String)
         /// Optional attribute with a given name and a default value used when attribute not provided by user
-        case optional(String, default: String)
+        case optional(String, default: Value)
+    }
+}
+
+extension Template.Attribute {
+    /// This represents the default value type of Attribute
+    public indirect enum Value: Codable, Equatable, Sendable {
+        /// It represents a string value.
+        case string(String)
+        /// It represents an integer value.
+        case integer(Int)
+        /// It represents a floating value.
+        case real(Double)
+        /// It represents a boolean value.
+        case boolean(Bool)
+        /// It represents a dictionary value.
+        case dictionary([String: Value])
+        /// It represents an array value.
+        case array([Value])
+    }
+}
+
+extension Template.Attribute.Value: ExpressibleByStringLiteral {
+    public init(stringLiteral value: String) {
+        self = .string(value)
+    }
+}
+
+extension Template.Attribute.Value: ExpressibleByIntegerLiteral {
+    public init(integerLiteral value: Int) {
+        self = .integer(value)
+    }
+}
+
+extension Template.Attribute.Value: ExpressibleByFloatLiteral {
+    public init(floatLiteral value: Double) {
+        self = .real(value)
+    }
+}
+
+extension Template.Attribute.Value: ExpressibleByBooleanLiteral {
+    public init(booleanLiteral value: Bool) {
+        self = .boolean(value)
+    }
+}
+
+extension Template.Attribute.Value: ExpressibleByDictionaryLiteral {
+    public init(dictionaryLiteral elements: (String, Template.Attribute.Value)...) {
+        self = .dictionary(Dictionary(uniqueKeysWithValues: elements))
+    }
+}
+
+extension Template.Attribute.Value: ExpressibleByArrayLiteral {
+    public init(arrayLiteral elements: Template.Attribute.Value...) {
+        self = .array(elements)
     }
 }
 

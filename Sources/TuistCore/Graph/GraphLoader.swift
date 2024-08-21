@@ -1,6 +1,6 @@
 import Foundation
-import TSCBasic
-import TuistGraph
+import Path
+import XcodeGraph
 
 // MARK: - GraphLoading
 
@@ -41,9 +41,9 @@ public final class GraphLoader: GraphLoading {
     public func loadWorkspace(workspace: Workspace, projects: [Project]) throws -> Graph {
         let cache = Cache(projects: projects)
 
-        try workspace.projects.forEach {
+        for project in workspace.projects {
             try loadProject(
-                path: $0,
+                path: project,
                 cache: cache
             )
         }
@@ -55,7 +55,6 @@ public final class GraphLoader: GraphLoading {
             workspace: updatedWorkspace,
             projects: cache.loadedProjects,
             packages: cache.packages,
-            targets: cache.loadedTargets,
             dependencies: cache.dependencies,
             dependencyConditions: cache.dependencyConditions
         )
@@ -76,10 +75,10 @@ public final class GraphLoader: GraphLoading {
         }
         cache.add(project: project)
 
-        try project.targets.forEach {
+        for target in project.targets.values {
             try loadTarget(
                 path: path,
-                name: $0.name,
+                name: target.name,
                 cache: cache
             )
         }
@@ -120,6 +119,7 @@ public final class GraphLoader: GraphLoading {
         }
     }
 
+    // swiftlint:disable:next function_body_length
     private func loadDependency(
         path: AbsolutePath,
         forPlatforms platforms: Set<Platform>,
@@ -177,6 +177,7 @@ public final class GraphLoader: GraphLoading {
                     source: .system
                 )
             }
+
         case let .package(product, type, _):
             switch type {
             case .macro:
@@ -186,6 +187,7 @@ public final class GraphLoader: GraphLoading {
             case .plugin:
                 return try loadPackage(fromPath: path, productName: product, type: .plugin)
             }
+
         case .xctest:
             return try platforms.map { platform in
                 try loadXCTestSDK(platform: platform)
@@ -213,7 +215,6 @@ public final class GraphLoader: GraphLoading {
             bcsymbolmapPaths: metadata.bcsymbolmapPaths,
             linking: metadata.linking,
             architectures: metadata.architectures,
-            isCarthage: metadata.isCarthage,
             status: metadata.status
         )
         cache.add(framework: framework, at: path)
@@ -259,14 +260,15 @@ public final class GraphLoader: GraphLoading {
             at: path,
             status: status
         )
-        let xcframework: GraphDependency = .xcframework(
+        let xcframework: GraphDependency = .xcframework(GraphDependency.XCFramework(
             path: metadata.path,
             infoPlist: metadata.infoPlist,
             primaryBinaryPath: metadata.primaryBinaryPath,
             linking: metadata.linking,
             mergeable: metadata.mergeable,
-            status: metadata.status
-        )
+            status: metadata.status,
+            macroPath: metadata.macroPath
+        ))
         cache.add(xcframework: xcframework, at: path)
         return xcframework
     }
@@ -321,17 +323,15 @@ public final class GraphLoader: GraphLoading {
 
         init(projects: [Project]) {
             let allProjects = Dictionary(uniqueKeysWithValues: projects.map { ($0.path, $0) })
-            let allTargets = allProjects.mapValues {
-                Dictionary(uniqueKeysWithValues: $0.targets.map { ($0.name, $0) })
-            }
+            let allTargets = allProjects.mapValues { $0.targets }
             self.allProjects = allProjects
             self.allTargets = allTargets
         }
 
         func add(project: Project) {
             loadedProjects[project.path] = project
-            project.packages.forEach {
-                packages[project.path, default: [:]][$0.name] = $0
+            for package in project.packages {
+                packages[project.path, default: [:]][package.name] = package
             }
         }
 

@@ -1,14 +1,14 @@
 import Foundation
 
 /// The structure defining the output schema of a Xcode project.
-public struct Project: Codable, Equatable {
+public struct Project: Codable, Equatable, Sendable {
     /// The name of the project.
     public let name: String
 
     /// The absolute path of the project.
     public let path: String
 
-    /// Indicates whether the project is imported through `Dependencies.swift`.
+    /// Indicates whether the project is imported through `Package.swift`.
     public let isExternal: Bool
 
     /// The Swift packages that this project depends on.

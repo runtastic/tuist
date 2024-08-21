@@ -1,7 +1,7 @@
 import Foundation
 import TuistCore
-import TuistGraph
 import TuistSupport
+import XcodeGraph
 
 protocol SchemeLinting {
     func lint(project: Project) -> [LintingIssue]
@@ -11,8 +11,8 @@ class SchemeLinter: SchemeLinting {
     func lint(project: Project) -> [LintingIssue] {
         var issues = [LintingIssue]()
         issues.append(contentsOf: lintReferencedBuildConfigurations(schemes: project.schemes, settings: project.settings))
-        issues.append(contentsOf: lintCodeCoverageTargets(schemes: project.schemes, targets: project.targets))
-        issues.append(contentsOf: lintExpandVariableTarget(schemes: project.schemes, targets: project.targets))
+        issues.append(contentsOf: lintCodeCoverageTargets(schemes: project.schemes, targets: Array(project.targets.values)))
+        issues.append(contentsOf: lintExpandVariableTarget(schemes: project.schemes, targets: Array(project.targets.values)))
         issues.append(contentsOf: projectSchemeCantReferenceRemoteTargets(schemes: project.schemes, project: project))
         return issues
     }
@@ -149,13 +149,11 @@ extension SchemeLinter {
     private func projectSchemeCantReferenceRemoteTargets(scheme: Scheme, project: Project) -> [LintingIssue] {
         var issues: [LintingIssue] = []
 
-        scheme.targetDependencies().forEach {
-            if $0.projectPath != project.path {
-                issues.append(.init(
-                    reason: "The target '\($0.name)' specified in scheme '\(scheme.name)' is not defined in the project named '\(project.name)'. Consider using a workspace scheme instead to reference a target in another project.",
-                    severity: .error
-                ))
-            }
+        for targetDependency in scheme.targetDependencies() where targetDependency.projectPath != project.path {
+            issues.append(.init(
+                reason: "The target '\(targetDependency.name)' specified in scheme '\(scheme.name)' is not defined in the project named '\(project.name)'. Consider using a workspace scheme instead to reference a target in another project.",
+                severity: .error
+            ))
         }
 
         return issues

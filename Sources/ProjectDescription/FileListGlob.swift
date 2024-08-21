@@ -1,7 +1,7 @@
 import Foundation
 
 /// A glob pattern that refers to files.
-public struct FileListGlob: Codable, Equatable {
+public struct FileListGlob: Codable, Equatable, Sendable {
     /// The path with a glob pattern.
     public var glob: Path
 
@@ -33,6 +33,6 @@ public struct FileListGlob: Codable, Equatable {
 
 extension FileListGlob: ExpressibleByStringInterpolation {
     public init(stringLiteral value: String) {
-        self.init(glob: Path(value), excluding: [])
+        self.init(glob: .path(value), excluding: [])
     }
 }

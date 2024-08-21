@@ -1,3 +1,4 @@
+import Path
 import ProjectDescription
 import TSCUtility
 
@@ -7,6 +8,9 @@ import TSCUtility
 /// It decodes data encoded from Manifest.swift: https://github.com/apple/swift-package-manager/blob/06f9b30f4593940272f57f6284e5614d817d2f22/Sources/PackageModel/Manifest.swift#L372-L409
 /// Fields not needed by tuist are commented out and not decoded at all.
 public struct PackageInfo: Hashable {
+    /// The name of the package.
+    public let name: String
+
     /// The products declared in the manifest.
     public let products: [Product]
 
@@ -27,9 +31,6 @@ public struct PackageInfo: Hashable {
 
     // Ignored fields
 
-    // /// The name of the package.
-    // let name: String
-
     // /// The tools version declared in the manifest.
     // let toolsVersion: ToolsVersion
 
@@ -46,6 +47,7 @@ public struct PackageInfo: Hashable {
     // let packageKind: PackageReference.Kind
 
     public init(
+        name: String,
         products: [Product],
         targets: [Target],
         platforms: [Platform],
@@ -53,6 +55,7 @@ public struct PackageInfo: Hashable {
         cxxLanguageStandard: String?,
         swiftLanguageVersions: [TSCUtility.Version]?
     ) {
+        self.name = name
         self.products = products
         self.targets = targets
         self.platforms = platforms
@@ -65,7 +68,7 @@ public struct PackageInfo: Hashable {
 // MARK: Platform
 
 extension PackageInfo {
-    public struct Platform: Decodable, Hashable {
+    public struct Platform: Codable, Hashable {
         public let platformName: String
         public let version: String
         public let options: [String]
@@ -89,7 +92,7 @@ extension PackageInfo {
 // MARK: PackageConditionDescription
 
 extension PackageInfo {
-    public struct PackageConditionDescription: Decodable, Hashable {
+    public struct PackageConditionDescription: Codable, Hashable {
         public let platformNames: [String]
         public let config: String?
 
@@ -106,7 +109,7 @@ extension PackageInfo {
 // MARK: - Product
 
 extension PackageInfo {
-    public struct Product: Decodable, Hashable {
+    public struct Product: Codable, Hashable {
         /// The name of the product.
         public let name: String
 
@@ -162,7 +165,7 @@ extension PackageInfo.Product {
 // MARK: - Target
 
 extension PackageInfo {
-    public struct Target: Decodable, Hashable {
+    public struct Target: Codable, Hashable {
         private enum CodingKeys: String, CodingKey {
             case name, path, url, sources, packageAccess, resources, exclude, dependencies, publicHeadersPath, type, settings,
                  checksum
@@ -259,7 +262,12 @@ extension PackageInfo.Target {
         case target(name: String, condition: PackageInfo.PackageConditionDescription?)
 
         /// A product from an external package.
-        case product(name: String, package: String, condition: PackageInfo.PackageConditionDescription?)
+        case product(
+            name: String,
+            package: String,
+            moduleAliases: [String: String]?,
+            condition: PackageInfo.PackageConditionDescription?
+        )
 
         /// A dependency to be resolved by name.
         case byName(name: String, condition: PackageInfo.PackageConditionDescription?)
@@ -269,8 +277,8 @@ extension PackageInfo.Target {
 // MARK: Target.Resource
 
 extension PackageInfo.Target {
-    public struct Resource: Decodable, Hashable {
-        public enum Rule: String, Decodable, Hashable {
+    public struct Resource: Codable, Hashable {
+        public enum Rule: String, Codable, Hashable {
             case process
             case copy
 
@@ -311,7 +319,7 @@ extension PackageInfo.Target {
             }
         }
 
-        public enum Localization: String, Decodable, Hashable {
+        public enum Localization: String, Codable, Hashable {
             case `default`
             case base
         }
@@ -336,7 +344,7 @@ extension PackageInfo.Target {
 // MARK: Target.TargetType
 
 extension PackageInfo.Target {
-    public enum TargetType: String, Hashable, Decodable {
+    public enum TargetType: String, Hashable, Codable {
         case regular
         case executable
         case test
@@ -353,7 +361,7 @@ extension PackageInfo.Target {
     /// A namespace for target-specific build settings.
     public enum TargetBuildSettingDescription {
         /// The tool for which a build setting is declared.
-        public enum Tool: String, Decodable, Hashable, CaseIterable {
+        public enum Tool: String, Codable, Hashable, CaseIterable {
             case c
             case cxx
             case swift
@@ -361,7 +369,7 @@ extension PackageInfo.Target {
         }
 
         /// The name of the build setting.
-        public enum SettingName: String, Decodable, Hashable {
+        public enum SettingName: String, Codable, Hashable {
             case headerSearchPath
             case define
             case linkedLibrary
@@ -372,7 +380,7 @@ extension PackageInfo.Target {
         }
 
         /// An individual build setting.
-        public struct Setting: Decodable, Hashable {
+        public struct Setting: Codable, Hashable {
             /// The tool associated with this setting.
             public let tool: Tool
 
@@ -408,18 +416,18 @@ extension PackageInfo.Target {
                 case tool, name, condition, value, kind
             }
 
-            public init(from decoder: Decoder) throws {
-                // Xcode 14 format
-                enum Kind: Codable, Equatable {
-                    case headerSearchPath(String)
-                    case define(String)
-                    case linkedLibrary(String)
-                    case linkedFramework(String)
-                    case unsafeFlags([String])
-                    case enableUpcomingFeature(String)
-                    case enableExperimentalFeature(String)
-                }
+            // Xcode 14 format
+            private enum Kind: Codable, Equatable {
+                case headerSearchPath(String)
+                case define(String)
+                case linkedLibrary(String)
+                case linkedFramework(String)
+                case unsafeFlags([String])
+                case enableUpcomingFeature(String)
+                case enableExperimentalFeature(String)
+            }
 
+            public init(from decoder: Decoder) throws {
                 let container = try decoder.container(keyedBy: CodingKeys.self)
 
                 tool = try container.decode(Tool.self, forKey: .tool)
@@ -453,19 +461,43 @@ extension PackageInfo.Target {
                     value = try container.decode([String].self, forKey: .value)
                 }
             }
+
+            public func encode(to encoder: Encoder) throws {
+                var container = encoder.container(keyedBy: CodingKeys.self)
+
+                try container.encode(tool, forKey: .tool)
+                try container.encodeIfPresent(condition, forKey: .condition)
+                switch name {
+                case .headerSearchPath:
+                    try container.encode(Kind.headerSearchPath(value.first!), forKey: .kind)
+                case .define:
+                    try container.encode(Kind.define(value.first!), forKey: .kind)
+                case .linkedLibrary:
+                    try container.encode(Kind.linkedLibrary(value.first!), forKey: .kind)
+                case .linkedFramework:
+                    try container.encode(Kind.linkedFramework(value.first!), forKey: .kind)
+                case .unsafeFlags:
+                    try container.encode(Kind.unsafeFlags(value), forKey: .kind)
+                case .enableUpcomingFeature:
+                    try container.encode(Kind.enableUpcomingFeature(value.first!), forKey: .kind)
+                case .enableExperimentalFeature:
+                    try container.encode(Kind.enableExperimentalFeature(value.first!), forKey: .kind)
+                }
+            }
         }
     }
 }
 
-// MARK: Decodable conformances
+// MARK: Codable conformances
 
-extension PackageInfo: Decodable {
+extension PackageInfo: Codable {
     private enum CodingKeys: String, CodingKey {
-        case products, targets, platforms, cLanguageStandard, cxxLanguageStandard, swiftLanguageVersions
+        case name, products, targets, platforms, cLanguageStandard, cxxLanguageStandard, swiftLanguageVersions
     }
 
     public init(from decoder: Decoder) throws {
         let values = try decoder.container(keyedBy: CodingKeys.self)
+        name = try values.decode(String.self, forKey: .name)
         products = try values.decode([Product].self, forKey: .products)
         targets = try values.decode([Target].self, forKey: .targets)
         platforms = try values.decode([Platform].self, forKey: .platforms)
@@ -477,7 +509,7 @@ extension PackageInfo: Decodable {
     }
 }
 
-extension PackageInfo.Target.Dependency: Decodable {
+extension PackageInfo.Target.Dependency: Codable {
     private enum CodingKeys: String, CodingKey {
         case target, product, byName
     }
@@ -501,6 +533,7 @@ extension PackageInfo.Target.Dependency: Decodable {
             self = .product(
                 name: first,
                 package: try unkeyedValues.decodeIfPresent(String.self) ?? first,
+                moduleAliases: try unkeyedValues.decodeIfPresent([String: String].self),
                 condition: try unkeyedValues.decodeIfPresent(PackageInfo.PackageConditionDescription.self)
             )
         case .byName:
@@ -510,9 +543,33 @@ extension PackageInfo.Target.Dependency: Decodable {
             )
         }
     }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        switch self {
+        case let .byName(name: name, condition: condition):
+            var unkeyedContainer = container.nestedUnkeyedContainer(forKey: .byName)
+            try unkeyedContainer.encode(name)
+            if let condition {
+                try unkeyedContainer.encode(condition)
+            }
+        case let .product(name: name, package: package, moduleAliases: moduleAliases, condition: condition):
+            var unkeyedContainer = container.nestedUnkeyedContainer(forKey: .product)
+            try unkeyedContainer.encode(name)
+            try unkeyedContainer.encode(package)
+            try unkeyedContainer.encode(moduleAliases)
+            try unkeyedContainer.encode(condition)
+        case let .target(name: name, condition: condition):
+            var unkeyedContainer = container.nestedUnkeyedContainer(forKey: .target)
+            try unkeyedContainer.encode(name)
+            if let condition {
+                try unkeyedContainer.encode(condition)
+            }
+        }
+    }
 }
 
-extension PackageInfo.Product.ProductType: Decodable {
+extension PackageInfo.Product.ProductType: Codable {
     private enum CodingKeys: String, CodingKey {
         case library, executable, plugin, test
     }
@@ -536,19 +593,25 @@ extension PackageInfo.Product.ProductType: Decodable {
             self = .plugin
         }
     }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+
+        switch self {
+        case .executable:
+            try container.encode(CodingKeys.executable.rawValue, forKey: .executable)
+        case .plugin:
+            try container.encode(CodingKeys.plugin.rawValue, forKey: .plugin)
+        case .test:
+            try container.encode(CodingKeys.test.rawValue, forKey: .test)
+        case let .library(libraryType):
+            var nestedContainer = container.nestedUnkeyedContainer(forKey: .library)
+            try nestedContainer.encode(libraryType)
+        }
+    }
 }
 
 extension PackageInfo.Target.TargetType {
-    /// Defines if the target would be processed when processing the package
-    public var isSupported: Bool {
-        switch self {
-        case .regular, .system, .macro:
-            return true
-        default:
-            return false
-        }
-    }
-
     /// Defines if target may have a public headers path
     /// Based on preconditions in https://github.com/apple/swift-package-manager/blob/main/Sources/PackageDescription/Target.swift
     public var supportsPublicHeaderPath: Bool {

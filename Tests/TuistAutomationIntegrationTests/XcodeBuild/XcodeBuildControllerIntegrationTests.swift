@@ -1,5 +1,5 @@
 import Foundation
-import TSCBasic
+import Path
 import TuistCore
 import TuistSupport
 import XCTest
@@ -25,7 +25,7 @@ final class XcodeBuildControllerIntegrationTests: TuistTestCase {
         let target = XcodeBuildTarget.project(fixturePath(path: try RelativePath(validating: "Frameworks/Frameworks.xcodeproj")))
 
         // When
-        let got = try await subject.showBuildSettings(target, scheme: "iOS", configuration: "Debug")
+        let got = try await subject.showBuildSettings(target, scheme: "iOS", configuration: "Debug", derivedDataPath: nil)
 
         // Then
         XCTAssertEqual(got.count, 1)

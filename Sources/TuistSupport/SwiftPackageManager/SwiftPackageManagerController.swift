@@ -1,5 +1,5 @@
 import Foundation
-import TSCBasic
+import Path
 import TSCUtility
 
 /// Protocol that defines an interface to interact with the Swift Package Manager.
@@ -15,6 +15,11 @@ public protocol SwiftPackageManagerControlling {
     ///   - path: Directory where the `Package.swift` is defined.
     ///   - printOutput: When true it prints the Swift Package Manager's output.
     func update(at path: AbsolutePath, printOutput: Bool) throws
+
+    /// Gets the tools version of the package at the given path
+    /// - Parameter path: Directory where the `Package.swift` is defined.
+    /// - Returns: Version of tools.
+    func getToolsVersion(at path: AbsolutePath) throws -> Version
 
     /// Sets tools version of package to the given value.
     /// - Parameter path: Directory where the `Package.swift` is defined.
@@ -40,22 +45,28 @@ public protocol SwiftPackageManagerControlling {
 }
 
 public final class SwiftPackageManagerController: SwiftPackageManagerControlling {
-    public init() {}
+    let system: Systeming
+    let fileHandler: FileHandling
+
+    public init(system: Systeming, fileHandler: FileHandling) {
+        self.system = system
+        self.fileHandler = fileHandler
+    }
 
     public func resolve(at path: AbsolutePath, printOutput: Bool) throws {
         let command = buildSwiftPackageCommand(packagePath: path, extraArguments: ["resolve"])
 
         printOutput ?
-            try System.shared.runAndPrint(command) :
-            try System.shared.run(command)
+            try system.runAndPrint(command) :
+            try system.run(command)
     }
 
     public func update(at path: AbsolutePath, printOutput: Bool) throws {
         let command = buildSwiftPackageCommand(packagePath: path, extraArguments: ["update"])
 
         printOutput ?
-            try System.shared.runAndPrint(command) :
-            try System.shared.run(command)
+            try system.runAndPrint(command) :
+            try system.run(command)
     }
 
     public func setToolsVersion(at path: AbsolutePath, to version: Version) throws {
@@ -63,13 +74,22 @@ public final class SwiftPackageManagerController: SwiftPackageManagerControlling
 
         let command = buildSwiftPackageCommand(packagePath: path, extraArguments: extraArguments)
 
-        try System.shared.run(command)
+        try system.run(command)
+    }
+
+    public func getToolsVersion(at path: AbsolutePath) throws -> Version {
+        let extraArguments = ["tools-version"]
+
+        let command = buildSwiftPackageCommand(packagePath: path, extraArguments: extraArguments)
+
+        let rawVersion = try system.capture(command).trimmingCharacters(in: .whitespacesAndNewlines)
+        return try Version(versionString: rawVersion)
     }
 
     public func loadPackageInfo(at path: AbsolutePath) throws -> PackageInfo {
         let command = buildSwiftPackageCommand(packagePath: path, extraArguments: ["dump-package"])
 
-        let json = try System.shared.capture(command)
+        let json = try system.capture(command)
 
         let data = Data(json.utf8)
         let decoder = JSONDecoder()
@@ -95,22 +115,22 @@ public final class SwiftPackageManagerController: SwiftPackageManagerControlling
 
         let arm64Target = "arm64-apple-macosx"
         let x64Target = "x86_64-apple-macosx"
-        try System.shared.run(
+        try system.run(
             buildCommand + [
                 arm64Target,
             ]
         )
-        try System.shared.run(
+        try system.run(
             buildCommand + [
                 x64Target,
             ]
         )
 
-        if !FileHandler.shared.exists(outputPath) {
-            try FileHandler.shared.createFolder(outputPath)
+        if !fileHandler.exists(outputPath) {
+            try fileHandler.createFolder(outputPath)
         }
 
-        try System.shared.run([
+        try system.run([
             "lipo", "-create", "-output", outputPath.appending(component: product).pathString,
             buildPath.appending(components: arm64Target, "release", product).pathString,
             buildPath.appending(components: x64Target, "release", product).pathString,

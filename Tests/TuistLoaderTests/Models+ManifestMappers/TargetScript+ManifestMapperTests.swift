@@ -1,9 +1,9 @@
 import Foundation
+import Path
 import ProjectDescription
-import TSCBasic
 import TuistCore
-import TuistGraph
 import TuistSupport
+import XcodeGraph
 import XCTest
 
 @testable import TuistLoader
@@ -21,7 +21,7 @@ final class TargetScriptManifestMapperTests: TuistUnitTestCase {
             arguments: ["arg1", "arg2"]
         )
         // When
-        let model = try TuistGraph.TargetScript.from(manifest: manifest, generatorPaths: generatorPaths)
+        let model = try XcodeGraph.TargetScript.from(manifest: manifest, generatorPaths: generatorPaths)
 
         // Then
         XCTAssertEqual(model.name, "MyScript")
@@ -57,10 +57,10 @@ final class TargetScriptManifestMapperTests: TuistUnitTestCase {
             outputFileListPaths: ["$(SRCROOT)/foo/bar/**/*.swift"]
         )
         // When
-        let model = try TuistGraph.TargetScript.from(manifest: manifest, generatorPaths: generatorPaths)
+        let model = try XcodeGraph.TargetScript.from(manifest: manifest, generatorPaths: generatorPaths)
 
         // Then
-        let relativeSources = model.inputPaths.map { $0.relative(to: temporaryPath).pathString }
+        let relativeSources = try model.inputPaths.map { try AbsolutePath(validating: $0).relative(to: temporaryPath).pathString }
 
         XCTAssertEqual(Set(relativeSources), Set([
             "${DWARF_DSYM_FOLDER_PATH}/${DWARF_DSYM_FILE_NAME}/Contents/Resources/DWARF/${TARGET_NAME}",
@@ -82,7 +82,7 @@ final class TargetScriptManifestMapperTests: TuistUnitTestCase {
         )
         XCTAssertEqual(
             model.outputPaths,
-            [temporaryPath.appending(try RelativePath(validating: "$(SRCROOT)/foo/bar/**/*.swift"))]
+            [temporaryPath.appending(try RelativePath(validating: "$(SRCROOT)/foo/bar/**/*.swift")).pathString]
         )
         XCTAssertEqual(
             model.outputFileListPaths,
@@ -123,10 +123,10 @@ final class TargetScriptManifestMapperTests: TuistUnitTestCase {
             outputFileListPaths: ["$(SRCROOT)/foo/bar/**/*.swift"]
         )
         // When
-        let model = try TuistGraph.TargetScript.from(manifest: manifest, generatorPaths: generatorPaths)
+        let model = try XcodeGraph.TargetScript.from(manifest: manifest, generatorPaths: generatorPaths)
 
         // Then
-        let relativeSources = model.inputPaths.map { $0.relative(to: temporaryPath).pathString }
+        let relativeSources = try model.inputPaths.map { try AbsolutePath(validating: $0).relative(to: temporaryPath).pathString }
 
         XCTAssertEqual(Set(relativeSources), Set([
             "foo/bar/a.swift",
@@ -143,7 +143,7 @@ final class TargetScriptManifestMapperTests: TuistUnitTestCase {
         )
         XCTAssertEqual(
             model.outputPaths,
-            [temporaryPath.appending(try RelativePath(validating: "$(SRCROOT)/foo/bar/**/*.swift"))]
+            [temporaryPath.appending(try RelativePath(validating: "$(SRCROOT)/foo/bar/**/*.swift")).pathString]
         )
         XCTAssertEqual(
             model.outputFileListPaths,

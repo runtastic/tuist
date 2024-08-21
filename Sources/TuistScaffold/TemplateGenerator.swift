@@ -1,9 +1,9 @@
+import FileSystem
 import Foundation
+import Path
 import PathKit
 import StencilSwiftKit
-import TSCBasic
 import TuistCore
-import TuistGraph
 import TuistSupport
 
 /// Interface for generating content defined in template manifest
@@ -16,19 +16,23 @@ public protocol TemplateGenerating {
     func generate(
         template: Template,
         to destinationPath: AbsolutePath,
-        attributes: [String: String]
-    ) throws
+        attributes: [String: Template.Attribute.Value]
+    ) async throws
 }
 
 public final class TemplateGenerator: TemplateGenerating {
+    private let fileSystem: FileSystem
+
     // Public initializer
-    public init() {}
+    public init(fileSystem: FileSystem = FileSystem()) {
+        self.fileSystem = fileSystem
+    }
 
     public func generate(
         template: Template,
         to destinationPath: AbsolutePath,
-        attributes: [String: String]
-    ) throws {
+        attributes: [String: Template.Attribute.Value]
+    ) async throws {
         let renderedItems = try renderItems(
             template: template,
             attributes: attributes
@@ -38,7 +42,7 @@ public final class TemplateGenerator: TemplateGenerating {
             destinationPath: destinationPath
         )
 
-        try generateItems(
+        try await generateItems(
             renderedItems: renderedItems,
             attributes: attributes,
             destinationPath: destinationPath
@@ -50,13 +54,13 @@ public final class TemplateGenerator: TemplateGenerating {
     /// Renders items' paths in format  path_to_dir/{{ attribute_name }} with `attributes`
     private func renderItems(
         template: Template,
-        attributes: [String: String]
+        attributes: [String: Template.Attribute.Value]
     ) throws -> [Template.Item] {
         let environment = stencilSwiftEnvironment()
         return try template.items.map {
             let renderedPathString = try environment.renderTemplate(
                 string: $0.path.pathString,
-                context: attributes
+                context: attributes.toStringAny
             )
             let path = try RelativePath(validating: renderedPathString)
 
@@ -64,7 +68,7 @@ public final class TemplateGenerator: TemplateGenerating {
             if case let Template.Contents.file(path) = contents {
                 let renderedPathString = try environment.renderTemplate(
                     string: path.pathString,
-                    context: attributes
+                    context: attributes.toStringAny
                 )
                 contents = .file(
                     try AbsolutePath(validating: renderedPathString)
@@ -73,7 +77,7 @@ public final class TemplateGenerator: TemplateGenerating {
             if case let Template.Contents.directory(path) = contents {
                 let renderedPathString = try environment.renderTemplate(
                     string: path.pathString,
-                    context: attributes
+                    context: attributes.toStringAny
                 )
                 contents = .directory(
                     try AbsolutePath(validating: renderedPathString)
@@ -103,17 +107,17 @@ public final class TemplateGenerator: TemplateGenerating {
     /// Generate all `renderedItems`
     private func generateItems(
         renderedItems: [Template.Item],
-        attributes: [String: String],
+        attributes: [String: Template.Attribute.Value],
         destinationPath: AbsolutePath
-    ) throws {
+    ) async throws {
         let environment = stencilSwiftEnvironment()
-        try renderedItems.forEach {
+        for renderedItem in renderedItems {
             let renderedContents: String?
-            switch $0.contents {
+            switch renderedItem.contents {
             case let .string(contents):
                 renderedContents = try environment.renderTemplate(
                     string: contents,
-                    context: attributes
+                    context: attributes.toStringAny
                 )
             case let .file(path):
                 let injectedLoaderEnvironment = stencilSwiftEnvironment(templatePaths: [Path(path.dirname)])
@@ -122,21 +126,21 @@ public final class TemplateGenerator: TemplateGenerating {
                 if path.extension == "stencil" {
                     renderedContents = try injectedLoaderEnvironment.renderTemplate(
                         string: fileContents,
-                        context: attributes
+                        context: attributes.toStringAny
                     )
                 } else {
                     renderedContents = fileContents
                 }
             case let .directory(path):
                 let destinationDirectoryPath = destinationPath
-                    .appending(try RelativePath(validating: $0.path.pathString))
+                    .appending(try RelativePath(validating: renderedItem.path.pathString))
                     .appending(component: path.basename)
                 // workaround for creating folder tree of destinationDirectoryPath
                 if !FileHandler.shared.exists(destinationDirectoryPath.parentDirectory) {
                     try FileHandler.shared.createFolder(destinationDirectoryPath.parentDirectory)
                 }
                 if FileHandler.shared.exists(destinationDirectoryPath) {
-                    try FileHandler.shared.delete(destinationDirectoryPath)
+                    try await fileSystem.remove(destinationDirectoryPath)
                 }
                 try FileHandler.shared.copy(from: path, to: destinationDirectoryPath)
                 renderedContents = nil
@@ -144,14 +148,24 @@ public final class TemplateGenerator: TemplateGenerating {
             // Generate file only when it has some content, unless it is a `.gitkeep` file
             if let rendered = renderedContents,
                !rendered.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ||
-               $0.path.basename == ".gitkeep"
+               renderedItem.path.basename == ".gitkeep"
             {
                 try FileHandler.shared.write(
                     rendered,
-                    path: destinationPath.appending($0.path),
+                    path: destinationPath.appending(renderedItem.path),
                     atomically: true
                 )
             }
+        }
+    }
+}
+
+extension [String: Template.Attribute.Value] {
+    fileprivate var toStringAny: [String: Any] {
+        reduce([:]) { partialResult, attribute in
+            var result: [String: Any] = partialResult
+            result[attribute.key] = attribute.value.rawValue
+            return result
         }
     }
 }

@@ -1,5 +1,5 @@
 import Foundation
-import TSCBasic
+import Path
 import TuistSupport
 import XCTest
 
@@ -485,7 +485,7 @@ final class ManifestFilesLocatorTests: TuistUnitTestCase {
         XCTAssertNil(configPath)
     }
 
-    func test_locateDependencies() throws {
+    func test_locatePackageManifest_when_in_root() throws {
         // Given
         let paths = try createFiles([
             "Module01/File01.swift",
@@ -499,18 +499,19 @@ final class ManifestFilesLocatorTests: TuistUnitTestCase {
 
             "File01.swift",
             "File02.swift",
-            "Tuist/Dependencies.swift",
+            "Tuist/Config.swift",
+            "Package.swift",
         ])
 
         // When
-        let dependenciesPath = subject.locateDependencies(at: try temporaryPath())
+        let packageManifestPath = subject.locatePackageManifest(at: try temporaryPath())
 
         // Then
-        XCTAssertNotNil(dependenciesPath)
-        XCTAssertEqual(paths.last, dependenciesPath)
+        XCTAssertNotNil(packageManifestPath)
+        XCTAssertEqual(paths.last, packageManifestPath)
     }
 
-    func test_locateDependencies_traversing() throws {
+    func test_locatePackageManifest() throws {
         // Given
         let paths = try createFiles([
             "Module01/File01.swift",
@@ -524,63 +525,17 @@ final class ManifestFilesLocatorTests: TuistUnitTestCase {
 
             "File01.swift",
             "File02.swift",
-            "Tuist/Dependencies.swift",
-        ])
-        let locatingPath = paths[5] // "Module02/Subdir01/File01.swift"
-
-        // When
-        let dependenciesPath = subject.locateDependencies(at: locatingPath)
-
-        // Then
-        XCTAssertNotNil(dependenciesPath)
-        XCTAssertEqual(paths.last, dependenciesPath)
-    }
-
-    func test_locateDependencies_where_config_not_exist() throws {
-        // Given
-        try createFiles([
-            "Module01/File01.swift",
-            "Module01/File02.swift",
-            "Module01/File03.swift",
-
-            "Module02/File01.swift",
-            "Module02/File01.swift",
-            "Module02/Subdir01/File01.swift",
-            "Module02/Subdir01/File02.swift",
-
-            "File01.swift",
-            "File02.swift",
+            "Tuist/Config.swift",
+            "Package.swift",
+            "Tuist/Package.swift",
         ])
 
         // When
-        let dependenciesPath = subject.locateDependencies(at: try temporaryPath())
+        let packageManifestPath = subject.locatePackageManifest(at: try temporaryPath())
 
         // Then
-        XCTAssertNil(dependenciesPath)
-    }
-
-    func test_locateDependencies_traversing_where_config_not_exist() throws {
-        // Given
-        let paths = try createFiles([
-            "Module01/File01.swift",
-            "Module01/File02.swift",
-            "Module01/File03.swift",
-
-            "Module02/File01.swift",
-            "Module02/File01.swift",
-            "Module02/Subdir01/File01.swift",
-            "Module02/Subdir01/File02.swift",
-
-            "File01.swift",
-            "File02.swift",
-        ])
-        let locatingPath = paths[5] // "Module02/Subdir01/File01.swift"
-
-        // When
-        let dependenciesPath = subject.locateDependencies(at: locatingPath)
-
-        // Then
-        XCTAssertNil(dependenciesPath)
+        XCTAssertNotNil(packageManifestPath)
+        XCTAssertEqual(paths.last, packageManifestPath)
     }
 
     func test_locateProjectManifests_returns_all_manifest_containing_manifest_signature() throws {

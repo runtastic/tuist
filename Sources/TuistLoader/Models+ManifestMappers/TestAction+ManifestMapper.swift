@@ -1,28 +1,29 @@
 import Foundation
+import Path
 import ProjectDescription
-import TSCBasic
 import TuistCore
-import TuistGraph
 import TuistSupport
+import XcodeGraph
 
-extension TuistGraph.TestAction {
+extension XcodeGraph.TestAction {
     // swiftlint:disable function_body_length
-    /// Maps a ProjectDescription.TestAction instance into a TuistGraph.TestAction instance.
+    /// Maps a ProjectDescription.TestAction instance into a XcodeGraph.TestAction instance.
     /// - Parameters:
     ///   - manifest: Manifest representation of test action model.
     ///   - generatorPaths: Generator paths.
-    static func from(manifest: ProjectDescription.TestAction, generatorPaths: GeneratorPaths) throws -> TuistGraph.TestAction {
+    static func from(manifest: ProjectDescription.TestAction, generatorPaths: GeneratorPaths) throws -> XcodeGraph.TestAction {
         // swiftlint:enable function_body_length
-        let testPlans: [TuistGraph.TestPlan]?
-        let targets: [TuistGraph.TestableTarget]
-        let arguments: TuistGraph.Arguments?
+        let testPlans: [XcodeGraph.TestPlan]?
+        let targets: [XcodeGraph.TestableTarget]
+        let arguments: XcodeGraph.Arguments?
         let coverage: Bool
-        let codeCoverageTargets: [TuistGraph.TargetReference]
-        let expandVariablesFromTarget: TuistGraph.TargetReference?
-        let diagnosticsOptions: Set<TuistGraph.SchemeDiagnosticsOption>
+        let codeCoverageTargets: [XcodeGraph.TargetReference]
+        let expandVariablesFromTarget: XcodeGraph.TargetReference?
+        let diagnosticsOptions: XcodeGraph.SchemeDiagnosticsOptions
         let language: SchemeLanguage?
         let region: String?
-        let preferredScreenCaptureFormat: TuistGraph.ScreenCaptureFormat?
+        let preferredScreenCaptureFormat: XcodeGraph.ScreenCaptureFormat?
+        let skippedTests: [String]?
 
         if let plans = manifest.testPlans {
             testPlans = try plans.enumerated().compactMap { index, path in
@@ -37,29 +38,29 @@ extension TuistGraph.TestAction {
             coverage = false
             codeCoverageTargets = []
             expandVariablesFromTarget = nil
-            diagnosticsOptions = []
+            diagnosticsOptions = .init()
             language = nil
             region = nil
             preferredScreenCaptureFormat = nil
+            skippedTests = nil
         } else {
             targets = try manifest.targets
-                .map { try TuistGraph.TestableTarget.from(manifest: $0, generatorPaths: generatorPaths) }
-            arguments = manifest.arguments.map { TuistGraph.Arguments.from(manifest: $0) }
+                .map { try XcodeGraph.TestableTarget.from(manifest: $0, generatorPaths: generatorPaths) }
+            arguments = manifest.arguments.map { XcodeGraph.Arguments.from(manifest: $0) }
             coverage = manifest.options.coverage
             codeCoverageTargets = try manifest.options.codeCoverageTargets.map {
-                TuistGraph.TargetReference(
+                XcodeGraph.TargetReference(
                     projectPath: try generatorPaths.resolveSchemeActionProjectPath($0.projectPath),
                     name: $0.targetName
                 )
             }
             expandVariablesFromTarget = try manifest.expandVariableFromTarget.map {
-                TuistGraph.TargetReference(
+                XcodeGraph.TargetReference(
                     projectPath: try generatorPaths.resolveSchemeActionProjectPath($0.projectPath),
                     name: $0.targetName
                 )
             }
-
-            diagnosticsOptions = Set(manifest.diagnosticsOptions.map { TuistGraph.SchemeDiagnosticsOption.from(manifest: $0) })
+            diagnosticsOptions = XcodeGraph.SchemeDiagnosticsOptions.from(manifest: manifest.diagnosticsOptions)
             language = manifest.options.language
             region = manifest.options.region
             preferredScreenCaptureFormat = manifest.options.preferredScreenCaptureFormat
@@ -67,14 +68,15 @@ extension TuistGraph.TestAction {
 
             // not used when using targets
             testPlans = nil
+            skippedTests = manifest.skippedTests
         }
 
         let configurationName = manifest.configuration.rawValue
-        let preActions = try manifest.preActions.map { try TuistGraph.ExecutionAction.from(
+        let preActions = try manifest.preActions.map { try XcodeGraph.ExecutionAction.from(
             manifest: $0,
             generatorPaths: generatorPaths
         ) }
-        let postActions = try manifest.postActions.map { try TuistGraph.ExecutionAction.from(
+        let postActions = try manifest.postActions.map { try XcodeGraph.ExecutionAction.from(
             manifest: $0,
             generatorPaths: generatorPaths
         ) }
@@ -93,7 +95,8 @@ extension TuistGraph.TestAction {
             language: language?.identifier,
             region: region,
             preferredScreenCaptureFormat: preferredScreenCaptureFormat,
-            testPlans: testPlans
+            testPlans: testPlans,
+            skippedTests: skippedTests
         )
     }
 }

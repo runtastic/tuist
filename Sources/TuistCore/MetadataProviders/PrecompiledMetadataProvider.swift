@@ -1,8 +1,8 @@
 import Foundation
 import MachO
-import TSCBasic
-import TuistGraph
+import Path
 import TuistSupport
+import XcodeGraph
 
 enum PrecompiledMetadataProviderError: FatalError, Equatable {
     case architecturesNotFound(AbsolutePath)
@@ -217,7 +217,7 @@ public class PrecompiledMetadataProvider: PrecompiledMetadataProviding {
 
         guard String(data: magic, encoding: .ascii) == archiveFormatMagic else { return }
 
-        binary.seek(to: archiveHeaderSizeOffset)
+        binary.seek(to: currentOffset + archiveHeaderSizeOffset)
         guard let sizeString = binary.readString(ofLength: 10) else { return }
 
         let size = strtoul(sizeString, nil, 10)

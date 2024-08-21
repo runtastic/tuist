@@ -1,16 +1,17 @@
 import Foundation
+import Mockable
+import Path
 import ProjectDescription
-import TSCBasic
 import TuistCore
-import TuistGraph
 import TuistSupport
+import XcodeGraph
 
 public enum ManifestLoaderError: FatalError, Equatable {
     case projectDescriptionNotFound(AbsolutePath)
     case unexpectedOutput(AbsolutePath)
     case manifestNotFound(Manifest?, AbsolutePath)
     case manifestCachingFailed(Manifest?, AbsolutePath)
-    case manifestLoadingFailed(path: AbsolutePath, context: String)
+    case manifestLoadingFailed(path: AbsolutePath, data: Data, context: String)
 
     public static func manifestNotFound(_ path: AbsolutePath) -> ManifestLoaderError {
         .manifestNotFound(nil, path)
@@ -26,7 +27,7 @@ public enum ManifestLoaderError: FatalError, Equatable {
             return "\(manifest?.fileName(path) ?? "Manifest") not found at path \(path.pathString)"
         case let .manifestCachingFailed(manifest, path):
             return "Could not cache \(manifest?.fileName(path) ?? "Manifest") at path \(path.pathString)"
-        case let .manifestLoadingFailed(path, context):
+        case let .manifestLoadingFailed(path, _, context):
             return """
             Unable to load manifest at \(path.pathString.bold())
             \(context)
@@ -50,47 +51,55 @@ public enum ManifestLoaderError: FatalError, Equatable {
     }
 }
 
+@Mockable
 public protocol ManifestLoading {
     /// Loads the Config.swift in the given directory.
     ///
     /// - Parameter path: Path to the directory that contains the Config.swift file.
     /// - Returns: Loaded Config.swift file.
     /// - Throws: An error if the file has a syntax error.
-    func loadConfig(at path: AbsolutePath) throws -> ProjectDescription.Config
+    func loadConfig(at path: AbsolutePath) async throws -> ProjectDescription.Config
 
     /// Loads the Project.swift in the given directory.
     /// - Parameter path: Path to the directory that contains the Project.swift.
-    func loadProject(at path: AbsolutePath) throws -> ProjectDescription.Project
+    func loadProject(at path: AbsolutePath) async throws -> ProjectDescription.Project
 
     /// Loads the Workspace.swift in the given directory.
     /// - Parameter path: Path to the directory that contains the Workspace.swift
-    func loadWorkspace(at path: AbsolutePath) throws -> ProjectDescription.Workspace
+    func loadWorkspace(at path: AbsolutePath) async throws -> ProjectDescription.Workspace
 
     /// Loads the name_of_template.swift in the given directory.
     /// - Parameter path: Path to the directory that contains the name_of_template.swift
-    func loadTemplate(at path: AbsolutePath) throws -> ProjectDescription.Template
+    func loadTemplate(at path: AbsolutePath) async throws -> ProjectDescription.Template
 
-    /// Loads the Dependencies.swift in the given directory
-    /// - Parameters:
-    ///     -  path: Path to the directory that contains Dependencies.swift
-    func loadDependencies(at path: AbsolutePath) throws -> ProjectDescription.Dependencies
+    /// Loads the `PackageSettings` from `Package.swift` in the given directory
+    /// -  path: Path to the directory that contains Package.swift
+    func loadPackageSettings(at path: AbsolutePath) async throws -> ProjectDescription.PackageSettings
+
+    /// Loads `Package.swift`
+    /// - path: Path to the directory that contains Package.swift
+    func loadPackage(at path: AbsolutePath) async throws -> PackageInfo
 
     /// Loads the Plugin.swift in the given directory.
     /// - Parameter path: Path to the directory that contains Plugin.swift
-    func loadPlugin(at path: AbsolutePath) throws -> ProjectDescription.Plugin
+    func loadPlugin(at path: AbsolutePath) async throws -> ProjectDescription.Plugin
 
     /// List all the manifests in the given directory.
     /// - Parameter path: Path to the directory whose manifest files will be returned.
     func manifests(at path: AbsolutePath) -> Set<Manifest>
 
     /// Verifies that there is a project or workspace manifest at the given path, or throws an error otherwise.
-    func validateHasProjectOrWorkspaceManifest(at path: AbsolutePath) throws
+    func validateHasRootManifest(at path: AbsolutePath) throws
+
+    /// - Returns: `true` if there is a project or workspace manifest at the given path
+    func hasRootManifest(at path: AbsolutePath) -> Bool
 
     /// Registers plugins that will be used within the manifest loading process.
     /// - Parameter plugins: The plugins to register.
     func register(plugins: Plugins) throws
 }
 
+// swiftlint:disable:next type_body_length
 public class ManifestLoader: ManifestLoading {
     // MARK: - Static
 
@@ -106,6 +115,8 @@ public class ManifestLoader: ManifestLoading {
     private var plugins: Plugins = .none
     private let cacheDirectoryProviderFactory: CacheDirectoriesProviderFactoring
     private let projectDescriptionHelpersBuilderFactory: ProjectDescriptionHelpersBuilderFactoring
+    private let xcodeController: XcodeControlling
+    private let swiftPackageManagerController: SwiftPackageManagerControlling
 
     // MARK: - Init
 
@@ -115,7 +126,9 @@ public class ManifestLoader: ManifestLoading {
             resourceLocator: ResourceLocator(),
             cacheDirectoryProviderFactory: CacheDirectoriesProviderFactory(),
             projectDescriptionHelpersBuilderFactory: ProjectDescriptionHelpersBuilderFactory(),
-            manifestFilesLocator: ManifestFilesLocator()
+            manifestFilesLocator: ManifestFilesLocator(),
+            xcodeController: XcodeController.shared,
+            swiftPackageManagerController: SwiftPackageManagerController(system: System.shared, fileHandler: FileHandler.shared)
         )
     }
 
@@ -124,13 +137,17 @@ public class ManifestLoader: ManifestLoading {
         resourceLocator: ResourceLocating,
         cacheDirectoryProviderFactory: CacheDirectoriesProviderFactoring,
         projectDescriptionHelpersBuilderFactory: ProjectDescriptionHelpersBuilderFactoring,
-        manifestFilesLocator: ManifestFilesLocating
+        manifestFilesLocator: ManifestFilesLocating,
+        xcodeController: XcodeControlling,
+        swiftPackageManagerController: SwiftPackageManagerControlling
     ) {
         self.environment = environment
         self.resourceLocator = resourceLocator
         self.cacheDirectoryProviderFactory = cacheDirectoryProviderFactory
         self.projectDescriptionHelpersBuilderFactory = projectDescriptionHelpersBuilderFactory
         self.manifestFilesLocator = manifestFilesLocator
+        self.xcodeController = xcodeController
+        self.swiftPackageManagerController = swiftPackageManagerController
         decoder = JSONDecoder()
     }
 
@@ -138,36 +155,59 @@ public class ManifestLoader: ManifestLoading {
         Set(manifestFilesLocator.locateManifests(at: path).map(\.0))
     }
 
-    public func validateHasProjectOrWorkspaceManifest(at path: AbsolutePath) throws {
-        let manifests = manifests(at: path)
-        guard manifests.contains(.workspace) || manifests.contains(.project) else {
+    public func validateHasRootManifest(at path: AbsolutePath) throws {
+        guard hasRootManifest(at: path) else {
             throw ManifestLoaderError.manifestNotFound(path)
         }
     }
 
-    public func loadConfig(at path: AbsolutePath) throws -> ProjectDescription.Config {
-        try loadManifest(.config, at: path)
+    public func hasRootManifest(at path: AbsolutePath) -> Bool {
+        let manifests = manifests(at: path)
+        let rootManifests: Set<Manifest> = [.workspace, .project, .package]
+        return !manifests.isDisjoint(with: rootManifests)
     }
 
-    public func loadProject(at path: AbsolutePath) throws -> ProjectDescription.Project {
-        try loadManifest(.project, at: path)
+    public func loadConfig(at path: AbsolutePath) async throws -> ProjectDescription.Config {
+        try await loadManifest(.config, at: path)
     }
 
-    public func loadWorkspace(at path: AbsolutePath) throws -> ProjectDescription.Workspace {
-        try loadManifest(.workspace, at: path)
+    public func loadProject(at path: AbsolutePath) async throws -> ProjectDescription.Project {
+        try await loadManifest(.project, at: path)
     }
 
-    public func loadTemplate(at path: AbsolutePath) throws -> ProjectDescription.Template {
-        try loadManifest(.template, at: path)
+    public func loadWorkspace(at path: AbsolutePath) async throws -> ProjectDescription.Workspace {
+        try await loadManifest(.workspace, at: path)
     }
 
-    public func loadDependencies(at path: AbsolutePath) throws -> ProjectDescription.Dependencies {
-        let dependencyPath = path.appending(components: Constants.tuistDirectoryName)
-        return try loadManifest(.dependencies, at: dependencyPath)
+    public func loadTemplate(at path: AbsolutePath) async throws -> ProjectDescription.Template {
+        try await loadManifest(.template, at: path)
     }
 
-    public func loadPlugin(at path: AbsolutePath) throws -> ProjectDescription.Plugin {
-        try loadManifest(.plugin, at: path)
+    public func loadPackage(at path: AbsolutePath) throws -> PackageInfo {
+        try swiftPackageManagerController.loadPackageInfo(
+            at: path
+        )
+    }
+
+    public func loadPackageSettings(at path: AbsolutePath) async throws -> ProjectDescription.PackageSettings {
+        do {
+            return try await loadManifest(.packageSettings, at: path)
+        } catch let error as ManifestLoaderError {
+            switch error {
+            case let .manifestLoadingFailed(path: _, data: data, context: _):
+                if data.count == 0 {
+                    return PackageSettings()
+                } else {
+                    throw error
+                }
+            default:
+                throw error
+            }
+        }
+    }
+
+    public func loadPlugin(at path: AbsolutePath) async throws -> ProjectDescription.Plugin {
+        try await loadManifest(.plugin, at: path)
     }
 
     public func register(plugins: Plugins) throws {
@@ -180,20 +220,22 @@ public class ManifestLoader: ManifestLoading {
     private func loadManifest<T: Decodable>(
         _ manifest: Manifest,
         at path: AbsolutePath
-    ) throws -> T {
+    ) async throws -> T {
         let manifestPath = try manifestPath(
             manifest,
             at: path
         )
 
-        let data = try loadDataForManifest(manifest, at: manifestPath)
+        let data = try await loadDataForManifest(manifest, at: manifestPath)
 
         do {
             return try decoder.decode(T.self, from: data)
         } catch {
             guard let error = error as? DecodingError else {
                 throw ManifestLoaderError.manifestLoadingFailed(
-                    path: manifestPath, context: error.localizedDescription
+                    path: manifestPath,
+                    data: data,
+                    context: error.localizedDescription
                 )
             }
 
@@ -203,6 +245,7 @@ public class ManifestLoader: ManifestLoading {
             case let .typeMismatch(type, context):
                 throw ManifestLoaderError.manifestLoadingFailed(
                     path: manifestPath,
+                    data: data,
                     context: """
                     The content of the manifest did not match the expected type of: \(String(describing: type).bold())
                     \(context.debugDescription)
@@ -211,6 +254,7 @@ public class ManifestLoader: ManifestLoading {
             case let .valueNotFound(value, _):
                 throw ManifestLoaderError.manifestLoadingFailed(
                     path: manifestPath,
+                    data: data,
                     context: """
                     Expected a non-optional value for property of type \(String(describing: value).bold()) but found a nil value.
                     \(json.bold())
@@ -219,6 +263,7 @@ public class ManifestLoader: ManifestLoading {
             case let .keyNotFound(codingKey, _):
                 throw ManifestLoaderError.manifestLoadingFailed(
                     path: manifestPath,
+                    data: data,
                     context: """
                     Did not find property with name \(codingKey.stringValue.bold()) in the JSON represented by:
                     \(json.bold())
@@ -227,6 +272,7 @@ public class ManifestLoader: ManifestLoading {
             case let .dataCorrupted(context):
                 throw ManifestLoaderError.manifestLoadingFailed(
                     path: manifestPath,
+                    data: data,
                     context: """
                     The encoded data for the manifest is corrupted.
                     \(context.debugDescription)
@@ -235,6 +281,7 @@ public class ManifestLoader: ManifestLoading {
             @unknown default:
                 throw ManifestLoaderError.manifestLoadingFailed(
                     path: manifestPath,
+                    data: data,
                     context: """
                     Unable to decode the manifest for an unknown reason.
                     \(error.localizedDescription)
@@ -260,8 +307,8 @@ public class ManifestLoader: ManifestLoading {
     private func loadDataForManifest(
         _ manifest: Manifest,
         at path: AbsolutePath
-    ) throws -> Data {
-        let arguments = try buildArguments(
+    ) async throws -> Data {
+        let arguments = try await buildArguments(
             manifest,
             at: path
         ) + ["--tuist-dump"]
@@ -278,8 +325,8 @@ public class ManifestLoader: ManifestLoading {
             let preManifestLogs = String(string[string.startIndex ..< startTokenRange.lowerBound]).chomp()
             let postManifestLogs = String(string[endTokenRange.upperBound ..< string.endIndex]).chomp()
 
-            if !preManifestLogs.isEmpty { logger.info("\(path.pathString): \(preManifestLogs)") }
-            if !postManifestLogs.isEmpty { logger.info("\(path.pathString):\(postManifestLogs)") }
+            if !preManifestLogs.isEmpty { logger.notice("\(path.pathString): \(preManifestLogs)") }
+            if !postManifestLogs.isEmpty { logger.notice("\(path.pathString):\(postManifestLogs)") }
 
             let manifest = string[startTokenRange.upperBound ..< endTokenRange.lowerBound]
             return manifest.data(using: .utf8)!
@@ -294,17 +341,18 @@ public class ManifestLoader: ManifestLoading {
     private func buildArguments(
         _ manifest: Manifest,
         at path: AbsolutePath
-    ) throws -> [String] {
+    ) async throws -> [String] {
         let projectDescriptionPath = try resourceLocator.projectDescription()
         let searchPaths = ProjectDescriptionSearchPaths.paths(for: projectDescriptionPath)
         let frameworkName: String
         switch manifest {
         case .config,
              .plugin,
-             .dependencies,
              .project,
              .template,
-             .workspace:
+             .workspace,
+             .package,
+             .packageSettings:
             frameworkName = "ProjectDescription"
         }
         var arguments = [
@@ -318,18 +366,18 @@ public class ManifestLoader: ManifestLoading {
             "-framework", frameworkName,
         ]
         let projectDescriptionHelpersCacheDirectory = try cacheDirectoryProviderFactory
-            .cacheDirectories(config: nil)
+            .cacheDirectories()
             .cacheDirectory(for: .projectDescriptionHelpers)
 
-        let projectDescriptionHelperArguments: [String] = try {
+        let projectDescriptionHelperArguments: [String] = try await {
             switch manifest {
-            case .config, .plugin:
+            case .config, .plugin, .package:
                 return []
-            case .dependencies,
-                 .project,
+            case .project,
                  .template,
-                 .workspace:
-                return try projectDescriptionHelpersBuilderFactory.projectDescriptionHelpersBuilder(
+                 .workspace,
+                 .packageSettings:
+                return try await projectDescriptionHelpersBuilderFactory.projectDescriptionHelpersBuilder(
                     cacheDirectory: projectDescriptionHelpersCacheDirectory
                 )
                 .build(
@@ -345,7 +393,29 @@ public class ManifestLoader: ManifestLoading {
             }
         }()
 
+        let packageDescriptionArguments: [String] = try {
+            if case .packageSettings = manifest {
+                guard let xcode = try xcodeController.selected() else { return [] }
+                let packageVersion = try swiftPackageManagerController.getToolsVersion(
+                    at: path.parentDirectory
+                )
+                let manifestPath =
+                    "\(xcode.path.pathString)/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/lib/swift/pm/ManifestAPI"
+                return [
+                    "-I", manifestPath,
+                    "-L", manifestPath,
+                    "-F", manifestPath,
+                    "-lPackageDescription",
+                    "-package-description-version", packageVersion.description,
+                    "-D", "TUIST",
+                ]
+            } else {
+                return []
+            }
+        }()
+
         arguments.append(contentsOf: projectDescriptionHelperArguments)
+        arguments.append(contentsOf: packageDescriptionArguments)
         arguments.append(path.pathString)
 
         return arguments
@@ -361,7 +431,7 @@ public class ManifestLoader: ManifestLoading {
 
         if errorMessage.contains(defaultHelpersName) {
             logger.error("Cannot import \(defaultHelpersName) in \(manifest.fileName(path))")
-            logger.info("Project description helpers that depend on plugins are not allowed in \(manifest.fileName(path))")
+            logger.notice("Project description helpers that depend on plugins are not allowed in \(manifest.fileName(path))")
         } else if errorMessage.contains("import") {
             logger.error("Helper plugins are not allowed in \(manifest.fileName(path))")
         }

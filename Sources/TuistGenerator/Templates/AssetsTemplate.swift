@@ -74,7 +74,7 @@ extension SynthesizedResourceInterfaceTemplates {
       {% elif asset.type == "symbol" %}
       {{accessModifier}} static let {{asset.name|swiftIdentifier:"pretty"|lowerFirstWord|escapeReservedKeywords}} = {{imageType}}(name: "{{asset.value}}")
       {% elif asset.items and ( forceNamespaces == "true" or asset.isNamespaced == "true" ) %}
-      {{accessModifier}} enum {{asset.name|swiftIdentifier:"pretty"|escapeReservedKeywords}} {
+      {{accessModifier}} enum {{asset.name|swiftIdentifier:"pretty"|escapeReservedKeywords}}: Sendable {
         {% filter indent:2 %}{% call casesBlock asset.items %}{% endfilter %}
       }
       {% elif asset.items %}
@@ -95,7 +95,7 @@ extension SynthesizedResourceInterfaceTemplates {
       {% endfor %}
     {% endmacro %}
     // swiftlint:disable identifier_name line_length nesting type_body_length type_name
-    {{accessModifier}} enum {{enumName}} {
+    {{accessModifier}} enum {{enumName}}: Sendable {
       {% if catalogs.count > 1 or param.forceFileNameEnum %}
       {% for catalog in catalogs %}
       {{accessModifier}} enum {{catalog.name|swiftIdentifier:"pretty"|escapeReservedKeywords}} {
@@ -111,8 +111,8 @@ extension SynthesizedResourceInterfaceTemplates {
     // MARK: - Implementation Details
 
     {% if resourceCount.arresourcegroup > 0 %}
-    {{accessModifier}} struct {{arResourceGroupType}} {
-      {{accessModifier}} fileprivate(set) var name: String
+    {{accessModifier}} struct {{arResourceGroupType}}: Sendable {
+      {{accessModifier}} let name: String
 
       #if os(iOS)
       @available(iOS 11.3, *)
@@ -131,7 +131,7 @@ extension SynthesizedResourceInterfaceTemplates {
     @available(iOS 11.3, *)
     {{accessModifier}} extension ARReferenceImage {
       static func referenceImages(in asset: {{arResourceGroupType}}) -> Set<ARReferenceImage> {
-        let bundle = {{bundleToken}}.bundle
+        let bundle = Bundle.module
         return referenceImages(inGroupNamed: asset.name, bundle: bundle) ?? Set()
       }
     }
@@ -139,7 +139,7 @@ extension SynthesizedResourceInterfaceTemplates {
     @available(iOS 12.0, *)
     {{accessModifier}} extension ARReferenceObject {
       static func referenceObjects(in asset: {{arResourceGroupType}}) -> Set<ARReferenceObject> {
-        let bundle = {{bundleToken}}.bundle
+        let bundle = Bundle.module
         return referenceObjects(inGroupNamed: asset.name, bundle: bundle) ?? Set()
       }
     }
@@ -147,37 +147,27 @@ extension SynthesizedResourceInterfaceTemplates {
 
     {% endif %}
     {% if resourceCount.color > 0 %}
-    {{accessModifier}} final class {{colorType}} {
-      {{accessModifier}} fileprivate(set) var name: String
+    {{accessModifier}} final class {{colorType}}: Sendable {
+      {{accessModifier}} let name: String
 
       #if os(macOS)
       {{accessModifier}} typealias Color = NSColor
-      #elseif os(iOS) || os(tvOS) || os(watchOS)
+      #elseif os(iOS) || os(tvOS) || os(watchOS) || os(visionOS)
       {{accessModifier}} typealias Color = UIColor
       #endif
 
-      @available(iOS 11.0, tvOS 11.0, watchOS 4.0, macOS 10.13, *)
-      {{accessModifier}} private(set) lazy var color: Color = {
+      @available(iOS 11.0, tvOS 11.0, watchOS 4.0, macOS 10.13, visionOS 1.0, *)
+      {{accessModifier}} var color: Color {
         guard let color = Color(asset: self) else {
           fatalError("Unable to load color asset named \\(name).")
         }
         return color
-      }()
+      }
 
       #if canImport(SwiftUI)
-      private var _swiftUIColor: Any? = nil
-      @available(iOS 13.0, tvOS 13.0, watchOS 6.0, macOS 10.15, *)
-      {{accessModifier}} private(set) var swiftUIColor: SwiftUI.Color {
-        get {
-          if self._swiftUIColor == nil {
-            self._swiftUIColor = SwiftUI.Color(asset: self)
-          }
-
-          return self._swiftUIColor as! SwiftUI.Color
-        }
-        set {
-          self._swiftUIColor = newValue
-        }
+      @available(iOS 13.0, tvOS 13.0, watchOS 6.0, macOS 10.15, visionOS 1.0, *)
+      {{accessModifier}} var swiftUIColor: SwiftUI.Color {
+          return SwiftUI.Color(asset: self)
       }
       #endif
 
@@ -187,10 +177,10 @@ extension SynthesizedResourceInterfaceTemplates {
     }
 
     {{accessModifier}} extension {{colorType}}.Color {
-      @available(iOS 11.0, tvOS 11.0, watchOS 4.0, macOS 10.13, *)
+      @available(iOS 11.0, tvOS 11.0, watchOS 4.0, macOS 10.13, visionOS 1.0, *)
       convenience init?(asset: {{colorType}}) {
-        let bundle = {{bundleToken}}.bundle
-        #if os(iOS) || os(tvOS)
+        let bundle = Bundle.module
+        #if os(iOS) || os(tvOS) || os(visionOS)
         self.init(named: asset.name, in: bundle, compatibleWith: nil)
         #elseif os(macOS)
         self.init(named: NSColor.Name(asset.name), bundle: bundle)
@@ -201,10 +191,10 @@ extension SynthesizedResourceInterfaceTemplates {
     }
 
     #if canImport(SwiftUI)
-    @available(iOS 13.0, tvOS 13.0, watchOS 6.0, macOS 10.15, *)
+    @available(iOS 13.0, tvOS 13.0, watchOS 6.0, macOS 10.15, visionOS 1.0, *)
     {{accessModifier}} extension SwiftUI.Color {
       init(asset: {{colorType}}) {
-        let bundle = {{bundleToken}}.bundle
+        let bundle = Bundle.module
         self.init(asset.name, bundle: bundle)
       }
     }
@@ -212,11 +202,11 @@ extension SynthesizedResourceInterfaceTemplates {
 
     {% endif %}
     {% if resourceCount.data > 0 %}
-    {{accessModifier}} struct {{dataType}} {
-      {{accessModifier}} fileprivate(set) var name: String
+    {{accessModifier}} struct {{dataType}}: Sendable {
+      {{accessModifier}} let name: String
 
-      #if os(iOS) || os(tvOS) || os(macOS)
-      @available(iOS 9.0, macOS 10.11, *)
+      #if os(iOS) || os(tvOS) || os(macOS) || os(visionOS)
+      @available(iOS 9.0, macOS 10.11, visionOS 1.0, *)
       {{accessModifier}} var data: NSDataAsset {
         guard let data = NSDataAsset(asset: self) else {
           fatalError("Unable to load data asset named \\(name).")
@@ -226,12 +216,12 @@ extension SynthesizedResourceInterfaceTemplates {
       #endif
     }
 
-    #if os(iOS) || os(tvOS) || os(macOS)
-    @available(iOS 9.0, macOS 10.11, *)
+    #if os(iOS) || os(tvOS) || os(macOS) || os(visionOS)
+    @available(iOS 9.0, macOS 10.11, visionOS 1.0, *)
     {{accessModifier}} extension NSDataAsset {
       convenience init?(asset: {{dataType}}) {
-        let bundle = {{bundleToken}}.bundle
-        #if os(iOS) || os(tvOS)
+        let bundle = Bundle.module
+        #if os(iOS) || os(tvOS) || os(visionOS)
         self.init(name: asset.name, bundle: bundle)
         #elseif os(macOS)
         self.init(name: NSDataAsset.Name(asset.name), bundle: bundle)
@@ -242,18 +232,18 @@ extension SynthesizedResourceInterfaceTemplates {
 
     {% endif %}
     {% if resourceCount.image > 0 or resourceCount.symbol > 0 %}
-    {{accessModifier}} struct {{imageType}} {
-      {{accessModifier}} fileprivate(set) var name: String
+    {{accessModifier}} struct {{imageType}}: Sendable {
+      {{accessModifier}} let name: String
 
       #if os(macOS)
       {{accessModifier}} typealias Image = NSImage
-      #elseif os(iOS) || os(tvOS) || os(watchOS)
+      #elseif os(iOS) || os(tvOS) || os(watchOS) || os(visionOS)
       {{accessModifier}} typealias Image = UIImage
       #endif
 
       {{accessModifier}} var image: Image {
-        let bundle = {{bundleToken}}.bundle
-        #if os(iOS) || os(tvOS)
+        let bundle = Bundle.module
+        #if os(iOS) || os(tvOS) || os(visionOS)
         let image = Image(named: name, in: bundle, compatibleWith: nil)
         #elseif os(macOS)
         let image = bundle.image(forResource: NSImage.Name(name))
@@ -267,43 +257,28 @@ extension SynthesizedResourceInterfaceTemplates {
       }
 
       #if canImport(SwiftUI)
-      @available(iOS 13.0, tvOS 13.0, watchOS 6.0, macOS 10.15, *)
+      @available(iOS 13.0, tvOS 13.0, watchOS 6.0, macOS 10.15, visionOS 1.0, *)
       {{accessModifier}} var swiftUIImage: SwiftUI.Image {
         SwiftUI.Image(asset: self)
       }
       #endif
     }
 
-    {{accessModifier}} extension {{imageType}}.Image {
-      @available(macOS, deprecated,
-        message: "This initializer is unsafe on macOS, please use the {{imageType}}.image property")
-      convenience init?(asset: {{imageType}}) {
-        #if os(iOS) || os(tvOS)
-        let bundle = {{bundleToken}}.bundle
-        self.init(named: asset.name, in: bundle, compatibleWith: nil)
-        #elseif os(macOS)
-        self.init(named: NSImage.Name(asset.name))
-        #elseif os(watchOS)
-        self.init(named: asset.name)
-        #endif
-      }
-    }
-
     #if canImport(SwiftUI)
-    @available(iOS 13.0, tvOS 13.0, watchOS 6.0, macOS 10.15, *)
+    @available(iOS 13.0, tvOS 13.0, watchOS 6.0, macOS 10.15, visionOS 1.0, *)
     {{accessModifier}} extension SwiftUI.Image {
       init(asset: {{imageType}}) {
-        let bundle = {{bundleToken}}.bundle
+        let bundle = Bundle.module
         self.init(asset.name, bundle: bundle)
       }
 
       init(asset: {{imageType}}, label: Text) {
-        let bundle = {{bundleToken}}.bundle
+        let bundle = Bundle.module
         self.init(asset.name, bundle: bundle, label: label)
       }
 
       init(decorative asset: {{imageType}}) {
-        let bundle = {{bundleToken}}.bundle
+        let bundle = Bundle.module
         self.init(decorative: asset.name, bundle: bundle)
       }
     }

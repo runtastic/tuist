@@ -1,6 +1,5 @@
-import Combine
 import Foundation
-import TSCBasic
+import Path
 import TuistCore
 import TuistSupport
 
@@ -18,7 +17,9 @@ public final class XcodeBuildController: XcodeBuildControlling {
 
     private let formatter: Formatting
     private let environment: Environmenting
-    
+    private let simulatorController: SimulatorController
+    private let system: Systeming
+
     public convenience init() {
         self.init(formatter: Formatter(), environment: Environment.shared)
     }
@@ -29,6 +30,8 @@ public final class XcodeBuildController: XcodeBuildControlling {
     ) {
         self.formatter = formatter
         self.environment = environment
+        self.simulatorController = SimulatorController()
+        self.system = System.shared
     }
 
     public func build(
@@ -39,8 +42,8 @@ public final class XcodeBuildController: XcodeBuildControlling {
         derivedDataPath: AbsolutePath?,
         clean: Bool = false,
         arguments: [XcodeBuildArgument],
-        rawXcodebuildLogs: Bool
-    ) throws -> AsyncThrowingStream<SystemEvent<XcodeBuildOutput>, Error> {
+        passthroughXcodeBuildArguments: [String]
+    ) async throws {
         var command = ["/usr/bin/xcrun", "xcodebuild"]
 
         // Action
@@ -58,6 +61,9 @@ public final class XcodeBuildController: XcodeBuildControlling {
         // Arguments
         command.append(contentsOf: arguments.flatMap(\.arguments))
 
+        // Passthrough arguments
+        command.append(contentsOf: passthroughXcodeBuildArguments)
+
         // Destination
         switch destination {
         case let .device(udid):
@@ -67,17 +73,17 @@ public final class XcodeBuildController: XcodeBuildControlling {
             }
             command.append(contentsOf: ["-destination", value.joined(separator: ",")])
         case .mac:
-            command.append(contentsOf: ["-destination", SimulatorController().macOSDestination()])
+            command.append(contentsOf: ["-destination", simulatorController.macOSDestination()])
         case nil:
             break
         }
-        
+
         // Derived data path
-        if let derivedDataPath = derivedDataPath {
+        if let derivedDataPath {
             command.append(contentsOf: ["-derivedDataPath", derivedDataPath.pathString])
         }
 
-        return try run(command: command, rawXcodebuildLogs: rawXcodebuildLogs)
+        try await run(command: command)
     }
 
     public func test(
@@ -93,8 +99,8 @@ public final class XcodeBuildController: XcodeBuildControlling {
         testTargets: [TestIdentifier],
         skipTestTargets: [TestIdentifier],
         testPlanConfiguration: TestPlanConfiguration?,
-        rawXcodebuildLogs: Bool
-    ) throws -> AsyncThrowingStream<SystemEvent<XcodeBuildOutput>, Error> {
+        passthroughXcodeBuildArguments: [String]
+    ) async throws {
         var command = ["/usr/bin/xcrun", "xcodebuild"]
 
         // Action
@@ -112,6 +118,9 @@ public final class XcodeBuildController: XcodeBuildControlling {
         // Arguments
         command.append(contentsOf: arguments.flatMap(\.arguments))
 
+        // Passthrough arguments
+        command.append(contentsOf: passthroughXcodeBuildArguments)
+        
         // Retry On Failure
         if retryCount > 0 {
             command.append(contentsOf: XcodeBuildArgument.retryCount(retryCount).arguments)
@@ -126,16 +135,16 @@ public final class XcodeBuildController: XcodeBuildControlling {
             }
             command.append(contentsOf: ["-destination", value.joined(separator: ",")])
         case .mac:
-            command.append(contentsOf: ["-destination", SimulatorController().macOSDestination()])
+            command.append(contentsOf: ["-destination", simulatorController.macOSDestination()])
         }
 
         // Derived data path
-        if let derivedDataPath = derivedDataPath {
+        if let derivedDataPath {
             command.append(contentsOf: ["-derivedDataPath", derivedDataPath.pathString])
         }
 
         // Result bundle path
-        if let resultBundlePath = resultBundlePath {
+        if let resultBundlePath {
             command.append(contentsOf: ["-resultBundlePath", resultBundlePath.pathString])
         }
 
@@ -158,7 +167,7 @@ public final class XcodeBuildController: XcodeBuildControlling {
             }
         }
 
-        return try run(command: command, rawXcodebuildLogs: rawXcodebuildLogs)
+        try await run(command: command)
     }
 
     public func archive(
@@ -167,8 +176,8 @@ public final class XcodeBuildController: XcodeBuildControlling {
         clean: Bool,
         archivePath: AbsolutePath,
         arguments: [XcodeBuildArgument],
-        rawXcodebuildLogs: Bool
-    ) throws -> AsyncThrowingStream<SystemEvent<XcodeBuildOutput>, Error> {
+        derivedDataPath: AbsolutePath?
+    ) async throws {
         var command = ["/usr/bin/xcrun", "xcodebuild"]
 
         // Action
@@ -186,42 +195,38 @@ public final class XcodeBuildController: XcodeBuildControlling {
         // Archive path
         command.append(contentsOf: ["-archivePath", archivePath.pathString])
 
+        // Derived data path
+        if let derivedDataPath {
+            command.append(contentsOf: ["-derivedDataPath", derivedDataPath.pathString])
+        }
+
         // Arguments
         command.append(contentsOf: arguments.flatMap(\.arguments))
 
-        return try run(command: command, rawXcodebuildLogs: rawXcodebuildLogs)
+        try await run(command: command)
     }
 
     public func createXCFramework(
-        frameworks: [AbsolutePath],
-        output: AbsolutePath,
-        rawXcodebuildLogs: Bool
-    ) throws -> AsyncThrowingStream<SystemEvent<XcodeBuildOutput>, Error> {
+        arguments: [String],
+        output: AbsolutePath
+    ) async throws {
         var command = ["/usr/bin/xcrun", "xcodebuild", "-create-xcframework"]
-        command.append(contentsOf: frameworks.flatMap {
-            let pathString = $0.pathString
-            return [
-                "-framework",
-                // It's workaround for Xcode 15 RC bug
-                // remove it since bug will be fixed
-                // more details here: https://github.com/tuist/tuist/issues/5354
-                pathString.hasPrefix("/var/") ? pathString.replacingOccurrences(of: "/var/", with: "/private/var/") : pathString
-            ]
-        })
+        command.append(contentsOf: arguments)
         command.append(contentsOf: ["-output", output.pathString])
         command.append("-allow-internal-distribution")
-        return try run(command: command, rawXcodebuildLogs: rawXcodebuildLogs)
+
+        try await run(command: command)
     }
 
     enum ShowBuildSettingsError: Error {
-        // swiftformat:disable trailingCommas
         case timeout
     }
 
     public func showBuildSettings(
         _ target: XcodeBuildTarget,
         scheme: String,
-        configuration: String
+        configuration: String,
+        derivedDataPath: AbsolutePath?
     ) async throws -> [String: XcodeBuildSettings] {
         var command = ["/usr/bin/xcrun", "xcodebuild", "archive", "-showBuildSettings", "-skipUnavailableActions"]
 
@@ -231,85 +236,127 @@ public final class XcodeBuildController: XcodeBuildControlling {
         // Scheme
         command.append(contentsOf: ["-scheme", scheme])
 
+        // Derived data path
+        if let derivedDataPath {
+            command.append(contentsOf: ["-derivedDataPath", derivedDataPath.pathString])
+        }
+
         // Target
         command.append(contentsOf: target.xcodebuildArguments)
-
-        let values = System.shared.publisher(command)
-            .mapToString()
-            .collectAndMergeOutput()
-            // xcodebuild has a bug where xcodebuild -showBuildSettings
-            // can sometimes hang indefinitely on projects that don't
-            // share any schemes, so automatically bail out if it looks
-            // like that's happening.
-            .timeout(.seconds(20), scheduler: DispatchQueue.main, customError: { ShowBuildSettingsError.timeout })
-            .retry(5)
-            .values
+        
+        let buildSettings = try await loadBuildSettings(command)
+        
         var buildSettingsByTargetName = [String: XcodeBuildSettings]()
-        for try await string in values {
-            var currentSettings: [String: String] = [:]
-            var currentTarget: String?
-
-            let flushTarget = { () in
-                if let currentTarget = currentTarget {
-                    let buildSettings = XcodeBuildSettings(
-                        currentSettings,
-                        target: currentTarget,
-                        configuration: configuration
-                    )
-                    buildSettingsByTargetName[buildSettings.target] = buildSettings
-                }
-
-                currentTarget = nil
-                currentSettings = [:]
+        var currentSettings: [String: String] = [:]
+        var currentTarget: String?
+        
+        func flushTarget() {
+            if let currentTarget {
+                let buildSettings = XcodeBuildSettings(
+                    currentSettings,
+                    target: currentTarget,
+                    configuration: configuration
+                )
+                buildSettingsByTargetName[buildSettings.target] = buildSettings
             }
-
-            string.enumerateLines { line, _ in
-                if let result = XcodeBuildController.targetSettingsRegex.firstMatch(
-                    in: line,
-                    range: NSRange(line.startIndex..., in: line)
-                ) {
-                    let targetRange = Range(result.range(at: 1), in: line)!
-
-                    flushTarget()
-                    currentTarget = String(line[targetRange])
-                    return
-                }
-
-                let trimSet = CharacterSet.whitespacesAndNewlines
-                let components = line
-                    .split(maxSplits: 1) { $0 == "=" }
-                    .map { $0.trimmingCharacters(in: trimSet) }
-
-                if components.count == 2 {
-                    currentSettings[components[0]] = components[1]
-                }
-            }
-            flushTarget()
+            
+            currentTarget = nil
+            currentSettings = [:]
         }
+
+        buildSettings.enumerateLines { line, _ in
+            if let result = XcodeBuildController.targetSettingsRegex.firstMatch(
+                in: line,
+                range: NSRange(line.startIndex..., in: line)
+            ) {
+                let targetRange = Range(result.range(at: 1), in: line)!
+                
+                flushTarget()
+                currentTarget = String(line[targetRange])
+                return
+            }
+            
+            let trimSet = CharacterSet.whitespacesAndNewlines
+            let components = line
+                .split(maxSplits: 1) { $0 == "=" }
+                .map { $0.trimmingCharacters(in: trimSet) }
+            
+            if components.count == 2 {
+                currentSettings[components[0]] = components[1]
+            }
+        }
+        
+        flushTarget()
+        
         return buildSettingsByTargetName
     }
 
-    fileprivate func run(command: [String], rawXcodebuildLogs: Bool) throws -> AsyncThrowingStream<SystemEvent<XcodeBuildOutput>, Error> {
-        System.shared.publisher(command)
-            .compactMap { [weak self] event -> SystemEvent<XcodeBuildOutput>? in
-                switch event {
-                case let .standardError(errorData):
-                    guard let line = String(data: errorData, encoding: .utf8) else { return nil }
-                    if rawXcodebuildLogs || self?.environment.isVerbose == true {
-                        return SystemEvent.standardError(XcodeBuildOutput(raw: line))
-                    } else {
-                        return SystemEvent.standardError(XcodeBuildOutput(raw: self?.formatter.format(line) ?? ""))
-                    }
-                case let .standardOutput(outputData):
-                    guard let line = String(data: outputData, encoding: .utf8) else { return nil }
-                    if rawXcodebuildLogs || self?.environment.isVerbose == true {
-                        return SystemEvent.standardOutput(XcodeBuildOutput(raw: line))
-                    } else {
-                        return SystemEvent.standardOutput(XcodeBuildOutput(raw: self?.formatter.format(line) ?? ""))
-                    }
+    fileprivate func run(command: [String]) async throws {
+        func format(_ bytes: [UInt8]) -> String {
+            let string = String(decoding: bytes, as: Unicode.UTF8.self)
+            if self.environment.isVerbose == true {
+                return string
+            } else {
+                return self.format(string)
+            }
+        }
+        
+        func log(_ bytes: [UInt8], isError: Bool = false) {
+            let lines = format(bytes).split(separator: "\n")
+            for line in lines where !line.isEmpty {
+                if isError {
+                    logger.error("\(line)")
+                } else {
+                    logger.notice("\(line)")
                 }
             }
-            .eraseToAnyPublisher()
-            .stream
+        }
+        
+        logger.debug("Running xcodebuild command: \(command.joined(separator: " "))")
+        
+        try system.run(command,
+                       verbose: false,
+                       environment: system.env,
+                       redirection: .stream(stdout: { bytes in
+            log(bytes)
+        }, stderr: { bytes in
+            log(bytes, isError: true)
+        }))
+       
+    }
+    
+    private func loadBuildSettings(_ command: [String]) async throws -> String {
+        // xcodebuild has a bug where xcodebuild -showBuildSettings
+        // can sometimes hang indefinitely on projects that don't
+        // share any schemes, so automatically bail out if it looks
+        // like that's happening.
+        return try await Task.retrying(maxRetryCount: 5) {
+            let systemTask = Task {
+                return try await self.system.runAndCollectOutput(command).standardOutput
+            }
+            
+            let timeoutTask = Task {
+                try await Task.sleep(nanoseconds: 20_000_000)
+                systemTask.cancel()
+            }
+            
+            let result = try await systemTask.value
+            timeoutTask.cancel()
+            return result
+        }.value
+    }
+}
+
+// MARK: - Helpers
+
+fileprivate extension XcodeBuildController {
+    func format(_ multiLineText: String) -> String {
+        multiLineText.split(separator: "\n").map {
+            let line = String($0)
+            let formattedLine = formatter.format(line)
+
+            return formattedLine ?? ""
+        }
+        .joined(separator: "\n")
     }
 }

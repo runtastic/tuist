@@ -1,6 +1,6 @@
-import TSCBasic
-import TuistGraph
+import Path
 import TuistSupport
+import XcodeGraph
 import XCTest
 @testable import TuistCore
 @testable import TuistCoreTesting
@@ -80,7 +80,6 @@ final class FrameworkLoaderTests: TuistUnitTestCase {
                 bcsymbolmapPaths: bcsymbolmapPaths,
                 linking: linking,
                 architectures: architectures,
-                isCarthage: false,
                 status: .required
             )
         }
@@ -98,7 +97,6 @@ final class FrameworkLoaderTests: TuistUnitTestCase {
                 bcsymbolmapPaths: bcsymbolmapPaths,
                 linking: linking,
                 architectures: architectures,
-                isCarthage: false,
                 status: .required
             )
         )

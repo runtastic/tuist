@@ -1,5 +1,6 @@
+import Difference
 import Foundation
-import TSCBasic
+import Path
 import XCTest
 
 @testable import TuistSupport
@@ -90,6 +91,24 @@ public final class MockFileHandler: FileHandler {
         try closure(temporaryDirectory())
     }
 
+    public var stubFiles: ((AbsolutePath, ((URL) -> Bool)?, Set<String>?, Set<String>?) -> Set<AbsolutePath>)?
+    override public func files(
+        in path: AbsolutePath,
+        filter: ((URL) -> Bool)?,
+        nameFilter: Set<String>?,
+        extensionFilter: Set<String>?
+    ) -> Set<AbsolutePath> {
+        guard let stubFiles else {
+            return super.files(
+                in: path,
+                filter: filter,
+                nameFilter: nameFilter,
+                extensionFilter: extensionFilter
+            )
+        }
+        return stubFiles(path, filter, nameFilter, extensionFilter)
+    }
+
     public var stubGlob: ((AbsolutePath, String) -> [AbsolutePath])?
     override public func glob(_ path: AbsolutePath, glob: String) -> [AbsolutePath] {
         guard let stubGlob else {
@@ -118,14 +137,14 @@ open class TuistTestCase: XCTestCase {
         do {
             // Environment
             environment = try MockEnvironment()
-            Environment.shared = environment
+            Environment._shared.mutate { $0 = environment }
         } catch {
             XCTFail("Failed to setup environment")
         }
 
         // FileHandler
         fileHandler = MockFileHandler(temporaryDirectory: { try self.temporaryPath() })
-        FileHandler.shared = fileHandler
+        FileHandler._shared.mutate { $0 = fileHandler }
     }
 
     override open func tearDown() {
@@ -147,10 +166,10 @@ open class TuistTestCase: XCTestCase {
         let fileHandler = FileHandler()
         let paths = try files.map { temporaryPath.appending(try RelativePath(validating: $0)) }
 
-        try paths.forEach {
-            try fileHandler.touch($0)
+        for item in paths {
+            try fileHandler.touch(item)
             if let content {
-                try fileHandler.write(content, path: $0, atomically: true)
+                try fileHandler.write(content, path: item, atomically: true)
             }
         }
         return paths
@@ -161,10 +180,30 @@ open class TuistTestCase: XCTestCase {
         let temporaryPath = try temporaryPath()
         let fileHandler = FileHandler.shared
         let paths = try folders.map { temporaryPath.appending(try RelativePath(validating: $0)) }
-        try paths.forEach {
-            try fileHandler.createFolder($0)
+        for path in paths {
+            try fileHandler.createFolder(path)
         }
         return paths
+    }
+
+    public func XCTAssertBetterEqual<T: Equatable>(
+        _ expected: @autoclosure () throws -> T,
+        _ received: @autoclosure () throws -> T,
+        file: StaticString = #filePath,
+        line: UInt = #line
+    ) {
+        do {
+            let expected = try expected()
+            let received = try received()
+            XCTAssertTrue(
+                expected == received,
+                "Found difference for \n" + diff(expected, received).joined(separator: ", "),
+                file: file,
+                line: line
+            )
+        } catch {
+            XCTFail("Caught error while testing: \(error)", file: file, line: line)
+        }
     }
 
     public func XCTAssertPrinterOutputContains(_ expected: String, file: StaticString = #file, line: UInt = #line) {

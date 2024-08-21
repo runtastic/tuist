@@ -1,4 +1,4 @@
-import TSCBasic
+import Path
 import TSCUtility
 @testable import TuistSupport
 
@@ -26,12 +26,20 @@ public final class MockSwiftPackageManagerController: SwiftPackageManagerControl
         try setToolsVersionStub?(path, version)
     }
 
+    public var invokedGetToolsVersion = false
+    public var getToolsVersionStub: ((AbsolutePath) throws -> Version)?
+    public func getToolsVersion(at path: AbsolutePath) throws -> Version {
+        invokedGetToolsVersion = true
+        return try getToolsVersionStub?(path) ?? Version("5.4.0")
+    }
+
     public var invokedLoadPackageInfo = false
     public var loadPackageInfoStub: ((AbsolutePath) throws -> PackageInfo)?
     public func loadPackageInfo(at path: AbsolutePath) throws -> PackageInfo {
         invokedLoadPackageInfo = true
         return try loadPackageInfoStub?(path)
             ?? .init(
+                name: "Package",
                 products: [],
                 targets: [],
                 platforms: [],

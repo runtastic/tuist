@@ -43,7 +43,7 @@ final class XcodeBuildControllerTests: TuistUnitTestCase {
         system.succeedCommand(command, output: "output")
 
         // When
-        let events = try subject.build(
+        try await subject.build(
             target,
             scheme: scheme,
             destination: nil,
@@ -51,11 +51,8 @@ final class XcodeBuildControllerTests: TuistUnitTestCase {
             derivedDataPath: nil,
             clean: true,
             arguments: [],
-            rawXcodebuildLogs: false
+            passthroughXcodeBuildArguments: []
         )
-
-        let result = try await events.toArray()
-        XCTAssertEqual(result, [.standardOutput(XcodeBuildOutput(raw: "output"))])
     }
 
     func test_build_without_device_id_but_arch() async throws {
@@ -72,7 +69,7 @@ final class XcodeBuildControllerTests: TuistUnitTestCase {
         system.succeedCommand(command, output: "output")
 
         // When
-        let events = try subject.build(
+        try await subject.build(
             target,
             scheme: scheme,
             destination: nil,
@@ -80,11 +77,8 @@ final class XcodeBuildControllerTests: TuistUnitTestCase {
             derivedDataPath: nil,
             clean: true,
             arguments: [],
-            rawXcodebuildLogs: false
+            passthroughXcodeBuildArguments: []
         )
-
-        let result = try await events.toArray()
-        XCTAssertEqual(result, [.standardOutput(XcodeBuildOutput(raw: "output"))])
     }
 
     func test_build_with_device_id() async throws {
@@ -102,7 +96,7 @@ final class XcodeBuildControllerTests: TuistUnitTestCase {
         system.succeedCommand(command, output: "output")
 
         // When
-        let events = try subject.build(
+        try await subject.build(
             target,
             scheme: scheme,
             destination: .device("this_is_a_udid"),
@@ -110,11 +104,8 @@ final class XcodeBuildControllerTests: TuistUnitTestCase {
             derivedDataPath: nil,
             clean: true,
             arguments: [],
-            rawXcodebuildLogs: false
+            passthroughXcodeBuildArguments: []
         )
-
-        let result = try await events.toArray()
-        XCTAssertEqual(result, [.standardOutput(XcodeBuildOutput(raw: "output"))])
     }
 
     func test_build_with_device_id_and_arch() async throws {
@@ -132,7 +123,7 @@ final class XcodeBuildControllerTests: TuistUnitTestCase {
         system.succeedCommand(command, output: "output")
 
         // When
-        let events = try subject.build(
+        try await subject.build(
             target,
             scheme: scheme,
             destination: .device("this_is_a_udid"),
@@ -140,11 +131,8 @@ final class XcodeBuildControllerTests: TuistUnitTestCase {
             derivedDataPath: nil,
             clean: true,
             arguments: [],
-            rawXcodebuildLogs: false
+            passthroughXcodeBuildArguments: []
         )
-
-        let result = try await events.toArray()
-        XCTAssertEqual(result, [.standardOutput(XcodeBuildOutput(raw: "output"))])
     }
 
     func test_test_when_device() async throws {
@@ -169,7 +157,7 @@ final class XcodeBuildControllerTests: TuistUnitTestCase {
         system.succeedCommand(command, output: "output")
 
         // When
-        let events = try subject.test(
+        try await subject.test(
             target,
             scheme: scheme,
             clean: true,
@@ -182,11 +170,8 @@ final class XcodeBuildControllerTests: TuistUnitTestCase {
             testTargets: [],
             skipTestTargets: [],
             testPlanConfiguration: nil,
-            rawXcodebuildLogs: false
+            passthroughXcodeBuildArguments: []
         )
-
-        let result = try await events.toArray()
-        XCTAssertEqual(result, [.standardOutput(XcodeBuildOutput(raw: "output"))])
     }
 
     func test_test_when_device_arch() async throws {
@@ -211,7 +196,7 @@ final class XcodeBuildControllerTests: TuistUnitTestCase {
         system.succeedCommand(command, output: "output")
 
         // When
-        let events = try subject.test(
+        try await subject.test(
             target,
             scheme: scheme,
             clean: true,
@@ -224,11 +209,8 @@ final class XcodeBuildControllerTests: TuistUnitTestCase {
             testTargets: [],
             skipTestTargets: [],
             testPlanConfiguration: nil,
-            rawXcodebuildLogs: false
+            passthroughXcodeBuildArguments: []
         )
-
-        let result = try await events.toArray()
-        XCTAssertEqual(result, [.standardOutput(XcodeBuildOutput(raw: "output"))])
     }
 
     func test_test_when_mac() async throws {
@@ -255,7 +237,7 @@ final class XcodeBuildControllerTests: TuistUnitTestCase {
         developerEnvironment.stubbedArchitecture = .x8664
 
         // When
-        let events = try subject.test(
+        try await subject.test(
             target,
             scheme: scheme,
             clean: true,
@@ -268,11 +250,8 @@ final class XcodeBuildControllerTests: TuistUnitTestCase {
             testTargets: [],
             skipTestTargets: [],
             testPlanConfiguration: nil,
-            rawXcodebuildLogs: false
+            passthroughXcodeBuildArguments: []
         )
-
-        let result = try await events.toArray()
-        XCTAssertEqual(result, [.standardOutput(XcodeBuildOutput(raw: "output"))])
     }
 
     func test_test_with_derived_data() async throws {
@@ -299,7 +278,7 @@ final class XcodeBuildControllerTests: TuistUnitTestCase {
         developerEnvironment.stubbedArchitecture = .x8664
 
         // When
-        let events = try subject.test(
+        try await subject.test(
             target,
             scheme: scheme,
             clean: true,
@@ -312,11 +291,8 @@ final class XcodeBuildControllerTests: TuistUnitTestCase {
             testTargets: [],
             skipTestTargets: [],
             testPlanConfiguration: nil,
-            rawXcodebuildLogs: false
+            passthroughXcodeBuildArguments: []
         )
-
-        let result = try await events.toArray()
-        XCTAssertEqual(result, [.standardOutput(XcodeBuildOutput(raw: "output"))])
     }
 
     func test_test_with_result_bundle_path() async throws {
@@ -343,7 +319,7 @@ final class XcodeBuildControllerTests: TuistUnitTestCase {
         developerEnvironment.stubbedArchitecture = .x8664
 
         // When
-        let events = try subject.test(
+        try await subject.test(
             target,
             scheme: scheme,
             clean: true,
@@ -356,11 +332,8 @@ final class XcodeBuildControllerTests: TuistUnitTestCase {
             testTargets: [],
             skipTestTargets: [],
             testPlanConfiguration: nil,
-            rawXcodebuildLogs: false
+            passthroughXcodeBuildArguments: []
         )
-
-        let result = try await events.toArray()
-        XCTAssertEqual(result, [.standardOutput(XcodeBuildOutput(raw: "output"))])
     }
 }
 

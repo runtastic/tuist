@@ -1,6 +1,8 @@
-import TSCBasic
+import Mockable
+import Path
 
 /// An interface that defines a factory of archiver and unarchivers.
+@Mockable
 public protocol FileArchivingFactorying {
     /// Returns an archiver to archive the given paths.
     /// - Parameter paths: Files to archive.

@@ -1,10 +1,9 @@
 import Foundation
-import TSCBasic
+import Path
 import TuistCore
 import TuistCoreTesting
-import TuistGraph
-import TuistGraphTesting
 import TuistSupport
+import XcodeGraph
 import XcodeProj
 import XCTest
 @testable import TuistGenerator
@@ -48,7 +47,7 @@ final class WorkspaceGeneratorIntegrationTests: TuistTestCase {
         let graphTraverser = GraphTraverser(graph: graph)
 
         // When / Then
-        try (0 ..< 50).forEach { _ in
+        for _ in 0 ..< 50 {
             _ = try subject.generate(graphTraverser: graphTraverser)
         }
     }

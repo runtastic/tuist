@@ -1,4 +1,5 @@
 import AppKit
+import BrazeUI
 import Styles
 import UIKit
 
@@ -32,9 +33,16 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
         window?.makeKeyAndVisible()
 
         let singleFile = StylesResources.bundle.url(forResource: "jsonFile", withExtension: "json")
-        guard let singleFile else {
+        guard singleFile != nil else {
             fatalError("singleFile is missing")
         }
+
+        let brazeUILocalizedString = BrazeUIResources.bundle?.localizedString(
+            forKey: "braze.in-app-message.close-button.title",
+            value: nil,
+            table: "InAppMessageLocalizable"
+        )
+        precondition(brazeUILocalizedString == "Close", "Failed to fetch localized resource from BrazeUI")
 
         AppKit.start()
 

@@ -1,9 +1,9 @@
 import Foundation
+import Path
 import ProjectDescription
-import TSCBasic
 import TuistCore
-import TuistGraph
 import TuistSupport
+import XcodeGraph
 
 // MARK: - TargetDependency Mapper Error
 
@@ -20,17 +20,17 @@ public enum TargetDependencyMapperError: FatalError {
     }
 }
 
-extension TuistGraph.TargetDependency {
-    /// Maps a ProjectDescription.TargetDependency instance into a TuistGraph.TargetDependency instance.
+extension XcodeGraph.TargetDependency {
+    /// Maps a ProjectDescription.TargetDependency instance into a XcodeGraph.TargetDependency instance.
     /// - Parameters:
     ///   - manifest: Manifest representation of the target dependency model.
     ///   - generatorPaths: Generator paths.
     ///   - externalDependencies: External dependencies graph.
-    static func from(
+    static func from( // swiftlint:disable:this function_body_length
         manifest: ProjectDescription.TargetDependency,
         generatorPaths: GeneratorPaths,
-        externalDependencies: [String: [TuistGraph.TargetDependency]]
-    ) throws -> [TuistGraph.TargetDependency] {
+        externalDependencies: [String: [XcodeGraph.TargetDependency]]
+    ) throws -> [XcodeGraph.TargetDependency] {
         switch manifest {
         case let .target(name, condition):
             return [.target(name: name, condition: condition?.asGraphCondition)]
@@ -66,9 +66,6 @@ extension TuistGraph.TargetDependency {
             case .plugin:
                 return [.package(product: product, type: .plugin, condition: condition?.asGraphCondition)]
             }
-        case let .packagePlugin(product, condition):
-            logger.warning(".packagePlugin is deprecated. Use .package(product:, type: .plugin) instead.")
-            return [.package(product: product, type: .plugin, condition: condition?.asGraphCondition)]
         case let .sdk(name, type, status, condition):
             return [
                 .sdk(
@@ -98,19 +95,19 @@ extension TuistGraph.TargetDependency {
 }
 
 extension ProjectDescription.PlatformFilters {
-    var asGraphFilters: TuistGraph.PlatformFilters {
-        Set<TuistGraph.PlatformFilter>(map(\.graphPlatformFilter))
+    var asGraphFilters: XcodeGraph.PlatformFilters {
+        Set<XcodeGraph.PlatformFilter>(map(\.graphPlatformFilter))
     }
 }
 
 extension ProjectDescription.PlatformCondition {
-    var asGraphCondition: TuistGraph.PlatformCondition? {
+    var asGraphCondition: XcodeGraph.PlatformCondition? {
         .when(Set(platformFilters.asGraphFilters))
     }
 }
 
 extension ProjectDescription.PlatformFilter {
-    fileprivate var graphPlatformFilter: TuistGraph.PlatformFilter {
+    fileprivate var graphPlatformFilter: XcodeGraph.PlatformFilter {
         switch self {
         case .ios:
             .ios
@@ -136,6 +133,8 @@ extension ProjectDescription.SDKType {
         switch self {
         case .library:
             return "lib"
+        case .swiftLibrary:
+            return "libswift"
         case .framework:
             return ""
         }
@@ -144,7 +143,7 @@ extension ProjectDescription.SDKType {
     /// The extension associated to the type
     fileprivate var fileExtension: String {
         switch self {
-        case .library:
+        case .library, .swiftLibrary:
             return "tbd"
         case .framework:
             return "framework"
