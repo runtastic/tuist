@@ -72,7 +72,8 @@ final class ScaffoldServiceTests: TuistUnitTestCase {
         // When
         let options = try await subject.loadTemplateOptions(
             templateName: "template",
-            path: nil
+            path: nil,
+            url: nil
         )
 
         // Then
@@ -107,7 +108,8 @@ final class ScaffoldServiceTests: TuistUnitTestCase {
         // When
         let options = try await subject.loadTemplateOptions(
             templateName: "PluginTemplate",
-            path: nil
+            path: nil,
+            url: nil
         )
 
         // Then
@@ -269,6 +271,7 @@ extension ScaffoldService {
     ) async throws {
         try await run(
             path: path,
+            templateUrl: nil,
             templateName: templateName,
             requiredTemplateOptions: requiredTemplateOptions,
             optionalTemplateOptions: optionalTemplateOptions

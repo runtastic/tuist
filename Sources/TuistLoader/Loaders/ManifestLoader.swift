@@ -167,12 +167,12 @@ public class ManifestLoader: ManifestLoading {
         return !manifests.isDisjoint(with: rootManifests)
     }
 
-    public func loadProject(at path: AbsolutePath) throws -> ProjectDescription.Project {
-        try loadManifest(.project, at: path)
+    public func loadConfig(at path: AbsolutePath) async throws -> ProjectDescription.Config {
+        try await loadManifest(.config, at: path)
     }
 
-    public func loadProject(at path: AbsolutePath) async throws -> ProjectDescription.Project {
-        try await loadManifest(.project, at: path)
+    public func loadProject(at path: AbsolutePath, rootPath: AbsolutePath? = nil) async throws -> ProjectDescription.Project {
+        try await loadManifest(.project, at: path, rootPath: rootPath)
     }
 
     public func loadWorkspace(at path: AbsolutePath) async throws -> ProjectDescription.Workspace {
@@ -219,14 +219,18 @@ public class ManifestLoader: ManifestLoading {
     // swiftlint:disable:next function_body_length
     private func loadManifest<T: Decodable>(
         _ manifest: Manifest,
-        at path: AbsolutePath
-    ) throws -> T {
+        at path: AbsolutePath,
+        rootPath: AbsolutePath? = nil
+    ) async throws -> T {
         let manifestPath = try manifestPath(
             manifest,
             at: path
         )
 
-        let data = try loadDataForManifest(manifest, at: manifestPath)
+        // build root manifest file path
+        let rootManifestPath = try rootManifestPath(manifest, at: rootPath)
+
+        let data = try await loadDataForManifest(manifest, at: manifestPath, rootPath: rootManifestPath)
 
         do {
             return try decoder.decode(T.self, from: data)
@@ -314,9 +318,10 @@ public class ManifestLoader: ManifestLoading {
 
     private func loadDataForManifest(
         _ manifest: Manifest,
-        at path: AbsolutePath
-    ) throws -> Data {
-        let arguments = try buildArguments(
+        at path: AbsolutePath,
+        rootPath: AbsolutePath? = nil
+    ) async throws -> Data {
+        let arguments = try await buildArguments(
             manifest,
             at: path
         ) + ["--tuist-dump"]

@@ -323,8 +323,8 @@ class ManifestModelConverterTests: TuistUnitTestCase {
     ) -> ManifestLoading {
         let manifestLoader = MockManifestLoading()
         given(manifestLoader)
-            .loadProject(at: .any)
-            .willProduce { path in
+            .loadProject(at: .any, rootPath: .any)
+            .willProduce { path, rootPath in
                 guard let manifest = projects[path] else {
                     throw ManifestLoaderError.manifestNotFound(path)
                 }

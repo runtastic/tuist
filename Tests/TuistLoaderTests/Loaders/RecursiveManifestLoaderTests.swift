@@ -395,8 +395,8 @@ final class RecursiveManifestLoaderTests: TuistUnitTestCase {
     private func createManifestLoader() -> MockManifestLoading {
         let manifestLoader = MockManifestLoading()
         given(manifestLoader)
-            .loadProject(at: .any)
-            .willProduce { [unowned self] path in
+            .loadProject(at: .any, rootPath: .any)
+            .willProduce { [unowned self] path, rootPath in
                 guard let manifest = projectManifests[path] else {
                     throw ManifestLoaderError.manifestNotFound(.project, path)
                 }

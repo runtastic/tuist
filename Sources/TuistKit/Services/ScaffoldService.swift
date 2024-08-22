@@ -68,7 +68,7 @@ final class ScaffoldService {
         var attributes: [Template.Attribute] = []
 
         if let templateUrl = url, templateUrl.isGitURL {
-            try await templateGitLoader.loadTemplate(from: templateUrl, templateName: templateName, plugins: plugins) { template in
+            try await templateGitLoader.loadTemplate(from: templateUrl, templateName: templateName) { template in
                 attributes = template.attributes
             }
         } else {
@@ -80,7 +80,7 @@ final class ScaffoldService {
             let template = try await templateLoader.loadTemplate(at: templateDirectory, plugins: plugins)
             attributes = template.attributes
         }
-        return template.attributes.reduce(into: (required: [], optional: [])) { currentValue, attribute in
+        return attributes.reduce(into: (required: [], optional: [])) { currentValue, attribute in
             switch attribute {
             case let .optional(name, default: _):
                 currentValue.optional.append(name)
@@ -102,13 +102,13 @@ final class ScaffoldService {
 
         if let templateUrl = templateUrl, templateUrl.isGitURL {
             try await templateGitLoader.loadTemplate(from: templateUrl, templateName: templateName, closure: { template in
-                let parsedAttributes = try parseAttributes(
+                let parsedAttributes = try self.parseAttributes(
                     requiredTemplateOptions: requiredTemplateOptions,
                     optionalTemplateOptions: optionalTemplateOptions,
                     template: template
                 )
 
-                try await templateGenerator.generate(
+                try await self.templateGenerator.generate(
                     template: template,
                     to: path,
                     attributes: parsedAttributes
