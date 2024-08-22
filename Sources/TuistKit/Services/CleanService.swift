@@ -1,76 +1,145 @@
+import FileSystem
 import Foundation
-import TSCBasic
+import Path
 import TuistCore
-import TuistGraph
 import TuistLoader
+import TuistServer
 import TuistSupport
+import XcodeGraph
+
+enum TuistCleanCategory: ExpressibleByArgument, CaseIterable, Equatable {
+    static let allCases = CacheCategory.allCases
+        .map { .global($0) } + [Self.dependencies]
+
+    static var allValueStrings: [String] {
+        TuistCleanCategory.allCases.map(\.defaultValueDescription)
+    }
+
+    /// The local global cache
+    case global(CacheCategory)
+
+    /// The local dependencies cache
+    case dependencies
+
+    var defaultValueDescription: String {
+        switch self {
+        case let .global(cacheCategory):
+            return cacheCategory.rawValue
+        case .dependencies:
+            return "dependencies"
+        }
+    }
+
+    init?(argument: String) {
+        if let cacheCategory = CacheCategory(rawValue: argument) {
+            self = .global(cacheCategory)
+        } else if argument == "dependencies" {
+            self = .dependencies
+        } else {
+            return nil
+        }
+    }
+
+    func directory(
+        packageDirectory: AbsolutePath?
+    ) throws -> Path.AbsolutePath? {
+        switch self {
+        case let .global(category):
+            return try CacheDirectoriesProvider().cacheDirectory(for: category)
+        case .dependencies:
+            return packageDirectory?.appending(
+                component: Constants.SwiftPackageManager.packageBuildDirectoryName
+            )
+        }
+    }
+}
 
 final class CleanService {
-    private let cacheDirectoryProviderFactory: CacheDirectoriesProviderFactoring
+    private let fileHandler: FileHandling
+    private let rootDirectoryLocator: RootDirectoryLocating
+    private let cacheDirectoriesProvider: CacheDirectoriesProviding
+    private let manifestFilesLocator: ManifestFilesLocating
+    private let configLoader: ConfigLoading
+    private let serverURLService: ServerURLServicing
+    private let cleanCacheService: CleanCacheServicing
+    private let fileSystem: FileSystem
+
     init(
-        cacheDirectoryProviderFactory: CacheDirectoriesProviderFactoring = CacheDirectoriesProviderFactory()
+        fileHandler: FileHandling,
+        rootDirectoryLocator: RootDirectoryLocating,
+        cacheDirectoriesProvider: CacheDirectoriesProviding,
+        manifestFilesLocator: ManifestFilesLocating,
+        configLoader: ConfigLoading,
+        serverURLService: ServerURLServicing,
+        cleanCacheService: CleanCacheServicing,
+        fileSystem: FileSystem
     ) {
-        self.cacheDirectoryProviderFactory = cacheDirectoryProviderFactory
+        self.fileHandler = fileHandler
+        self.rootDirectoryLocator = rootDirectoryLocator
+        self.cacheDirectoriesProvider = cacheDirectoriesProvider
+        self.manifestFilesLocator = manifestFilesLocator
+        self.configLoader = configLoader
+        self.serverURLService = serverURLService
+        self.cleanCacheService = cleanCacheService
+        self.fileSystem = fileSystem
+    }
+
+    public convenience init() {
+        self.init(
+            fileHandler: FileHandler.shared,
+            rootDirectoryLocator: RootDirectoryLocator(),
+            cacheDirectoriesProvider: CacheDirectoriesProvider(),
+            manifestFilesLocator: ManifestFilesLocator(),
+            configLoader: ConfigLoader(),
+            serverURLService: ServerURLService(),
+            cleanCacheService: CleanCacheService(),
+            fileSystem: FileSystem()
+        )
     }
 
     func run(
-        categories: [CleanCategory],
+        categories: [TuistCleanCategory],
+        remote: Bool,
         path: String?
-    ) throws {
-        let path: AbsolutePath = try self.path(path)
-        let manifestLoaderFactory = ManifestLoaderFactory()
-        let manifestLoader = manifestLoaderFactory.createManifestLoader()
-        let configLoader = ConfigLoader(manifestLoader: manifestLoader)
-        let config = try configLoader.loadConfig(path: path)
-        let cacheDirectoryProvider = try cacheDirectoryProviderFactory.cacheDirectories(config: config)
+    ) async throws {
+        let resolvedPath = if let path {
+            try AbsolutePath(validating: path, relativeTo: FileHandler.shared.currentPath)
+        } else {
+            FileHandler.shared.currentPath
+        }
+
+        let packageDirectory = manifestFilesLocator.locatePackageManifest(at: resolvedPath)?.parentDirectory
 
         for category in categories {
+            let directory: AbsolutePath?
             switch category {
-            case let .global(cacheCategory):
-                try cleanCacheCategory(
-                    cacheCategory,
-                    cacheDirectoryProvider: cacheDirectoryProvider
-                )
+            case let .global(category):
+                directory = try cacheDirectoriesProvider.cacheDirectory(for: category)
             case .dependencies:
-                try cleanDependencies(at: path)
+                directory = packageDirectory?.appending(
+                    component: Constants.SwiftPackageManager.packageBuildDirectoryName
+                )
+            }
+            if let directory,
+               fileHandler.exists(directory)
+            {
+                try await fileSystem.remove(directory)
+                logger.notice("Successfully cleaned artifacts at path \(directory.pathString)", metadata: .success)
+            } else {
+                logger.notice("There's nothing to clean for \(category.defaultValueDescription)")
             }
         }
-    }
 
-    // MARK: - Helpers
+        if remote {
+            let config = try await configLoader.loadConfig(path: resolvedPath)
+            guard let fullHandle = config.fullHandle else { return }
+            let serverURL = try serverURLService.url(configServerURL: config.url)
+            try await cleanCacheService.cleanCache(
+                serverURL: serverURL,
+                fullHandle: fullHandle
+            )
 
-    private func path(_ path: String?) throws -> AbsolutePath {
-        if let path {
-            return try AbsolutePath(validating: path, relativeTo: FileHandler.shared.currentPath)
-        } else {
-            return FileHandler.shared.currentPath
+            logger.notice("Successfully cleaned the remote storage.")
         }
-    }
-
-    private func cleanCacheCategory(
-        _ cacheCategory: CacheCategory,
-        cacheDirectoryProvider: CacheDirectoriesProviding
-    ) throws {
-        let directory = cacheDirectoryProvider.cacheDirectory(for: cacheCategory)
-        if FileHandler.shared.exists(directory) {
-            try FileHandler.shared.delete(directory)
-            logger.info("Successfully cleaned artifacts at path \(directory.pathString)", metadata: .success)
-        }
-    }
-
-    private func cleanDependencies(at path: AbsolutePath) throws {
-        let dependenciesPath = path.appending(components: [Constants.tuistDirectoryName, Constants.DependenciesDirectory.name])
-        if FileHandler.shared.exists(dependenciesPath) {
-            let carthagePath = dependenciesPath.appending(component: Constants.DependenciesDirectory.carthageDirectoryName)
-            if FileHandler.shared.exists(carthagePath) {
-                try FileHandler.shared.delete(carthagePath)
-            }
-
-            let spmPath = dependenciesPath.appending(component: Constants.DependenciesDirectory.swiftPackageManagerDirectoryName)
-            if FileHandler.shared.exists(spmPath) {
-                try FileHandler.shared.delete(spmPath)
-            }
-        }
-        logger.info("Successfully cleaned dependencies at path \(dependenciesPath.pathString)", metadata: .success)
     }
 }

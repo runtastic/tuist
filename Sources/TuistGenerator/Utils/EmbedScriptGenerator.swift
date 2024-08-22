@@ -1,5 +1,5 @@
 import Foundation
-import TSCBasic
+import Path
 import TuistCore
 
 /// This protocols defines the interface of an utility that given a list of embeddable frameworks
@@ -79,7 +79,7 @@ final class EmbedScriptGenerator: EmbedScriptGenerating {
 
         for frameworkReference in frameworkReferences {
             guard case let GraphDependencyReference
-                .framework(path, _, _, dsymPath, bcsymbolmapPaths, _, _, _, _, _) = frameworkReference
+                .framework(path, _, dsymPath, bcsymbolmapPaths, _, _, _, _, _) = frameworkReference
             else {
                 preconditionFailure("references need to be of type framework")
                 break

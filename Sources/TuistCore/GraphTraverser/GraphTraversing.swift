@@ -1,7 +1,9 @@
 import Foundation
-import TSCBasic
-import TuistGraph
+import Mockable
+import Path
+import XcodeGraph
 
+@Mockable
 public protocol GraphTraversing {
     /// Graph name
     var name: String { get }
@@ -22,7 +24,7 @@ public protocol GraphTraversing {
     var projects: [AbsolutePath: Project] { get }
 
     /// Returns all the targets of the graph.
-    var targets: [AbsolutePath: [String: Target]] { get }
+    func targets() -> [AbsolutePath: [String: Target]]
 
     /// Dependencies.
     var dependencies: [GraphDependency: Set<GraphDependency>] { get }
@@ -73,6 +75,9 @@ public protocol GraphTraversing {
 
     /// - Returns: All direct and transitive target dependencies
     func allTargetDependencies(path: AbsolutePath, name: String) -> Set<GraphTarget>
+
+    /// - Returns: All direct and transitive target dependencies, traversing from the passed targets
+    func allTargetDependencies(traversingFromTargets: [GraphTarget]) -> Set<GraphTarget>
 
     /// Given a project directory and target name, it returns **all**l its direct target dependencies present in the same project.
     /// If you want only direct target dependencies present in the same project as the target, use `directLocalTargetDependencies`
@@ -187,6 +192,14 @@ public protocol GraphTraversing {
     /// the groups.
     /// - Parameter path: Path to the directory where the project is defined.
     func allProjectDependencies(path: AbsolutePath) throws -> Set<GraphDependencyReference>
+
+    /// Determines whether ENABLE_TESTING_SEARCH_PATHS needs to be enabled
+    ///
+    /// - Parameters:
+    ///   - path: Path to the project tha defines the target.
+    ///   - name: Target name.
+    /// - Returns: True if the given target needs to have ENABLE_TESTING_SEARCH_PATHS enabled, false otherwise
+    func needsEnableTestingSearchPaths(path: AbsolutePath, name: String) -> Bool
 
     /// Returns true if the given target depends on XCTest.
     /// - Parameters:

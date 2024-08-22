@@ -1,13 +1,15 @@
+import FileSystem
 import Foundation
-import TSCBasic
+import Mockable
+import Path
 
-/// An interface to unarchive files from a zip file.
+@Mockable
 public protocol FileUnarchiving {
     /// Unarchives the files into a temporary directory and returns the path to that directory.
     func unzip() throws -> AbsolutePath
 
     /// Call this method to delete the temporary directory where the .zip file has been generated.
-    func delete() throws
+    func delete() async throws
 }
 
 public class FileUnarchiver: FileUnarchiving {
@@ -17,10 +19,13 @@ public class FileUnarchiver: FileUnarchiving {
     /// Temporary directory in which the .zip file will be generated.
     private var temporaryDirectory: AbsolutePath
 
+    private let fileSystem: FileSystem
+
     /// Initializes the unarchiver with the path to the file to unarchive.
     /// - Parameter path: Path to the .zip file to unarchive.
-    public init(path: AbsolutePath) throws {
+    public init(path: AbsolutePath, fileSystem: FileSystem = FileSystem()) throws {
         self.path = path
+        self.fileSystem = fileSystem
         temporaryDirectory = try TemporaryDirectory(removeTreeOnDeinit: false).path
     }
 
@@ -29,7 +34,7 @@ public class FileUnarchiver: FileUnarchiving {
         return temporaryDirectory
     }
 
-    public func delete() throws {
-        try FileHandler.shared.delete(temporaryDirectory)
+    public func delete() async throws {
+        try await fileSystem.remove(temporaryDirectory)
     }
 }

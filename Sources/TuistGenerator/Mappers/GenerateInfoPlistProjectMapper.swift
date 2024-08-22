@@ -1,8 +1,8 @@
 import Foundation
-import TSCBasic
+import Path
 import TuistCore
-import TuistGraph
 import TuistSupport
+import XcodeGraph
 import XcodeProj
 
 /// A project mapper that generates derived Info.plist files for targets that define it as a dictonary.
@@ -35,14 +35,18 @@ public final class GenerateInfoPlistProjectMapper: ProjectMapping {
     // MARK: - ProjectMapping
 
     public func map(project: Project) throws -> (Project, [SideEffectDescriptor]) {
-        let results = try project.targets
-            .reduce(into: (targets: [Target](), sideEffects: [SideEffectDescriptor]())) { results, target in
+        logger.debug("Transforming project \(project.name): Synthesizing Info.plist")
+
+        let results = try project.targets.values
+            .reduce(into: (targets: [String: Target](), sideEffects: [SideEffectDescriptor]())) { results, target in
                 let (updatedTarget, sideEffects) = try map(target: target, project: project)
-                results.targets.append(updatedTarget)
+                results.targets[updatedTarget.name] = updatedTarget
                 results.sideEffects.append(contentsOf: sideEffects)
             }
+        var project = project
+        project.targets = results.targets
 
-        return (project.with(targets: results.targets), results.sideEffects)
+        return (project, results.sideEffects)
     }
 
     // MARK: - Private
@@ -68,8 +72,7 @@ public final class GenerateInfoPlistProjectMapper: ProjectMapping {
             options: 0
         )
 
-        let infoPlistPath = project.path
-            .appending(component: derivedDirectoryName)
+        let infoPlistPath = project.derivedDirectoryPath(for: target)
             .appending(component: infoPlistsDirectoryName)
             .appending(component: "\(target.name)-Info.plist")
         let sideEffect = SideEffectDescriptor.file(FileDescriptor(path: infoPlistPath, contents: data))

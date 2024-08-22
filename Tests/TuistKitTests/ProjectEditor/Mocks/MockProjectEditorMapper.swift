@@ -1,9 +1,8 @@
 import Foundation
-import TSCBasic
+import Path
 import TuistCore
-import TuistGraph
-import TuistGraphTesting
 import TuistLoader
+import XcodeGraph
 
 @testable import TuistCoreTesting
 @testable import TuistKit
@@ -16,7 +15,6 @@ final class MockProjectEditorMapper: ProjectEditorMapping {
         sourceRootPath: AbsolutePath,
         destinationDirectory: AbsolutePath,
         configPath: AbsolutePath?,
-        dependenciesPath: AbsolutePath?,
         packageManifestPath: AbsolutePath?,
         projectManifests: [AbsolutePath],
         editablePluginManifests: [EditablePluginManifest],
@@ -35,7 +33,6 @@ final class MockProjectEditorMapper: ProjectEditorMapping {
         sourceRootPath: AbsolutePath,
         destinationDirectory: AbsolutePath,
         configPath: AbsolutePath?,
-        dependenciesPath: AbsolutePath?,
         packageManifestPath: AbsolutePath?,
         projectManifests: [AbsolutePath],
         editablePluginManifests: [EditablePluginManifest],
@@ -53,7 +50,6 @@ final class MockProjectEditorMapper: ProjectEditorMapping {
             sourceRootPath: sourceRootPath,
             destinationDirectory: destinationDirectory,
             configPath: configPath,
-            dependenciesPath: dependenciesPath,
             packageManifestPath: packageManifestPath,
             projectManifests: projectManifests,
             editablePluginManifests: editablePluginManifests,

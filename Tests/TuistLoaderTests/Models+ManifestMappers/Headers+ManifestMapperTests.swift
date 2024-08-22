@@ -1,9 +1,9 @@
 import Foundation
+import Path
 import ProjectDescription
-import TSCBasic
 import TuistCore
-import TuistGraph
 import TuistSupport
+import XcodeGraph
 import XCTest
 
 @testable import TuistLoader
@@ -38,7 +38,7 @@ final class HeadersManifestMapperTests: TuistUnitTestCase {
         )
 
         // When
-        let model = try TuistGraph.Headers.from(
+        let model = try XcodeGraph.Headers.from(
             manifest: manifest,
             generatorPaths: generatorPaths,
             productName: "ModuleA"
@@ -89,7 +89,7 @@ final class HeadersManifestMapperTests: TuistUnitTestCase {
         )
 
         // When
-        let model = try TuistGraph.Headers.from(
+        let model = try XcodeGraph.Headers.from(
             manifest: manifest,
             generatorPaths: generatorPaths,
             productName: "ModuleA"
@@ -132,7 +132,7 @@ final class HeadersManifestMapperTests: TuistUnitTestCase {
         )
 
         // When
-        let model = try TuistGraph.Headers.from(
+        let model = try XcodeGraph.Headers.from(
             manifest: manifest,
             generatorPaths: generatorPaths,
             productName: "ModuleA"
@@ -177,7 +177,7 @@ final class HeadersManifestMapperTests: TuistUnitTestCase {
         )
 
         // When
-        let model = try TuistGraph.Headers.from(
+        let model = try XcodeGraph.Headers.from(
             manifest: manifest,
             generatorPaths: generatorPaths,
             productName: "ModuleA"
@@ -221,7 +221,7 @@ final class HeadersManifestMapperTests: TuistUnitTestCase {
         )
 
         // When
-        let model = try TuistGraph.Headers.from(
+        let model = try XcodeGraph.Headers.from(
             manifest: manifest,
             generatorPaths: generatorPaths,
             productName: "ModuleA"
@@ -264,7 +264,7 @@ final class HeadersManifestMapperTests: TuistUnitTestCase {
         )
 
         // When
-        let model = try TuistGraph.Headers.from(
+        let model = try XcodeGraph.Headers.from(
             manifest: manifest,
             generatorPaths: generatorPaths,
             productName: "ModuleA"
@@ -320,7 +320,7 @@ final class HeadersManifestMapperTests: TuistUnitTestCase {
         )
 
         // When
-        let model = try TuistGraph.Headers.from(
+        let model = try XcodeGraph.Headers.from(
             manifest: manifest,
             generatorPaths: generatorPaths,
             productName: "ModuleA"
@@ -373,7 +373,7 @@ final class HeadersManifestMapperTests: TuistUnitTestCase {
         )
 
         // When
-        let model = try TuistGraph.Headers.from(
+        let model = try XcodeGraph.Headers.from(
             manifest: manifest,
             generatorPaths: generatorPaths,
             productName: "ModuleA"
@@ -413,7 +413,7 @@ final class HeadersManifestMapperTests: TuistUnitTestCase {
         // In this header, you should import all the public headers of your framework using statements like #import <TuistTestModule/PublicHeader.h>
 
         #import <TuistTestModule/A1.h>
-        #import <TuistTestModule/A2.h>
+          #import <TuistTestModule/A2.h> // to test spaces prefix
         #import "A3.h" // to test modules with legacy format
         #import <TuistTestModule/A2+Protected.h> // to test modules, where some protected files became public
         #import <UIKit/A4+Private.h> // to test incorrect module
@@ -436,7 +436,7 @@ final class HeadersManifestMapperTests: TuistUnitTestCase {
         )
 
         // When
-        let model = try TuistGraph.Headers.from(
+        let model = try XcodeGraph.Headers.from(
             manifest: manifest,
             generatorPaths: generatorPaths,
             productName: "TuistTestModule"
@@ -476,7 +476,7 @@ final class HeadersManifestMapperTests: TuistUnitTestCase {
         // In this header, you should import all the public headers of your framework using statements like #import <TuistTestModule/PublicHeader.h>
 
         #import <TuistTestModule/A1.h>
-        #import <TuistTestModule/A2.h>
+          #import <TuistTestModule/A2.h> // to test spaces prefix
         #import "A3.h" // to test modules with legacy format
         """
         let umbrellaPath = temporaryPath.appending(try RelativePath(validating: "Sources/Umbrella.h"))
@@ -503,7 +503,7 @@ final class HeadersManifestMapperTests: TuistUnitTestCase {
         )
 
         // When
-        let model = try TuistGraph.Headers.from(
+        let model = try XcodeGraph.Headers.from(
             manifest: manifest,
             generatorPaths: generatorPaths,
             productName: "TuistTestModule"
@@ -543,7 +543,7 @@ final class HeadersManifestMapperTests: TuistUnitTestCase {
         // In this header, you should import all the public headers of your framework using statements like #import <TuistTestModule/PublicHeader.h>
 
         #import <TuistTestModule/A1.h>
-        #import <TuistTestModule/A2.h>
+          #import <TuistTestModule/A2.h> // to test spaces prefix
         #import "A3.h" // to test modules with legacy format
         """
         let umbrellaPath = temporaryPath.appending(try RelativePath(validating: "Sources/Umbrella.h"))
@@ -570,7 +570,7 @@ final class HeadersManifestMapperTests: TuistUnitTestCase {
         )
 
         // When
-        let model = try TuistGraph.Headers.from(
+        let model = try XcodeGraph.Headers.from(
             manifest: manifest,
             generatorPaths: generatorPaths,
             productName: "TuistTestModule"

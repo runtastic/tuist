@@ -1,10 +1,10 @@
-import Darwin.C
+import Darwin
 import Foundation
-import TSCBasic
+import Path
 
 /// Protocol that defines the interface of a local environment controller.
 /// It manages the local directory where tuistenv stores the tuist versions and user settings.
-public protocol Environmenting: AnyObject {
+public protocol Environmenting: AnyObject, Sendable {
     /// Returns the versions directory.
     var versionsDirectory: AbsolutePath { get }
 
@@ -21,14 +21,14 @@ public protocol Environmenting: AnyObject {
     /// Returns all the environment variables that are specific to Tuist (prefixed with TUIST_)
     var tuistVariables: [String: String] { get }
 
-    /// Returns all the environment variables that are specific to Tuist configuration (prefixed with TUIST_CONFIG_)
-    var tuistConfigVariables: [String: String] { get }
-
     /// Returns all the environment variables that can be included during the manifest loading process
     var manifestLoadingVariables: [String: String] { get }
 
     /// Returns true if Tuist is running with verbose mode enabled.
     var isVerbose: Bool { get }
+
+    /// Returns the path to the cache directory. Configurable via the `XDG_CACHE_HOME` environment variable
+    var cacheDirectory: AbsolutePath? { get }
 
     /// Returns the path to the directory where the async queue events are persisted.
     var queueDirectory: AbsolutePath { get }
@@ -44,8 +44,13 @@ public protocol Environmenting: AnyObject {
 }
 
 /// Local environment controller.
-public class Environment: Environmenting {
-    public static var shared: Environmenting = Environment()
+public final class Environment: Environmenting {
+    public static var shared: Environmenting {
+        _shared.value
+    }
+
+    // swiftlint:disable:next identifier_name
+    static let _shared: ThreadSafe<Environmenting> = ThreadSafe(Environment())
 
     /// Returns the default local directory.
     static let defaultDirectory = try! AbsolutePath( // swiftlint:disable:this force_try
@@ -82,19 +87,30 @@ public class Environment: Environmenting {
 
     /// Sets up the local environment.
     public func bootstrap() throws {
-        for item in [directory, versionsDirectory] {
-            if !fileHandler.exists(item) {
-                try fileHandler.createFolder(item)
-            }
+        for item in [directory, versionsDirectory] where !fileHandler.exists(item) {
+            try fileHandler.createFolder(item)
         }
     }
 
     /// Returns true if the output of Tuist should be coloured.
     public var shouldOutputBeColoured: Bool {
-        if let coloredOutput = ProcessInfo.processInfo.environment[Constants.EnvironmentVariables.colouredOutput] {
-            return Constants.trueValues.contains(coloredOutput)
+        let noColor = if let noColorEnvVariable = ProcessInfo.processInfo.environment["NO_COLOR"] {
+            Constants.trueValues.contains(noColorEnvVariable)
         } else {
-            return isStandardOutputInteractive
+            false
+        }
+        let ciColorForce = if let ciColorForceEnvVariable = ProcessInfo.processInfo.environment["CLICOLOR_FORCE"] {
+            Constants.trueValues.contains(ciColorForceEnvVariable)
+        } else {
+            false
+        }
+        if noColor {
+            return false
+        } else if ciColorForce {
+            return true
+        } else {
+            let isPiped = isatty(fileno(stdout)) == 0
+            return !isPiped
         }
     }
 
@@ -136,6 +152,14 @@ public class Environment: Environmenting {
         }
     }
 
+    public var cacheDirectory: AbsolutePath? {
+        if let cacheDirectoryPathString = ProcessInfo.processInfo.environment["XDG_CACHE_HOME"] {
+            return try? AbsolutePath(validating: cacheDirectoryPathString)
+        } else {
+            return nil
+        }
+    }
+
     public var automationPath: AbsolutePath? {
         ProcessInfo.processInfo.environment[Constants.EnvironmentVariables.automationPath]
             .map { try! AbsolutePath(validating: $0) } // swiftlint:disable:this force_try
@@ -151,12 +175,7 @@ public class Environment: Environmenting {
 
     /// Returns all the environment variables that are specific to Tuist (prefixed with TUIST_)
     public var tuistVariables: [String: String] {
-        ProcessInfo.processInfo.environment.filter { $0.key.hasPrefix("TUIST_") }.filter { !$0.key.hasPrefix("TUIST_CONFIG_") }
-    }
-
-    /// Returns all the environment variables that are specific to Tuist config (prefixed with TUIST_CONFIG_)
-    public var tuistConfigVariables: [String: String] {
-        ProcessInfo.processInfo.environment.filter { $0.key.hasPrefix("TUIST_CONFIG_") }
+        ProcessInfo.processInfo.environment.filter { $0.key.hasPrefix("TUIST_") }
     }
 
     public var manifestLoadingVariables: [String: String] {

@@ -2,15 +2,20 @@ import Foundation
 
 public enum TuistAcceptanceFixtures {
     case appWithBuildRules
+    case appWithCustomDefaultConfiguration
     case appWithFrameworkAndTests
+    case appWithGoogleMaps
     case appWithPlugins
+    case appWithPreviews
     case appWithSpmDependencies
     case appWithTestPlan
+    case appWithTests
     case commandLineToolBasic
     case commandLineToolWithDynamicFramework
     case commandLineToolWithDynamicLibrary
     case commandLineToolWithStaticLibrary
     case frameworkWithEnvironmentVariables
+    case frameworkWithMacroAndPluginPackages
     case frameworkWithNativeSwiftMacro
     case frameworkWithSwiftMacro
     case invalidManifest
@@ -24,6 +29,8 @@ public enum TuistAcceptanceFixtures {
     case iosWppWithCustomResourceParserOptions
     case iosAppWithCustomScheme
     case iosAppWithExtensions
+    case iosAppWithExtensionAndTests
+    case iosAppWithDynamicFrameworksLinkingStaticFrameworks
     case iosAppWithFrameworkAndResources
     case iosAppWithFrameworkAndDisabledResources
     case iosAppWithFrameworkLinkingStaticFramework
@@ -35,6 +42,10 @@ public enum TuistAcceptanceFixtures {
     case iosAppWithLocalBinarySwiftPackage
     case iosAppWithLocalSwiftPackage
     case iosAppWithMultiConfigs
+    case iosAppWithOnDemandResources
+    case iosAppWithPluginsAndTemplates
+    case iosAppWithPrivacyManifest
+    case iosAppWithSpmDependencies
     case iosAppWithRemoteBinarySwiftPackage
     case iosAppWithRemoteSwiftPackage
     case iosAppWithStaticFrameworks
@@ -51,28 +62,41 @@ public enum TuistAcceptanceFixtures {
     case macosAppWithExtensions
     case manifestWithLogs
     case multiplatformAppWithExtension
+    case multiplatformAppWithMacrosAndEmbeddedWatchOSApp
     case multiplatformAppWithSdk
+    case multiplatformµFeatureUnitTestsWithExplicitDependencies
     case plugin
+    case projectWithClassPrefix
     case projectWithFileHeaderTemplate
     case projectWithInlineFileHeaderTemplate
+    case spmPackage
     case tuistPlugin
     case visionosApp
     case workspaceWithFileHeaderTemplate
     case workspaceWithInlineFileHeaderTemplate
+    case xcodeApp
     case custom(String)
 
     public var path: String {
         switch self {
         case .appWithBuildRules:
             return "app_with_build_rules"
+        case .appWithCustomDefaultConfiguration:
+            return "app_with_custom_default_configuration"
         case .appWithFrameworkAndTests:
             return "app_with_framework_and_tests"
+        case .appWithGoogleMaps:
+            return "app_with_google_maps"
         case .appWithPlugins:
             return "app_with_plugins"
+        case .appWithPreviews:
+            return "app_with_previews"
         case .appWithSpmDependencies:
             return "app_with_spm_dependencies"
         case .appWithTestPlan:
             return "app_with_test_plan"
+        case .appWithTests:
+            return "app_with_tests"
         case .commandLineToolBasic:
             return "command_line_tool_basic"
         case .commandLineToolWithDynamicFramework:
@@ -83,6 +107,8 @@ public enum TuistAcceptanceFixtures {
             return "command_line_tool_with_static_library"
         case .frameworkWithEnvironmentVariables:
             return "framework_with_environment_variables"
+        case .frameworkWithMacroAndPluginPackages:
+            return "framework_with_macro_and_plugin_packages"
         case .frameworkWithNativeSwiftMacro:
             return "framework_with_native_swift_macro"
         case .frameworkWithSwiftMacro:
@@ -103,12 +129,16 @@ public enum TuistAcceptanceFixtures {
             return "ios_app_with_custom_configuration"
         case .iosAppWithCustomDevelopmentRegion:
             return "ios_app_with_custom_development_region"
+        case .iosAppWithDynamicFrameworksLinkingStaticFrameworks:
+            return "ios_app_with_dynamic_frameworks_linking_static_frameworks"
         case .iosWppWithCustomResourceParserOptions:
             return "ios_app_with_custom_resource_parser_options"
         case .iosAppWithCustomScheme:
             return "ios_app_with_custom_scheme"
         case .iosAppWithExtensions:
             return "ios_app_with_extensions"
+        case .iosAppWithExtensionAndTests:
+            return "ios_app_with_extension_and_tests"
         case .iosAppWithFrameworkAndResources:
             return "ios_app_with_framework_and_resources"
         case .iosAppWithFrameworkAndDisabledResources:
@@ -131,6 +161,14 @@ public enum TuistAcceptanceFixtures {
             return "ios_app_with_local_swift_package"
         case .iosAppWithMultiConfigs:
             return "ios_app_with_multi_configs"
+        case .iosAppWithOnDemandResources:
+            return "ios_app_with_on_demand_resources"
+        case .iosAppWithSpmDependencies:
+            return "ios_app_with_spm_dependencies"
+        case .iosAppWithPluginsAndTemplates:
+            return "ios_app_with_plugins_and_templates"
+        case .iosAppWithPrivacyManifest:
+            return "ios_app_with_privacy_manifest"
         case .iosAppWithRemoteBinarySwiftPackage:
             return "ios_app_with_remote_binary_swift_package"
         case .iosAppWithRemoteSwiftPackage:
@@ -163,14 +201,22 @@ public enum TuistAcceptanceFixtures {
             return "manifest_with_logs"
         case .multiplatformAppWithExtension:
             return "multiplatform_app_with_extension"
+        case .multiplatformAppWithMacrosAndEmbeddedWatchOSApp:
+            return "multiplatform_app_with_macros_and_embedded_watchos_app"
         case .multiplatformAppWithSdk:
             return "multiplatform_app_with_sdk"
+        case .multiplatformµFeatureUnitTestsWithExplicitDependencies:
+            return "multiplatform_µFeature_unit_tests_with_explicit_dependencies"
         case .plugin:
             return "plugin"
+        case .projectWithClassPrefix:
+            return "project_with_class_prefix"
         case .projectWithFileHeaderTemplate:
             return "project_with_file_header_template"
         case .projectWithInlineFileHeaderTemplate:
             return "project_with_inline_file_header_template"
+        case .spmPackage:
+            return "spm_package"
         case .tuistPlugin:
             return "tuist_plugin"
         case .visionosApp:
@@ -179,6 +225,8 @@ public enum TuistAcceptanceFixtures {
             return "workspace_with_file_header_template"
         case .workspaceWithInlineFileHeaderTemplate:
             return "workspace_with_inline_file_header_template"
+        case .xcodeApp:
+            return "xcode_app"
         case let .custom(path):
             return path
         }

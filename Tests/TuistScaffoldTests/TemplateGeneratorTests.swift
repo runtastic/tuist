@@ -1,6 +1,6 @@
 import Foundation
-import TSCBasic
-import TuistGraph
+import Path
+import TuistCore
 import TuistSupport
 import XCTest
 
@@ -22,7 +22,7 @@ final class TemplateGeneratorTests: TuistTestCase {
         super.tearDown()
     }
 
-    func test_directories_are_generated() throws {
+    func test_directories_are_generated() async throws {
         // Given
         let directories = [
             try RelativePath(validating: "a"),
@@ -38,7 +38,7 @@ final class TemplateGeneratorTests: TuistTestCase {
         let template = Template.test(items: items)
 
         // When
-        try subject.generate(
+        try await subject.generate(
             template: template,
             to: destinationPath,
             attributes: [:]
@@ -48,7 +48,7 @@ final class TemplateGeneratorTests: TuistTestCase {
         XCTAssertTrue(expectedDirectories.allSatisfy(FileHandler.shared.exists))
     }
 
-    func test_directories_with_attributes() throws {
+    func test_directories_with_attributes() async throws {
         // Given
         let directories = [
             try RelativePath(validating: "{{ name|lowercase }}"),
@@ -67,13 +67,13 @@ final class TemplateGeneratorTests: TuistTestCase {
         ].map(destinationPath.appending)
 
         // When
-        try subject.generate(
+        try await subject.generate(
             template: template,
             to: destinationPath,
             attributes: [
-                "name": "Test_Name",
-                "aName": "test",
-                "bName": "nested_dir",
+                "name": .string("Test_Name"),
+                "aName": .string("test"),
+                "bName": .string("nested_dir"),
             ]
         )
 
@@ -81,7 +81,7 @@ final class TemplateGeneratorTests: TuistTestCase {
         XCTAssertTrue(expectedDirectories.allSatisfy(FileHandler.shared.exists))
     }
 
-    func test_files_are_generated() throws {
+    func test_files_are_generated() async throws {
         // Given
         let items: [Template.Item] = [
             Template.Item(path: try RelativePath(validating: "a"), contents: .string("aContent")),
@@ -104,7 +104,7 @@ final class TemplateGeneratorTests: TuistTestCase {
         }
 
         // When
-        try subject.generate(
+        try await subject.generate(
             template: template,
             to: destinationPath,
             attributes: [:]
@@ -116,7 +116,7 @@ final class TemplateGeneratorTests: TuistTestCase {
         }
     }
 
-    func test_files_are_generated_with_attributes() throws {
+    func test_files_are_generated_with_attributes() async throws {
         // Given
         let sourcePath = try temporaryPath()
         let items = [
@@ -146,15 +146,15 @@ final class TemplateGeneratorTests: TuistTestCase {
         ]
 
         // When
-        try subject.generate(
+        try await subject.generate(
             template: template,
             to: destinationPath,
             attributes: [
-                "name": name,
-                "contentName": contentName,
-                "directoryName": directoryName,
-                "fileName": fileName,
-                "filePath": filePath,
+                "name": .string(name),
+                "contentName": .string(contentName),
+                "directoryName": .string(directoryName),
+                "fileName": .string(fileName),
+                "filePath": .string(filePath),
             ]
         )
 
@@ -164,7 +164,7 @@ final class TemplateGeneratorTests: TuistTestCase {
         }
     }
 
-    func test_rendered_files() throws {
+    func test_rendered_files() async throws {
         // Given
         let sourcePath = try temporaryPath()
         let destinationPath = try temporaryPath()
@@ -190,10 +190,10 @@ final class TemplateGeneratorTests: TuistTestCase {
         ]
 
         // When
-        try subject.generate(
+        try await subject.generate(
             template: template,
             to: destinationPath,
-            attributes: ["name": name]
+            attributes: ["name": .string(name)]
         )
 
         // Then
@@ -202,7 +202,7 @@ final class TemplateGeneratorTests: TuistTestCase {
         }
     }
 
-    func test_file_rendered_with_attributes() throws {
+    func test_file_rendered_with_attributes() async throws {
         // Given
         let sourcePath = try temporaryPath()
         let destinationPath = try temporaryPath()
@@ -218,10 +218,10 @@ final class TemplateGeneratorTests: TuistTestCase {
         )])
 
         // When
-        try subject.generate(
+        try await subject.generate(
             template: template,
             to: destinationPath,
-            attributes: ["name": "attribute name"]
+            attributes: ["name": .string("attribute name")]
         )
 
         // Then
@@ -231,7 +231,7 @@ final class TemplateGeneratorTests: TuistTestCase {
         )
     }
 
-    func test_only_stencil_files_rendered() throws {
+    func test_only_stencil_files_rendered() async throws {
         // Given
         let sourcePath = try temporaryPath()
         let destinationPath = try temporaryPath()
@@ -259,10 +259,10 @@ final class TemplateGeneratorTests: TuistTestCase {
         ])
 
         // When
-        try subject.generate(
+        try await subject.generate(
             template: template,
             to: destinationPath,
-            attributes: ["name": "attribute name"]
+            attributes: ["name": .string("attribute name")]
         )
 
         // Then
@@ -276,7 +276,7 @@ final class TemplateGeneratorTests: TuistTestCase {
         )
     }
 
-    func test_empty_stencil_files_are_skipped() throws {
+    func test_empty_stencil_files_are_skipped() async throws {
         // Given
         let sourcePath = try temporaryPath()
         let destinationPath = try temporaryPath()
@@ -293,17 +293,17 @@ final class TemplateGeneratorTests: TuistTestCase {
         ])
 
         // When
-        try subject.generate(
+        try await subject.generate(
             template: template,
             to: destinationPath,
-            attributes: ["name": "attribute name"]
+            attributes: ["name": .string("attribute name")]
         )
 
         // Then
         XCTAssertFalse(FileHandler.shared.exists(destinationPath.appending(component: "ignore")))
     }
 
-    func test_copy_directory() throws {
+    func test_copy_directory() async throws {
         // Given
         let sourcePath = try temporaryPath().appending(components: "folder")
         try FileHandler.shared.createFolder(sourcePath)
@@ -325,7 +325,7 @@ final class TemplateGeneratorTests: TuistTestCase {
         ])
 
         // When
-        try subject.generate(
+        try await subject.generate(
             template: template,
             to: destinationPath,
             attributes: [:]

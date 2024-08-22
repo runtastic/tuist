@@ -1,6 +1,10 @@
 import Foundation
 
 public enum Constants {
+    // NOTE: We expect tuist-cloud to set the value before running the CLI
+    // public static var version: String! = "x.y.z"
+    public static var version: String! = "4.24.0.1-runtastic"
+
     public static let versionFileName = ".tuist-version"
     public static let binFolderName = ".tuist-bin"
     public static let binName = "tuist"
@@ -8,11 +12,10 @@ public enum Constants {
     public static let githubAPIURL = "https://api.github.com"
     public static let githubSlug = "tuist/tuist"
     public static let communityURL = "https://github.com/tuist/tuist/discussions/categories/general"
-    public static let version = "3.42.2.1-runtastic"
     public static let bundleName: String = "tuist.zip"
-    public static let envBundleName: String = "tuistenv.zip"
     public static let trueValues: [String] = ["1", "true", "TRUE", "yes", "YES"]
     public static let tuistDirectoryName: String = "Tuist"
+    public static let resultBundleName = "result-bundle"
 
     public static let helpersDirectoryName: String = "ProjectDescriptionHelpers"
     public static let signingDirectoryName: String = "Signing"
@@ -28,31 +31,25 @@ public enum Constants {
     public static let tuistGeneratedFileName = ".tuist-generated"
 
     /// The cache version.
-    /// This should change only when it changes the logic to map a `TuistGraph.Target` to a cached build artifact.
+    /// This should change only when it changes the logic to map a `XcodeGraph.Target` to a cached build artifact.
     /// Changing this results in changing the target hash and hence forcing a rebuild of its artifact.
     public static let cacheVersion = "1.0.0"
 
-    public enum DependenciesDirectory {
-        public static let dependenciesFileName = "Dependencies.swift"
-        public static let name = "Dependencies"
-        public static let graphName = "graph.json"
-        public static let lockfilesDirectoryName = "Lockfiles"
-        public static let cartfileName = "Cartfile"
-        public static let cartfileResolvedName = "Cartfile.resolved"
+    public enum SwiftPackageManager {
         public static let packageSwiftName = "Package.swift"
         public static let packageResolvedName = "Package.resolved"
         public static let packageBuildDirectoryName = ".build"
-        public static let carthageDirectoryName = "Carthage"
-        public static let swiftPackageManagerDirectoryName = "SwiftPackageManager"
     }
 
     public enum DerivedDirectory {
         public static let name = "Derived"
         public static let infoPlists = "InfoPlists"
         public static let entitlements = "Entitlements"
+        public static let privacyManifest = "PrivacyManifests"
         public static let moduleMaps = "ModuleMaps"
         public static let sources = "Sources"
         public static let signingKeychain = "signing.keychain"
+        public static let dependenciesDerivedDirectory = "tuist-derived"
     }
 
     public enum AsyncQueue {
@@ -64,9 +61,7 @@ public enum Constants {
     /// But only eg. for acceptance tests and other cases needed internally
     public enum EnvironmentVariables {
         public static let verbose = "TUIST_CONFIG_VERBOSE"
-        public static let colouredOutput = "TUIST_CONFIG_COLOURED_OUTPUT"
         public static let versionsDirectory = "TUIST_CONFIG_VERSIONS_DIRECTORY"
-        public static let forceConfigCacheDirectory = "TUIST_CONFIG_FORCE_CONFIG_CACHE_DIRECTORY"
         public static let automationPath = "TUIST_CONFIG_AUTOMATION_PATH"
         public static let queueDirectory = "TUIST_CONFIG_QUEUE_DIRECTORY"
         public static let cacheManifests = "TUIST_CONFIG_CACHE_MANIFESTS"
@@ -76,5 +71,12 @@ public enum Constants {
         public static let osLog = "TUIST_CONFIG_OS_LOG"
         /// `tuistBinaryPath` is used for specifying the exact tuist binary in tuist tasks.
         public static let tuistBinaryPath = "TUIST_CONFIG_BINARY_PATH"
+        public static let token = "TUIST_CONFIG_TOKEN"
+        @available(*, deprecated, message: "Use `token` instead")
+        public static let deprecatedToken = "TUIST_CONFIG_CLOUD_TOKEN"
+    }
+
+    public enum URLs {
+        public static let production = URL(string: "https://cloud.tuist.io")!
     }
 }

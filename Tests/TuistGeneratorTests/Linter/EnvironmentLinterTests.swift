@@ -1,22 +1,22 @@
 import Foundation
-import TSCBasic
+import MockableTest
+import Path
 import TuistCore
-import TuistGraph
-import TuistGraphTesting
 import TuistSupport
+import XcodeGraph
 import XCTest
 @testable import TuistCoreTesting
 @testable import TuistGenerator
 @testable import TuistSupportTesting
 
 final class EnvironmentLinterTests: TuistUnitTestCase {
-    private var rootDirectoryLocator: MockRootDirectoryLocator!
+    private var rootDirectoryLocator: MockRootDirectoryLocating!
     var subject: EnvironmentLinter!
 
     override func setUp() {
         super.setUp()
 
-        rootDirectoryLocator = MockRootDirectoryLocator()
+        rootDirectoryLocator = .init()
         subject = EnvironmentLinter(rootDirectoryLocator: rootDirectoryLocator)
     }
 
@@ -36,7 +36,9 @@ final class EnvironmentLinterTests: TuistUnitTestCase {
             Config.test(compatibleXcodeVersions: ["1.0", "4.3.2"]),
         ]
 
-        xcodeController.selectedStub = .success(Xcode.test(infoPlist: .test(version: "4.3.2")))
+        given(xcodeController)
+            .selected()
+            .willReturn(.test(infoPlist: .test(version: "4.3.2")))
 
         // When
         let got = try configs.flatMap { try subject.lintXcodeVersion(config: $0) }
@@ -58,7 +60,9 @@ final class EnvironmentLinterTests: TuistUnitTestCase {
             Config.test(compatibleXcodeVersions: .list(["3.2.1"])),
         ]
 
-        xcodeController.selectedStub = .success(Xcode.test(infoPlist: .test(version: "4.3.2")))
+        given(xcodeController)
+            .selected()
+            .willReturn(.test(infoPlist: .test(version: "4.3.2")))
 
         for config in configs {
             // When
@@ -74,7 +78,9 @@ final class EnvironmentLinterTests: TuistUnitTestCase {
     func test_lintXcodeVersion_doesntReturnIssues_whenAllVersionsAreSupported() throws {
         // Given
         let config = Config.test(compatibleXcodeVersions: .all)
-        xcodeController.selectedStub = .success(Xcode.test(infoPlist: .test(version: "4.3.2")))
+        given(xcodeController)
+            .selected()
+            .willReturn(.test(infoPlist: .test(version: "4.3.2")))
 
         // When
         let got = try subject.lintXcodeVersion(config: config)
@@ -87,6 +93,10 @@ final class EnvironmentLinterTests: TuistUnitTestCase {
         // Given
         let config = Config.test(compatibleXcodeVersions: .list(["3.2.1"]))
 
+        given(xcodeController)
+            .selected()
+            .willReturn(nil)
+
         // When
         let got = try subject.lintXcodeVersion(config: config)
 
@@ -98,7 +108,9 @@ final class EnvironmentLinterTests: TuistUnitTestCase {
         // Given
         let config = Config.test(compatibleXcodeVersions: .list(["3.2.1"]))
         let error = NSError.test()
-        xcodeController.selectedStub = .failure(error)
+        given(xcodeController)
+            .selected()
+            .willThrow(error)
 
         // Then
         XCTAssertThrowsError(try subject.lintXcodeVersion(config: config)) {
@@ -109,7 +121,9 @@ final class EnvironmentLinterTests: TuistUnitTestCase {
     func test_lintConfigPath_returnsALintingIssue_when_configManifestIsNotLocatedAtTuistDirectory() throws {
         // Given
         let fakeRoot = try! AbsolutePath(validating: "/root")
-        rootDirectoryLocator.locateStub = fakeRoot
+        given(rootDirectoryLocator)
+            .locate(from: .any)
+            .willReturn(fakeRoot)
 
         let configPath = fakeRoot.appending(try RelativePath(validating: "Config.swift"))
         let config = Config.test(path: configPath)
@@ -125,7 +139,9 @@ final class EnvironmentLinterTests: TuistUnitTestCase {
     func test_lintConfigPath_doesntReturnALintingIssue_when_configManifestIsLocatedAtTuistDirectory() throws {
         // Given
         let fakeRoot = try! AbsolutePath(validating: "/root")
-        rootDirectoryLocator.locateStub = fakeRoot
+        given(rootDirectoryLocator)
+            .locate(from: .any)
+            .willReturn(fakeRoot)
 
         let configPath = fakeRoot
             .appending(try RelativePath(validating: "\(Constants.tuistDirectoryName)"))

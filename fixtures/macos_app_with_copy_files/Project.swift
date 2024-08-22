@@ -1,9 +1,9 @@
 import ProjectDescription
 
 func target(name: String) -> Target {
-    Target(
+    .target(
         name: name,
-        platform: .macOS,
+        destinations: [.mac],
         product: .app,
         bundleId: "io.tuist.\(name)",
         infoPlist: .file(path: .relativeToManifest("Info.plist")),
@@ -12,7 +12,7 @@ func target(name: String) -> Target {
             .sharedSupport(
                 name: "Copy Templates",
                 subpath: "Templates",
-                files: ["Templates/**"]
+                files: [.glob(pattern: "Templates/**", condition: .when([.macos]))]
             ),
         ],
         settings: .settings(base: ["CODE_SIGN_IDENTITY": "", "CODE_SIGNING_REQUIRED": "NO"])

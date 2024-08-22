@@ -1,8 +1,8 @@
 import Foundation
-import TSCBasic
+import Path
 import TuistCore
-import TuistGraph
 import TuistSupport
+import XcodeGraph
 
 struct WorkspaceStructure {
     enum Element: Equatable {
@@ -130,8 +130,13 @@ private class DirectoryStructure {
 
     private func isDependencyProject(_ node: Node) -> Bool {
         switch node {
-        case let .project(path): return path.pathString.contains(".build/checkouts")
-        case .directory, .file, .folderReference, .virtualGroup: return false
+        case let .project(path):
+            return path.pathString
+                .contains(
+                    "\(Constants.SwiftPackageManager.packageBuildDirectoryName)/\(Constants.DerivedDirectory.dependenciesDerivedDirectory)"
+                )
+        case .directory, .file, .folderReference, .virtualGroup:
+            return false
         }
     }
 

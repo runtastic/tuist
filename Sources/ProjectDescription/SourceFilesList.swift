@@ -1,7 +1,7 @@
 import Foundation
 
 /// A glob pattern configuration representing source files and its compiler flags, if any.
-public struct SourceFileGlob: Codable, Equatable {
+public struct SourceFileGlob: Codable, Equatable, Sendable {
     /// Glob pattern to the source files.
     public var glob: Path
 
@@ -61,27 +61,27 @@ public struct SourceFileGlob: Codable, Equatable {
 
 extension SourceFileGlob: ExpressibleByStringInterpolation {
     public init(stringLiteral value: String) {
-        self.init(glob: Path(value), excluding: [], compilerFlags: nil, codeGen: nil, compilationCondition: nil)
+        self.init(glob: .path(value), excluding: [], compilerFlags: nil, codeGen: nil, compilationCondition: nil)
     }
 }
 
 /// A collection of source file globs.
-public struct SourceFilesList: Codable, Equatable {
+public struct SourceFilesList: Codable, Equatable, Sendable {
     /// List glob patterns.
     public var globs: [SourceFileGlob]
 
     /// Creates the source files list with the glob patterns.
     ///
     /// - Parameter globs: Glob patterns.
-    public init(globs: [SourceFileGlob]) {
-        self.globs = globs
+    public static func sourceFilesList(globs: [SourceFileGlob]) -> Self {
+        self.init(globs: globs)
     }
 
     /// Creates the source files list with the glob patterns as strings.
     ///
     /// - Parameter globs: Glob patterns.
-    public init(globs: [String]) {
-        self.globs = globs.map(SourceFileGlob.init)
+    public static func sourceFilesList(globs: [String]) -> Self {
+        sourceFilesList(globs: globs.map(SourceFileGlob.init))
     }
 
     /// Returns a sources list from a list of paths.
@@ -94,7 +94,7 @@ public struct SourceFilesList: Codable, Equatable {
 /// Support file as single string
 extension SourceFilesList: ExpressibleByStringInterpolation {
     public init(stringLiteral value: String) {
-        self.init(globs: [value])
+        self = .sourceFilesList(globs: [value])
     }
 }
 

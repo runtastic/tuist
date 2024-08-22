@@ -1,5 +1,7 @@
 import Foundation
-import TuistGraph
+import Path
+import TuistSupport
+import XcodeGraph
 
 extension Project {
     /// It returns the project targets sorted based on the target type and the dependencies between them.
@@ -8,7 +10,7 @@ extension Project {
     /// - Parameter graph: Dependencies graph.
     /// - Returns: Sorted targets.
     public func sortedTargetsForProjectScheme(graph: Graph) -> [Target] {
-        targets.sorted { first, second -> Bool in
+        targets.values.sorted { first, second -> Bool in
             // First criteria: Test bundles at the end
             if first.product.testsBundle, !second.product.testsBundle {
                 return false
@@ -36,6 +38,28 @@ extension Project {
             } else {
                 return first.name < second.name
             }
+        }
+    }
+
+    public func derivedDirectoryPath(for target: Target) -> AbsolutePath {
+        if isExternal,
+           path.pathString
+           .contains("\(Constants.SwiftPackageManager.packageBuildDirectoryName)/checkouts")
+        {
+            return path
+                // Leads to SPM's .build directory
+                .parentDirectory.parentDirectory
+                .appending(
+                    components: [
+                        Constants.DerivedDirectory.dependenciesDerivedDirectory,
+                        target.name,
+                    ]
+                )
+        } else {
+            return path
+                .appending(
+                    component: Constants.DerivedDirectory.name
+                )
         }
     }
 }

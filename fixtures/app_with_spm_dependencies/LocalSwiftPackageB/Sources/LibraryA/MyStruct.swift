@@ -1,3 +1,3 @@
-import AppKit
+import LibraryAProxy
 
 public struct MyStruct {}

@@ -3,7 +3,7 @@ import Foundation
 // MARK: - InfoPlist
 
 /// A info plist from a file, a custom dictonary or a extended defaults.
-public enum InfoPlist: Codable, Equatable {
+public enum InfoPlist: Codable, Equatable, Sendable {
     /// The path to an existing Info.plist file.
     case file(path: Path)
 
@@ -41,13 +41,6 @@ public enum InfoPlist: Codable, Equatable {
 
 extension InfoPlist: ExpressibleByStringInterpolation {
     public init(stringLiteral value: String) {
-        self = .file(path: Path(value))
+        self = .file(path: .path(value))
     }
-}
-
-// MARK: - InfoPlist API compatibility
-
-extension InfoPlist {
-    @available(*, deprecated, message: "InfoPlist.Value was renamed to Plist.Value")
-    public typealias Value = Plist.Value
 }

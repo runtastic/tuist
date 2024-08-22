@@ -1,9 +1,9 @@
 import Foundation
-import TSCBasic
+import Path
 import TuistCore
-import TuistGraph
 import TuistLoader
 import TuistSupport
+import XcodeGraph
 import XCTest
 @testable import TuistCoreTesting
 @testable import TuistKit
@@ -36,7 +36,7 @@ final class ManifestGraphLoaderIntegrationTests: TuistTestCase {
         let path = try temporaryFixture("WorkspaceWithPlugins")
 
         // When
-        let (result, _, _) = try await subject.load(path: path)
+        let (result, _, _, _) = try await subject.load(path: path)
 
         // Then
         XCTAssertEqual(result.workspace.name, "Workspace")
@@ -53,7 +53,7 @@ final class ManifestGraphLoaderIntegrationTests: TuistTestCase {
             .appending(component: "App")
 
         // When
-        let (result, _, _) = try await subject.load(path: path)
+        let (result, _, _, _) = try await subject.load(path: path)
 
         // Then
         XCTAssertEqual(result.workspace.name, "App")

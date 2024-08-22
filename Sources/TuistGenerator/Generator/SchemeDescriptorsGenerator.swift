@@ -1,9 +1,9 @@
 import Foundation
-import TSCBasic
+import Path
 import TSCUtility
 import TuistCore
-import TuistGraph
 import TuistSupport
+import XcodeGraph
 import XcodeProj
 
 /// Protocol that defines the interface of the schemes generation.
@@ -107,20 +107,6 @@ final class SchemeDescriptorsGenerator: SchemeDescriptorsGenerating {
         }
     }
 
-    /// Wipes shared and user schemes at a workspace or project path. This is needed
-    /// currently to support the workspace scheme generation case where a workspace that
-    /// already exists on disk is being regenerated. Wiping the schemes directory prevents
-    /// older custom schemes from persisting after regeneration.
-    ///
-    /// - Parameter at: Path to the workspace or project.
-    func wipeSchemes(at path: AbsolutePath) throws {
-        let fileHandler = FileHandler.shared
-        let userPath = try schemeDirectory(path: path, shared: false)
-        let sharedPath = try schemeDirectory(path: path, shared: true)
-        if fileHandler.exists(userPath) { try fileHandler.delete(userPath) }
-        if fileHandler.exists(sharedPath) { try fileHandler.delete(sharedPath) }
-    }
-
     // swiftlint:disable function_body_length
     /// Generate schemes for a project or workspace.
     ///
@@ -135,7 +121,7 @@ final class SchemeDescriptorsGenerator: SchemeDescriptorsGenerating {
         path: AbsolutePath,
         graphTraverser: GraphTraversing,
         generatedProjects: [AbsolutePath: GeneratedProject],
-        lastUpgradeCheck: Version?
+        lastUpgradeCheck: XcodeGraph.Version?
     ) throws -> SchemeDescriptor {
         let generatedBuildAction = try schemeBuildAction(
             scheme: scheme,
@@ -312,11 +298,29 @@ final class SchemeDescriptorsGenerator: SchemeDescriptorsGenerating {
             else {
                 continue
             }
+
+            var locationScenarioReference: XCScheme.LocationScenarioReference?
+
+            if let locationScenario = testableTarget.simulatedLocation {
+                var identifier = locationScenario.identifier
+
+                if case let .gpxFile(gpxPath) = locationScenario {
+                    let fileRelativePath = gpxPath.relative(to: graphTraverser.workspace.xcWorkspacePath)
+                    identifier = fileRelativePath.pathString
+                }
+
+                locationScenarioReference = .init(
+                    identifier: identifier,
+                    referenceType: locationScenario.referenceType
+                )
+            }
+
             let testable = XCScheme.TestableReference(
                 skipped: testableTarget.isSkipped,
                 parallelizable: testableTarget.isParallelizable,
                 randomExecutionOrdering: testableTarget.isRandomExecutionOrdering,
                 buildableReference: reference,
+                locationScenarioReference: locationScenarioReference,
                 skippedTests: skippedTests
             )
             testables.append(testable)
@@ -373,13 +377,13 @@ final class SchemeDescriptorsGenerator: SchemeDescriptorsGenerating {
 
         let onlyGenerateCoverageForSpecifiedTargets = codeCoverageTargets.count > 0 ? true : nil
 
-        let enableAddressSanitizer = testAction.diagnosticsOptions.contains(.enableAddressSanitizer)
+        let enableAddressSanitizer = testAction.diagnosticsOptions.addressSanitizerEnabled
         var enableASanStackUseAfterReturn = false
         if enableAddressSanitizer {
-            enableASanStackUseAfterReturn = testAction.diagnosticsOptions.contains(.enableASanStackUseAfterReturn)
+            enableASanStackUseAfterReturn = testAction.diagnosticsOptions.detectStackUseAfterReturnEnabled
         }
-        let enableThreadSanitizer = testAction.diagnosticsOptions.contains(.enableThreadSanitizer)
-        let disableMainThreadChecker = !testAction.diagnosticsOptions.contains(.mainThreadChecker)
+        let enableThreadSanitizer = testAction.diagnosticsOptions.threadSanitizerEnabled
+        let disableMainThreadChecker = !testAction.diagnosticsOptions.mainThreadCheckerEnabled
         let shouldUseLaunchSchemeArgsEnv: Bool = args == nil && environments == nil
         let language = testAction.language
         let region = testAction.region
@@ -506,15 +510,15 @@ final class SchemeDescriptorsGenerator: SchemeDescriptorsGenerating {
         }
 
         let buildConfiguration = scheme.runAction?.configurationName ?? defaultBuildConfiguration
-        let enableAddressSanitizer = scheme.runAction?.diagnosticsOptions.contains(.enableAddressSanitizer) ?? false
+        let enableAddressSanitizer = scheme.runAction?.diagnosticsOptions.addressSanitizerEnabled ?? false
         var enableASanStackUseAfterReturn = false
         if enableAddressSanitizer == true {
-            enableASanStackUseAfterReturn = scheme.runAction?.diagnosticsOptions.contains(.enableASanStackUseAfterReturn) ?? false
+            enableASanStackUseAfterReturn = scheme.runAction?.diagnosticsOptions.detectStackUseAfterReturnEnabled ?? false
         }
-        let enableThreadSanitizer = scheme.runAction?.diagnosticsOptions.contains(.enableThreadSanitizer) ?? false
-        let disableMainThreadChecker = scheme.runAction?.diagnosticsOptions.contains(.mainThreadChecker) == false
+        let enableThreadSanitizer = scheme.runAction?.diagnosticsOptions.threadSanitizerEnabled ?? false
+        let disableMainThreadChecker = scheme.runAction?.diagnosticsOptions.mainThreadCheckerEnabled == false
         let disablePerformanceAntipatternChecker = scheme.runAction?.diagnosticsOptions
-            .contains(.performanceAntipatternChecker) == false
+            .performanceAntipatternCheckerEnabled == false
 
         let launchActionConstants: Constants.LaunchAction
         let launcherIdentifier: String
@@ -748,10 +752,12 @@ final class SchemeDescriptorsGenerator: SchemeDescriptorsGenerating {
         rootPath: AbsolutePath,
         generatedProjects: [AbsolutePath: GeneratedProject]
     ) throws -> XCScheme.ArchiveAction? {
-        guard let target = defaultTargetReference(scheme: scheme),
-              let graphTarget = graphTraverser.target(path: target.projectPath, name: target.name) else { return nil }
-
         guard let archiveAction = scheme.archiveAction else {
+            guard let target = defaultTargetReference(scheme: scheme),
+                  let graphTarget = graphTraverser.target(path: target.projectPath, name: target.name)
+            else {
+                return nil
+            }
             return defaultSchemeArchiveAction(for: graphTarget.project)
         }
 
@@ -879,31 +885,6 @@ final class SchemeDescriptorsGenerator: SchemeDescriptorsGenerating {
         )
     }
 
-    /// Creates the directory where the schemes are stored inside the project.
-    /// If the directory exists it does not re-create it.
-    ///
-    /// - Parameters:
-    ///   - path: Path to the Xcode workspace or project.
-    ///   - shared: Scheme should be shared or not
-    /// - Returns: Path to the schemes directory.
-    /// - Throws: A FatalError if the creation of the directory fails.
-    private func createSchemesDirectory(path: AbsolutePath, shared: Bool = true) throws -> AbsolutePath {
-        let schemePath = try schemeDirectory(path: path, shared: shared)
-        if !FileHandler.shared.exists(schemePath) {
-            try FileHandler.shared.createFolder(schemePath)
-        }
-        return schemePath
-    }
-
-    private func schemeDirectory(path: AbsolutePath, shared: Bool = true) throws -> AbsolutePath {
-        if shared {
-            return path.appending(try RelativePath(validating: "xcshareddata/xcschemes"))
-        } else {
-            let username = NSUserName()
-            return path.appending(try RelativePath(validating: "xcuserdata/\(username).xcuserdatad/xcschemes"))
-        }
-    }
-
     /// Returns the scheme commandline argument passed on launch
     ///
     /// - Parameters:
@@ -997,7 +978,7 @@ extension TestAction {
             expandVariableFromTarget: nil,
             preActions: [],
             postActions: [],
-            diagnosticsOptions: [],
+            diagnosticsOptions: SchemeDiagnosticsOptions(),
             language: nil,
             region: nil,
             preferredScreenCaptureFormat: nil,

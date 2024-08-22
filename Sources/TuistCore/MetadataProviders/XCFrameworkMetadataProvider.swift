@@ -1,7 +1,7 @@
 import Foundation
-import TSCBasic
-import TuistGraph
+import Path
 import TuistSupport
+import XcodeGraph
 
 // MARK: - Provider Errors
 
@@ -141,7 +141,7 @@ public final class XCFrameworkMetadataProvider: PrecompiledMetadataProvider, XCF
             binaryPath = try AbsolutePath(validating: library.identifier, relativeTo: xcframeworkPath)
                 .appending(try RelativePath(validating: library.path.pathString))
                 .appending(component: library.path.basenameWithoutExt)
-        case "a":
+        case "a", "dylib":
             binaryPath = try AbsolutePath(validating: library.identifier, relativeTo: xcframeworkPath)
                 .appending(try RelativePath(validating: library.path.pathString))
         default:

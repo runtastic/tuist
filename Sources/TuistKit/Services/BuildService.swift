@@ -1,10 +1,11 @@
 import Foundation
-import TSCBasic
+import Path
 import TuistAutomation
 import TuistCore
-import TuistGraph
 import TuistLoader
+import TuistServer
 import TuistSupport
+import XcodeGraph
 
 enum BuildServiceError: FatalError {
     case workspaceNotFound(path: String)
@@ -33,42 +34,54 @@ enum BuildServiceError: FatalError {
     }
 }
 
-final class BuildService {
+public final class BuildService {
     private let generatorFactory: GeneratorFactorying
+    private let cacheStorageFactory: CacheStorageFactorying
     private let buildGraphInspector: BuildGraphInspecting
     private let targetBuilder: TargetBuilding
     private let configLoader: ConfigLoading
 
-    init(
-        generatorFactory: GeneratorFactorying = GeneratorFactory(),
+    public init(
+        generatorFactory: GeneratorFactorying,
+        cacheStorageFactory: CacheStorageFactorying,
         buildGraphInspector: BuildGraphInspecting = BuildGraphInspector(),
         targetBuilder: TargetBuilding = TargetBuilder(),
         configLoader: ConfigLoading = ConfigLoader(manifestLoader: ManifestLoader())
     ) {
         self.generatorFactory = generatorFactory
+        self.cacheStorageFactory = cacheStorageFactory
         self.buildGraphInspector = buildGraphInspector
         self.targetBuilder = targetBuilder
         self.configLoader = configLoader
     }
 
     // swiftlint:disable:next function_body_length
-    func run(
+    public func run(
         schemeName: String?,
         generate: Bool,
         clean: Bool,
         configuration: String?,
+        ignoreBinaryCache: Bool,
         buildOutputPath: AbsolutePath?,
         derivedDataPath: String?,
         path: AbsolutePath,
         device: String?,
-        platform: String?,
+        platform: Platform?,
         osVersion: String?,
         rosetta: Bool,
-        generateOnly: Bool
+        generateOnly: Bool,
+        generator _: ((Config) throws -> Generating)? = nil,
+        passthroughXcodeBuildArguments: [String]
     ) async throws {
         let graph: Graph
-        let config = try configLoader.loadConfig(path: path)
-        let generator = generatorFactory.default(config: config)
+        let config = try await configLoader.loadConfig(path: path)
+        let cacheStorage = try cacheStorageFactory.cacheStorage(config: config)
+        let generator = generatorFactory.building(
+            config: config,
+            configuration: configuration,
+            ignoreBinaryCache: ignoreBinaryCache,
+            cacheStorage: cacheStorage
+        )
         if try (generate || buildGraphInspector.workspacePath(directory: path) == nil) {
             graph = try await generator.generateWithGraph(path: path).1
         } else {
@@ -107,10 +120,10 @@ final class BuildService {
                 throw TargetBuilderError.schemeWithoutBuildableTargets(scheme: scheme.name)
             }
 
-            let buildPlatform: TuistGraph.Platform
+            let buildPlatform: XcodeGraph.Platform
 
-            if let platform, let inputPlatform = TuistGraph.Platform(rawValue: platform) {
-                buildPlatform = inputPlatform
+            if let platform {
+                buildPlatform = platform
             } else {
                 buildPlatform = try graphTarget.target.servicePlatform
             }
@@ -125,9 +138,10 @@ final class BuildService {
                 buildOutputPath: buildOutputPath,
                 derivedDataPath: derivedDataPath,
                 device: device,
-                osVersion: osVersion?.version(),
+                osVersion: osVersion?.version().map { .init(stringLiteral: $0.description) },
                 rosetta: rosetta,
-                graphTraverser: graphTraverser
+                graphTraverser: graphTraverser,
+                passthroughXcodeBuildArguments: passthroughXcodeBuildArguments
             )
         } else {
             var cleaned = false
@@ -138,10 +152,10 @@ final class BuildService {
                     throw TargetBuilderError.schemeWithoutBuildableTargets(scheme: scheme.name)
                 }
 
-                let buildPlatform: TuistGraph.Platform
+                let buildPlatform: XcodeGraph.Platform
 
-                if let platform, let inputPlatform = TuistGraph.Platform(rawValue: platform) {
-                    buildPlatform = inputPlatform
+                if let platform {
+                    buildPlatform = platform
                 } else {
                     buildPlatform = try graphTarget.target.servicePlatform
                 }
@@ -156,9 +170,10 @@ final class BuildService {
                     buildOutputPath: buildOutputPath,
                     derivedDataPath: derivedDataPath,
                     device: device,
-                    osVersion: osVersion?.version(),
+                    osVersion: osVersion?.version().map { .init(stringLiteral: $0.description) },
                     rosetta: rosetta,
-                    graphTraverser: graphTraverser
+                    graphTraverser: graphTraverser,
+                    passthroughXcodeBuildArguments: passthroughXcodeBuildArguments
                 )
                 cleaned = true
             }

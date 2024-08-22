@@ -1,8 +1,8 @@
 import Foundation
-import TSCBasic
+import Path
 import TuistCore
-import TuistGraph
 import TuistSupport
+import XcodeGraph
 import XcodeProj
 
 /// A project mapper that generates derived entitlements files for targets that define it as a dictonary.
@@ -21,14 +21,18 @@ public final class GenerateEntitlementsProjectMapper: ProjectMapping {
     // MARK: - ProjectMapping
 
     public func map(project: Project) throws -> (Project, [SideEffectDescriptor]) {
-        let results = try project.targets
-            .reduce(into: (targets: [Target](), sideEffects: [SideEffectDescriptor]())) { results, target in
+        logger.debug("Transforming project \(project.name): Synthesizing entitlement files'")
+
+        let results = try project.targets.values
+            .reduce(into: (targets: [String: Target](), sideEffects: [SideEffectDescriptor]())) { results, target in
                 let (updatedTarget, sideEffects) = try map(target: target, project: project)
-                results.targets.append(updatedTarget)
+                results.targets[updatedTarget.name] = updatedTarget
                 results.sideEffects.append(contentsOf: sideEffects)
             }
+        var project = project
+        project.targets = results.targets
 
-        return (project.with(targets: results.targets), results.sideEffects)
+        return (project, results.sideEffects)
     }
 
     // MARK: - Private

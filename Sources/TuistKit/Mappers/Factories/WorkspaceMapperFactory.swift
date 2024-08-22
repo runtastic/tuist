@@ -1,10 +1,11 @@
 import Foundation
-import TSCBasic
+import Path
 import TSCUtility
 import TuistAutomation
 import TuistCore
+import TuistDependencies
 import TuistGenerator
-import TuistGraph
+import XcodeGraph
 
 protocol WorkspaceMapperFactorying {
     /// Returns the default workspace mapper.
@@ -59,12 +60,10 @@ public final class WorkspaceMapperFactory: WorkspaceMapperFactorying {
         )
 
         mappers.append(
-            ModuleMapMapper()
-        )
-
-        mappers.append(
             LastUpgradeVersionWorkspaceMapper()
         )
+
+        mappers.append(ExternalDependencyPathWorkspaceMapper())
 
         return mappers
     }

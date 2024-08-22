@@ -1,9 +1,11 @@
 import Foundation
-import TSCBasic
+import MockableTest
+import Path
+import TSCUtility
 import TuistCore
-import TuistGraph
-import TuistGraphTesting
+import TuistCoreTesting
 import TuistSupport
+import XcodeGraph
 import XCTest
 
 @testable import ProjectDescription
@@ -12,58 +14,75 @@ import XCTest
 @testable import TuistSupportTesting
 
 final class PackageSettingsLoaderTests: TuistUnitTestCase {
-    private var manifestLoader: MockManifestLoader!
+    private var manifestLoader: MockManifestLoading!
+    private var swiftPackageManagerController: MockSwiftPackageManagerController!
+    private var manifestFilesLocator: MockManifestFilesLocating!
     private var subject: PackageSettingsLoader!
 
     override func setUp() {
         super.setUp()
 
-        manifestLoader = MockManifestLoader()
-        subject = PackageSettingsLoader(manifestLoader: manifestLoader)
+        manifestLoader = .init()
+        swiftPackageManagerController = MockSwiftPackageManagerController()
+        manifestFilesLocator = MockManifestFilesLocating()
+        subject = PackageSettingsLoader(
+            manifestLoader: manifestLoader,
+            swiftPackageManagerController: swiftPackageManagerController,
+            fileHandler: fileHandler,
+            manifestFilesLocator: manifestFilesLocator
+        )
     }
 
     override func tearDown() {
         subject = nil
         manifestLoader = nil
+        swiftPackageManagerController = nil
 
         super.tearDown()
     }
 
-    func test_loadDependencies() throws {
+    func test_loadPackageSettings() async throws {
         // Given
         let temporaryPath = try temporaryPath()
         let plugins = Plugins.test()
+        given(manifestFilesLocator)
+            .locatePackageManifest(at: .any)
+            .willReturn(temporaryPath)
 
-        manifestLoader.loadPackageSettingsStub = { _ in
-            PackageSettings(
-                platforms: [.iOS, .macOS]
-            )
-        }
-        manifestLoader.loadDependenciesStub = { _ in
-            Dependencies(
-                carthage: [
-                    .github(path: "Dependency1", requirement: .exact("1.1.1")),
-                    .git(path: "Dependency1", requirement: .exact("2.3.4")),
-                ],
-                swiftPackageManager: .init(),
-                platforms: [.iOS, .macOS]
-            )
+        given(manifestLoader)
+            .register(plugins: .any)
+            .willReturn(())
+
+        given(manifestLoader)
+            .loadPackageSettings(at: .any)
+            .willReturn(.test())
+
+        swiftPackageManagerController.getToolsVersionStub = { _ in
+            TSCUtility.Version("5.4.9")
         }
 
         // When
-        let got = try subject.loadPackageSettings(at: temporaryPath, with: plugins)
+        let got = try await subject.loadPackageSettings(at: temporaryPath, with: plugins)
 
         // Then
-        let expected: TuistGraph.PackageSettings = .init(
+        let expected: TuistCore.PackageSettings = .init(
             productTypes: [:],
-            baseSettings: .init(configurations: [
-                .debug: .init(settings: [:], xcconfig: nil),
-                .release: .init(settings: [:], xcconfig: nil),
-            ]),
+            productDestinations: [:],
+            baseSettings: XcodeGraph.Settings(
+                base: [:],
+                baseDebug: [:],
+                configurations: [
+                    .release: XcodeGraph.Configuration(settings: [:], xcconfig: nil),
+                    .debug: XcodeGraph.Configuration(settings: [:], xcconfig: nil),
+                ],
+                defaultSettings: .recommended
+            ),
             targetSettings: [:],
-            platforms: [.iOS, .macOS]
+            swiftToolsVersion: Version(stringLiteral: "5.4.9")
         )
-        XCTAssertEqual(manifestLoader.registerPluginsCount, 1)
+        verify(manifestLoader)
+            .register(plugins: .any)
+            .called(1)
         XCTAssertEqual(got, expected)
     }
 }

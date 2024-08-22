@@ -1,10 +1,9 @@
 import Foundation
-import TSCBasic
+import Path
 import TuistAutomation
 import TuistCoreTesting
-import TuistGraph
 import TuistLoader
-import TuistSigning
+import XcodeGraph
 import XCTest
 @testable import TuistCore
 @testable import TuistGenerator
@@ -60,20 +59,24 @@ final class ProjectMapperFactoryTests: TuistUnitTestCase {
         XCTAssertContainsElementOfType(got, GenerateInfoPlistProjectMapper.self, after: DeleteDerivedDirectoryProjectMapper.self)
     }
 
+    func test_default_contains_the_generate_privacy_manifest_mapper() {
+        // When
+        let got = subject.default()
+
+        // Then
+        XCTAssertContainsElementOfType(
+            got,
+            GeneratePrivacyManifestProjectMapper.self,
+            after: DeleteDerivedDirectoryProjectMapper.self
+        )
+    }
+
     func test_default_contains_the_ide_template_macros_mapper() {
         // When
         let got = subject.default()
 
         // Then
         XCTAssertContainsElementOfType(got, IDETemplateMacrosMapper.self)
-    }
-
-    func test_default_contains_the_signing_mapper() {
-        // When
-        let got = subject.default()
-
-        // Then
-        XCTAssertContainsElementOfType(got, SigningMapper.self)
     }
 
     func test_automation_contains_the_source_root_path_project_mapper() {

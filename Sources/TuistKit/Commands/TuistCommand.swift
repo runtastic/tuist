@@ -1,5 +1,10 @@
 @_exported import ArgumentParser
 import Foundation
+import OpenAPIRuntime
+import Path
+import TuistAnalytics
+import TuistLoader
+import TuistServer
 import TuistSupport
 
 public struct TuistCommand: AsyncParsableCommand {
@@ -9,38 +14,76 @@ public struct TuistCommand: AsyncParsableCommand {
         CommandConfiguration(
             commandName: "tuist",
             abstract: "Generate, build and test your Xcode projects.",
-            subcommands: [
-                BuildCommand.self,
-                CleanCommand.self,
-                DumpCommand.self,
-                EditCommand.self,
-                FetchCommand.self,
-                GenerateCommand.self,
-                GraphCommand.self,
-                InitCommand.self,
-                MigrationCommand.self,
-                PluginCommand.self,
-                RunCommand.self,
-                ScaffoldCommand.self,
-                SigningCommand.self,
-                TestCommand.self,
-                VersionCommand.self,
+            subcommands: [],
+            groupedSubcommands: [
+                CommandGroup(
+                    name: "Start",
+                    subcommands: [
+                        InitCommand.self,
+                    ]
+                ),
+                CommandGroup(
+                    name: "Develop",
+                    subcommands: [
+                        BuildCommand.self,
+                        CacheCommand.self,
+                        CleanCommand.self,
+                        DumpCommand.self,
+                        EditCommand.self,
+                        GenerateCommand.self,
+                        GraphCommand.self,
+                        InstallCommand.self,
+                        MigrationCommand.self,
+                        PluginCommand.self,
+                        RunCommand.self,
+                        ScaffoldCommand.self,
+                        TestCommand.self,
+                    ]
+                ),
+                CommandGroup(
+                    name: "Share",
+                    subcommands: [
+                        ShareCommand.self,
+                    ]
+                ),
+                CommandGroup(
+                    name: "Account",
+                    subcommands: [
+                        ProjectCommand.self,
+                        OrganizationCommand.self,
+                        AuthCommand.self,
+                        SessionCommand.self,
+                        LogoutCommand.self,
+                    ]
+                ),
             ]
         )
     }
 
-    @Flag(
-        name: [.customLong("help-env")],
-        help: "Display subcommands to manage the environment tuist versions."
-    )
-    var isTuistEnvHelp: Bool = false
-
     public static func main(
         _ arguments: [String]? = nil,
-        parseAsRoot: ((_ arguments: [String]?) throws -> ParsableCommand) = Self.parseAsRoot,
-        execute: ((_ command: ParsableCommand, _ commandArguments: [String]) async throws -> Void)? = nil
-    ) async {
-        let execute = execute ?? Self.execute
+        parseAsRoot: ((_ arguments: [String]?) throws -> ParsableCommand) = Self.parseAsRoot
+    ) async throws {
+        let path: AbsolutePath
+        if let argumentIndex = CommandLine.arguments.firstIndex(of: "--path") {
+            path = try AbsolutePath(validating: CommandLine.arguments[argumentIndex + 1], relativeTo: .current)
+        } else {
+            path = .current
+        }
+
+        let backend: TuistAnalyticsBackend?
+        let config = try await ConfigLoader().loadConfig(path: path)
+        if let fullHandle = config.fullHandle {
+            backend = TuistAnalyticsServerBackend(
+                fullHandle: fullHandle,
+                url: config.url
+            )
+        } else {
+            backend = nil
+        }
+        let dispatcher = TuistAnalyticsDispatcher(backend: backend)
+        try TuistAnalytics.bootstrap(dispatcher: dispatcher)
+
         let errorHandler = ErrorHandler()
         let executeCommand: () async throws -> Void
         let processedArguments = Array(processArguments(arguments)?.dropFirst() ?? [])
@@ -50,19 +93,20 @@ public struct TuistCommand: AsyncParsableCommand {
                 try await ScaffoldCommand.preprocess(processedArguments)
             }
             if processedArguments.first == InitCommand.configuration.commandName {
-                try InitCommand.preprocess(processedArguments)
+                try await InitCommand.preprocess(processedArguments)
             }
             let command = try parseAsRoot(processedArguments)
             executeCommand = {
-                try await execute(
-                    command,
-                    processedArguments
+                let trackableCommand = TrackableCommand(
+                    command: command,
+                    commandArguments: processedArguments
                 )
+                try await trackableCommand.run()
             }
         } catch {
             parsedError = error
             executeCommand = {
-                try executeTask(with: processedArguments)
+                try await executeTask(with: processedArguments)
             }
         }
 
@@ -72,6 +116,11 @@ public struct TuistCommand: AsyncParsableCommand {
         } catch let error as FatalError {
             WarningController.shared.flush()
             errorHandler.fatal(error: error)
+            _exit(exitCode(for: error).rawValue)
+        } catch let error as ClientError where error.underlyingError is ServerClientAuthenticationError {
+            WarningController.shared.flush()
+            // swiftlint:disable:next force_cast
+            logger.error("\((error.underlyingError as! ServerClientAuthenticationError).description)")
             _exit(exitCode(for: error).rawValue)
         } catch {
             WarningController.shared.flush()
@@ -88,8 +137,8 @@ public struct TuistCommand: AsyncParsableCommand {
         }
     }
 
-    private static func executeTask(with processedArguments: [String]) throws {
-        try TuistService().run(
+    private static func executeTask(with processedArguments: [String]) async throws {
+        try await TuistService().run(
             arguments: processedArguments,
             tuistBinaryPath: processArguments()!.first!
         )
@@ -98,23 +147,11 @@ public struct TuistCommand: AsyncParsableCommand {
     private static func handleParseError(_ error: Error) -> Never {
         let exitCode = exitCode(for: error).rawValue
         if exitCode == 0 {
-            logger.info("\(fullMessage(for: error))")
+            logger.notice("\(fullMessage(for: error))")
         } else {
             logger.error("\(fullMessage(for: error))")
         }
         _exit(exitCode)
-    }
-
-    private static func execute(
-        command: ParsableCommand,
-        commandArguments _: [String]
-    ) async throws {
-        var command = command
-        if var asyncCommand = command as? AsyncParsableCommand {
-            try await asyncCommand.run()
-        } else {
-            try command.run()
-        }
     }
 
     // MARK: - Helpers

@@ -1,14 +1,14 @@
 import Foundation
+import Path
 import ProjectDescription
-import TSCBasic
 import TuistCore
 import TuistLoaderTesting
 import TuistSupport
 import XCTest
 
-@testable import TuistGraph
 @testable import TuistLoader
 @testable import TuistSupportTesting
+@testable import XcodeGraph
 
 final class ProjectManifestMapperTests: TuistUnitTestCase {
     func test_from() throws {
@@ -16,6 +16,7 @@ final class ProjectManifestMapperTests: TuistUnitTestCase {
         let project = ProjectDescription.Project(
             name: "Name",
             organizationName: "Organization",
+            classPrefix: "ClassPrefix",
             options: .options(
                 automaticSchemesOptions: .enabled(
                     targetSchemesGrouping: .byNameSuffix(build: ["build"], test: ["test"], run: ["run"]),
@@ -43,7 +44,7 @@ final class ProjectManifestMapperTests: TuistUnitTestCase {
         fileHandler.stubExists = { _ in true }
 
         // When
-        let got = try TuistGraph.Project.from(
+        let got = try XcodeGraph.Project.from(
             manifest: project,
             generatorPaths: .init(manifestDirectory: "/"),
             plugins: .none,
@@ -55,12 +56,13 @@ final class ProjectManifestMapperTests: TuistUnitTestCase {
         // Then
         XCTAssertEqual(
             got,
-            TuistGraph.Project(
+            XcodeGraph.Project(
                 path: "/",
                 sourceRootPath: "/",
                 xcodeProjPath: "/XcodeName.xcodeproj",
                 name: "Name",
                 organizationName: "Organization",
+                classPrefix: "ClassPrefix",
                 defaultKnownRegions: ["en-US", "Base"],
                 developmentRegion: "us",
                 options: .init(

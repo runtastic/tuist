@@ -3,7 +3,7 @@ import Foundation
 /// An action that runs the built products.
 ///
 /// It's initialized with the .runAction static method.
-public struct RunAction: Equatable, Codable {
+public struct RunAction: Equatable, Codable, Sendable {
     /// Indicates the build configuration the product should run with.
     public var configuration: ConfigurationName
 
@@ -29,7 +29,7 @@ public struct RunAction: Equatable, Codable {
     public var options: RunActionOptions
 
     /// List of diagnostics options to set to the action.
-    public var diagnosticsOptions: [SchemeDiagnosticsOption]
+    public var diagnosticsOptions: SchemeDiagnosticsOptions
 
     /// A target that will be used to expand the variables defined inside Environment Variables definition (e.g. $SOURCE_ROOT)
     public var expandVariableFromTarget: TargetReference?
@@ -46,7 +46,7 @@ public struct RunAction: Equatable, Codable {
         executable: TargetReference? = nil,
         arguments: Arguments? = nil,
         options: RunActionOptions = .options(),
-        diagnosticsOptions: [SchemeDiagnosticsOption] = [.mainThreadChecker, .performanceAntipatternChecker],
+        diagnosticsOptions: SchemeDiagnosticsOptions = .options(),
         expandVariableFromTarget: TargetReference? = nil,
         launchStyle: LaunchStyle = .automatically
     ) {
@@ -86,7 +86,7 @@ public struct RunAction: Equatable, Codable {
         executable: TargetReference? = nil,
         arguments: Arguments? = nil,
         options: RunActionOptions = .options(),
-        diagnosticsOptions: [SchemeDiagnosticsOption] = [.mainThreadChecker],
+        diagnosticsOptions: SchemeDiagnosticsOptions = .options(),
         expandVariableFromTarget: TargetReference? = nil,
         launchStyle: LaunchStyle = .automatically
     ) -> RunAction {

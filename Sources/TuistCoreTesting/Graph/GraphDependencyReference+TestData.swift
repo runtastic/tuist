@@ -1,15 +1,13 @@
 import Foundation
-import TSCBasic
+import Path
 import TuistCore
-import TuistGraph
-import TuistGraphTesting
 import TuistSupport
+import XcodeGraph
 
 extension GraphDependencyReference {
     public static func testFramework(
         path: AbsolutePath = "/frameworks/tuist.framework",
         binaryPath: AbsolutePath = "/frameworks/tuist.framework/tuist",
-        isCarthage: Bool = false,
         dsymPath: AbsolutePath? = nil,
         bcsymbolmapPaths: [AbsolutePath] = [],
         linking: BinaryLinking = .dynamic,
@@ -21,7 +19,6 @@ extension GraphDependencyReference {
         GraphDependencyReference.framework(
             path: path,
             binaryPath: binaryPath,
-            isCarthage: isCarthage,
             dsymPath: dsymPath,
             bcsymbolmapPaths: bcsymbolmapPaths,
             linking: linking,

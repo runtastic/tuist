@@ -1,4 +1,4 @@
-import TSCBasic
+import Path
 import TSCUtility
 @testable import TuistSupport
 
@@ -39,6 +39,7 @@ public final class MockSwiftPackageManagerController: SwiftPackageManagerControl
         invokedLoadPackageInfo = true
         return try loadPackageInfoStub?(path)
             ?? .init(
+                name: "Package",
                 products: [],
                 targets: [],
                 platforms: [],

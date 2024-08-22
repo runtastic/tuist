@@ -1,6 +1,5 @@
-import TSCBasic
+import Path
 import TuistCore
-import TuistGraph
 import TuistSupport
 import XCTest
 
@@ -33,7 +32,7 @@ final class TemplateGitLoaderTests: TuistUnitTestCase {
         super.tearDown()
     }
 
-    func test_loadTemplatePath_isSameWithClonedRepository() throws {
+    func test_loadTemplatePath_isSameWithClonedRepository() async throws {
         // Given
         var clonedRepositoryPath: AbsolutePath?
         gitHandler.cloneToStub = { _, path in
@@ -43,13 +42,13 @@ final class TemplateGitLoaderTests: TuistUnitTestCase {
         var pathToLoadTemplateFrom: AbsolutePath?
         templateLoader.loadTemplateStub = { path in
             pathToLoadTemplateFrom = path
-            return TuistGraph.Template(
+            return TuistCore.Template(
                 description: ""
             )
         }
 
         // When
-        try subject.loadTemplate(from: "https://url/to/repo.git", templateName: "MyTemplate", closure: { _ in })
+        try await subject.loadTemplate(from: "https://url/to/repo.git", templateName: "MyTemplate", closure: { _ in })
 
         // Then
         XCTAssertNotNil(pathToLoadTemplateFrom)

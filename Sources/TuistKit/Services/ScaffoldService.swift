@@ -1,10 +1,10 @@
-import TSCBasic
+import Path
 import TuistCore
-import TuistGraph
 import TuistLoader
 import TuistPlugin
 import TuistScaffold
 import TuistSupport
+import XcodeGraph
 
 enum ScaffoldServiceError: FatalError, Equatable {
     var type: ErrorType {
@@ -68,7 +68,7 @@ final class ScaffoldService {
         var attributes: [Template.Attribute] = []
 
         if let templateUrl = url, templateUrl.isGitURL {
-            try templateGitLoader.loadTemplate(from: templateUrl, templateName: templateName) { template in
+            try await templateGitLoader.loadTemplate(from: templateUrl, templateName: templateName, plugins: plugins) { template in
                 attributes = template.attributes
             }
         } else {
@@ -77,10 +77,10 @@ final class ScaffoldService {
                 template: templateName
             )
 
-            let template = try templateLoader.loadTemplate(at: templateDirectory)
+            let template = try await templateLoader.loadTemplate(at: templateDirectory, plugins: plugins)
             attributes = template.attributes
         }
-        return attributes.reduce(into: (required: [], optional: [])) { currentValue, attribute in
+        return template.attributes.reduce(into: (required: [], optional: [])) { currentValue, attribute in
             switch attribute {
             case let .optional(name, default: _):
                 currentValue.optional.append(name)
@@ -101,14 +101,14 @@ final class ScaffoldService {
         let plugins = try await loadPlugins(at: path)
 
         if let templateUrl = templateUrl, templateUrl.isGitURL {
-            try templateGitLoader.loadTemplate(from: templateUrl, templateName: templateName, closure: { template in
+            try await templateGitLoader.loadTemplate(from: templateUrl, templateName: templateName, closure: { template in
                 let parsedAttributes = try parseAttributes(
                     requiredTemplateOptions: requiredTemplateOptions,
                     optionalTemplateOptions: optionalTemplateOptions,
                     template: template
                 )
 
-                try templateGenerator.generate(
+                try await templateGenerator.generate(
                     template: template,
                     to: path,
                     attributes: parsedAttributes
@@ -122,7 +122,7 @@ final class ScaffoldService {
                 template: templateName
             )
 
-            let template = try templateLoader.loadTemplate(at: templateDirectory)
+            let template = try await templateLoader.loadTemplate(at: templateDirectory, plugins: plugins)
 
             let parsedAttributes = try parseAttributes(
                 requiredTemplateOptions: requiredTemplateOptions,
@@ -130,7 +130,7 @@ final class ScaffoldService {
                 template: template
             )
 
-            try templateGenerator.generate(
+            try await templateGenerator.generate(
                 template: template,
                 to: path,
                 attributes: parsedAttributes
@@ -151,7 +151,7 @@ final class ScaffoldService {
     }
 
     private func loadPlugins(at path: AbsolutePath) async throws -> Plugins {
-        let config = try configLoader.loadConfig(path: path)
+        let config = try await configLoader.loadConfig(path: path)
         return try await pluginService.loadPlugins(using: config)
     }
 
@@ -162,13 +162,13 @@ final class ScaffoldService {
         requiredTemplateOptions: [String: String],
         optionalTemplateOptions: [String: String?],
         template: Template
-    ) throws -> [String: String] {
+    ) throws -> [String: Template.Attribute.Value] {
         try template.attributes.reduce(into: [:]) { attributesDictionary, attribute in
             switch attribute {
             case let .required(name):
                 guard let option = requiredTemplateOptions[name]
                 else { throw ScaffoldServiceError.attributeNotProvided(name) }
-                attributesDictionary[name] = option
+                attributesDictionary[name] = .string(option)
             case let .optional(name, default: defaultValue):
                 guard let unwrappedOption = optionalTemplateOptions[name],
                       let option = unwrappedOption
@@ -176,7 +176,7 @@ final class ScaffoldService {
                     attributesDictionary[name] = defaultValue
                     return
                 }
-                attributesDictionary[name] = option
+                attributesDictionary[name] = .string(option)
             }
         }
     }

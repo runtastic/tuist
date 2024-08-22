@@ -54,7 +54,7 @@ extension SynthesizedResourceInterfaceTemplates {
       {% endfor %}
       {% for child in item.children %}
 
-      {{accessModifier}} enum {{child.name|swiftIdentifier:"pretty"|escapeReservedKeywords}} {
+      {{accessModifier}} enum {{child.name|swiftIdentifier:"pretty"|escapeReservedKeywords}}: Sendable {
         {% filter indent:2 %}{% call recursiveBlock table child %}{% endfilter %}
       }
       {% endfor %}
@@ -62,7 +62,7 @@ extension SynthesizedResourceInterfaceTemplates {
     // swiftlint:disable explicit_type_interface function_parameter_count identifier_name line_length
     // swiftlint:disable nesting type_body_length type_name
     {% set enumName %}{{param.name}}Strings{% endset %}
-    {{accessModifier}} enum {{enumName}} {
+    {{accessModifier}} enum {{enumName}}: Sendable {
       {% if tables.count > 1 or param.forceFileNameEnum %}
       {% for table in tables %}
       {{accessModifier}} enum {{table.name|swiftIdentifier:"pretty"|escapeReservedKeywords}} {
@@ -83,7 +83,7 @@ extension SynthesizedResourceInterfaceTemplates {
         {% if param.lookupFunction %}
         let format = {{ param.lookupFunction }}(key, table)
         {% else %}
-        let format = {{bundleToken}}.bundle.localizedString(forKey: key, value: nil, table: table)
+        let format = Bundle.module.localizedString(forKey: key, value: nil, table: table)
         {% endif %}
         return String(format: format, locale: Locale.current, arguments: args)
       }

@@ -1,31 +1,38 @@
 import Foundation
-import TSCBasic
+import MockableTest
+import Path
 import TuistCore
 import TuistCoreTesting
-import TuistGraph
-import TuistGraphTesting
+import XcodeGraph
 import XcodeProj
 import XCTest
 @testable import TuistGenerator
 @testable import TuistSupportTesting
 
 final class ProjectFileElementsTests: TuistUnitTestCase {
-    var subject: ProjectFileElements!
-    var groups: ProjectGroups!
-    var pbxproj: PBXProj!
+    private var subject: ProjectFileElements!
+    private var groups: ProjectGroups!
+    private var pbxproj: PBXProj!
+    private var cacheDirectoriesProvider: MockCacheDirectoriesProviding!
 
-    override func setUp() {
+    override func setUpWithError() throws {
         super.setUp()
+        cacheDirectoriesProvider = .init()
         pbxproj = PBXProj()
         groups = ProjectGroups.generate(
             project: .test(path: "/path", sourceRootPath: "/path", xcodeProjPath: "/path/Project.xcodeproj"),
             pbxproj: pbxproj
         )
 
-        subject = ProjectFileElements()
+        given(cacheDirectoriesProvider)
+            .cacheDirectory()
+            .willReturn(try! temporaryPath())
+
+        subject = ProjectFileElements(cacheDirectoriesProvider: cacheDirectoriesProvider)
     }
 
     override func tearDown() {
+        cacheDirectoriesProvider = nil
         pbxproj = nil
         groups = nil
         subject = nil
@@ -390,10 +397,12 @@ final class ProjectFileElementsTests: TuistUnitTestCase {
             entitlements: .file(path: try AbsolutePath(validating: "/project/app.entitlements")),
             settings: settings,
             sources: [SourceFile(path: try AbsolutePath(validating: "/project/file.swift"))],
-            resources: [
-                .file(path: try AbsolutePath(validating: "/project/image.png")),
-                .folderReference(path: try AbsolutePath(validating: "/project/reference")),
-            ],
+            resources: .init(
+                [
+                    .file(path: try AbsolutePath(validating: "/project/image.png")),
+                    .folderReference(path: try AbsolutePath(validating: "/project/reference")),
+                ]
+            ),
             copyFiles: [
                 CopyFilesAction(
                     name: "Copy Templates",
@@ -814,14 +823,12 @@ final class ProjectFileElementsTests: TuistUnitTestCase {
         )
         let groups = ProjectGroups.generate(project: project, pbxproj: pbxproj)
 
-        let frameworkPath = try temporaryPath().appending(component: CacheCategory.builds.directoryName)
-            .appending(component: "Test.framework")
+        let frameworkPath = try cacheDirectoriesProvider.cacheDirectory().appending(component: "Test.framework")
         let binaryPath = frameworkPath.appending(component: "Test")
 
         let frameworkDependency = GraphDependencyReference.framework(
             path: frameworkPath,
             binaryPath: binaryPath,
-            isCarthage: false,
             dsymPath: nil,
             bcsymbolmapPaths: [],
             linking: .static,
@@ -841,7 +848,7 @@ final class ProjectFileElementsTests: TuistUnitTestCase {
         )
 
         // Then
-        XCTAssertEqual(groups.frameworks.flattenedChildren, [
+        XCTAssertEqual(groups.cachedFrameworks.flattenedChildren, [
             "Test.framework",
         ])
 
@@ -850,6 +857,72 @@ final class ProjectFileElementsTests: TuistUnitTestCase {
         XCTAssertEqual(frameworkElement?.sourceTree, .absolute)
         XCTAssertEqual(frameworkElement?.path, frameworkPath.pathString)
         XCTAssertEqual(frameworkElement?.name, frameworkPath.basename)
+    }
+
+    func test_generateDependencies_when_cacheCompiledArtifacts_and_sdk() throws {
+        // Given
+        let pbxproj = PBXProj()
+        let sourceRootPath = try AbsolutePath(validating: "/a/project/")
+        let project = Project.test(
+            path: sourceRootPath,
+            sourceRootPath: sourceRootPath,
+            xcodeProjPath: sourceRootPath.appending(component: "Project.xcodeproj")
+        )
+        let groups = ProjectGroups.generate(project: project, pbxproj: pbxproj)
+
+        let frameworkPath = cacheDirectoriesProvider.cacheDirectory().appending(component: "Test.framework")
+        let binaryPath = frameworkPath.appending(component: "Test")
+
+        let frameworkDependency = GraphDependencyReference.framework(
+            path: frameworkPath,
+            binaryPath: binaryPath,
+            dsymPath: nil,
+            bcsymbolmapPaths: [],
+            linking: .static,
+            architectures: [.arm64],
+            product: .framework,
+            status: .required
+        )
+
+        let sdkPath = try temporaryPath().appending(component: "ARKit.framework")
+        let sdkStatus: SDKStatus = .required
+        let sdkSource: SDKSource = .developer
+        let sdkDependency = GraphDependencyReference.sdk(
+            path: sdkPath,
+            status: sdkStatus,
+            source: sdkSource
+        )
+
+        // When
+        try subject.generate(
+            dependencyReferences: [frameworkDependency, sdkDependency],
+            groups: groups,
+            pbxproj: pbxproj,
+            sourceRootPath: sourceRootPath,
+            filesGroup: .group(name: "Project")
+        )
+
+        // Then
+        XCTAssertEqual(groups.cachedFrameworks.flattenedChildren, [
+            "Test.framework",
+        ])
+
+        let frameworkElement = subject.compiled[frameworkPath]
+        XCTAssertNotNil(frameworkElement)
+        XCTAssertEqual(frameworkElement?.sourceTree, .absolute)
+        XCTAssertEqual(frameworkElement?.path, frameworkPath.pathString)
+        XCTAssertEqual(frameworkElement?.name, frameworkPath.basename)
+
+        // Then
+        XCTAssertEqual(groups.frameworks.flattenedChildren, [
+            "ARKit.framework",
+        ])
+
+        let sdkElement = subject.compiled[sdkPath]
+        XCTAssertNotNil(sdkElement)
+        XCTAssertEqual(sdkElement?.sourceTree, .developerDir)
+        XCTAssertEqual(sdkElement?.path, sdkPath.relative(to: "/").pathString)
+        XCTAssertEqual(sdkElement?.name, sdkPath.basename)
     }
 
     func test_generateDependencies_remoteSwiftPackage_doNotGenerateElements() throws {
@@ -878,11 +951,6 @@ final class ProjectFileElementsTests: TuistUnitTestCase {
                     "A": .remote(url: "url", requirement: .branch("master")),
                 ],
             ],
-            targets: [
-                graphTarget.path: [
-                    graphTarget.target.name: graphTarget.target,
-                ],
-            ],
             dependencies: [
                 .target(name: graphTarget.target.name, path: graphTarget.path): [
                     .packageProduct(path: project.path, product: "A", type: .runtime),
@@ -902,6 +970,66 @@ final class ProjectFileElementsTests: TuistUnitTestCase {
         // Then
         let projectGroup = groups.sortedMain.group(named: "Project")
         XCTAssertEqual(projectGroup?.flattenedChildren, [])
+    }
+
+    func test_gpxFilesForRunAction() {
+        // Given
+        let schemes: [Scheme] = [
+            .test(runAction: nil),
+            .test(runAction: .test(
+                options: RunActionOptions(simulatedLocation: .gpxFile("/gpx/A"))
+            )),
+            .test(runAction: .test(
+                options: RunActionOptions(simulatedLocation: .gpxFile("/gpx/B"))
+            )),
+            .test(runAction: .test(
+                options: RunActionOptions(simulatedLocation: .reference("London, England"))
+            )),
+            .test(runAction: .test(
+                options: RunActionOptions(simulatedLocation: .gpxFile("/gpx/C"))
+            )),
+        ]
+        let filesGroup: ProjectGroup = .group(name: "Project")
+
+        // When
+        let gpxFiles = subject.gpxFilesForRunAction(in: schemes, filesGroup: filesGroup)
+
+        // Then
+        XCTAssertEqual(gpxFiles, [
+            GroupFileElement(path: "/gpx/A", group: filesGroup),
+            GroupFileElement(path: "/gpx/B", group: filesGroup),
+            GroupFileElement(path: "/gpx/C", group: filesGroup),
+        ])
+    }
+
+    func test_gpxFilesForTestAction() {
+        // Given
+        let schemes: [Scheme] = [
+            .test(testAction: nil),
+            .test(testAction: .test(targets: [
+                .test(simulatedLocation: .gpxFile("/gpx/A")),
+            ])),
+            .test(testAction: .test(targets: [
+                .test(simulatedLocation: .gpxFile("/gpx/B")),
+                .test(simulatedLocation: .reference("London, England")),
+            ])),
+            .test(testAction: .test(targets: [
+                .test(simulatedLocation: .gpxFile("/gpx/C")),
+                .test(simulatedLocation: .gpxFile("/gpx/D")),
+            ])),
+        ]
+        let filesGroup: ProjectGroup = .group(name: "Project")
+
+        // When
+        let gpxFiles = subject.gpxFilesForTestAction(in: schemes, filesGroup: filesGroup)
+
+        // Then
+        XCTAssertEqual(gpxFiles, [
+            GroupFileElement(path: "/gpx/A", group: filesGroup),
+            GroupFileElement(path: "/gpx/B", group: filesGroup),
+            GroupFileElement(path: "/gpx/C", group: filesGroup),
+            GroupFileElement(path: "/gpx/D", group: filesGroup),
+        ])
     }
 }
 

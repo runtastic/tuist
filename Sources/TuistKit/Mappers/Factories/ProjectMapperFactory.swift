@@ -1,11 +1,11 @@
 import Foundation
 import TuistAutomation
 import TuistCore
+import TuistDependencies
 import TuistGenerator
-import TuistGraph
 import TuistLoader
-import TuistSigning
 import TuistSupport
+import XcodeGraph
 
 /// The protocol describes an interface for getting project mappers.
 protocol ProjectMapperFactorying {
@@ -74,11 +74,11 @@ public final class ProjectMapperFactory: ProjectMapperFactorying {
         // Entitlements
         mappers.append(GenerateEntitlementsProjectMapper())
 
+        // Privacy Manifest
+        mappers.append(GeneratePrivacyManifestProjectMapper())
+
         // Template macros
         mappers.append(IDETemplateMacrosMapper())
-
-        // Signing
-        mappers.append(SigningMapper())
 
         return mappers
     }

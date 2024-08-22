@@ -3,13 +3,16 @@ import ProjectDescription
 let project = Project(
     name: "CommandLineTool",
     targets: [
-        Target(
+        .target(
             name: "CommandLineTool",
-            platform: .macOS,
+            destinations: [.mac],
             product: .commandLineTool,
             bundleId: "com.example.commandlinetool",
             infoPlist: .default,
-            sources: ["main.swift"]
+            sources: ["main.swift"],
+            dependencies: [
+                .external(name: "SystemPackage"),
+            ]
         ),
     ]
 )

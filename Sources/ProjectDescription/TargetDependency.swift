@@ -2,7 +2,7 @@ import Foundation
 
 /// Dependency status used by `.framework` and `.xcframework` target
 /// dependencies
-public enum FrameworkStatus: String, Codable, Hashable {
+public enum FrameworkStatus: String, Codable, Hashable, Sendable {
     /// Required dependency
     case required
 
@@ -11,7 +11,7 @@ public enum FrameworkStatus: String, Codable, Hashable {
 }
 
 /// Dependency status used by `.sdk` target dependencies
-public enum SDKStatus: String, Codable, Hashable {
+public enum SDKStatus: String, Codable, Hashable, Sendable {
     /// Required dependency
     case required
 
@@ -20,17 +20,24 @@ public enum SDKStatus: String, Codable, Hashable {
 }
 
 /// Dependency type used by `.sdk` target dependencies
-public enum SDKType: String, Codable, Hashable {
+public enum SDKType: String, Codable, Hashable, Sendable {
     /// Library SDK dependency
+    /// Libraries are located in:
+    /// `{path-to-xcode}.app/Contents/Developer/Platforms/{platform}.platform/Developer/SDKs/{runtime}.sdk/usr/lib`
     case library
+
+    /// Swift library SDK dependency
+    /// Swift libraries are located in:
+    /// `{path-to-xcode}.app/Contents/Developer/Platforms/{platform}.platform/Developer/SDKs/{runtime}.sdk/usr/lib/swift`
+    case swiftLibrary
 
     /// Framework SDK dependency
     case framework
 }
 
 /// A target dependency.
-public enum TargetDependency: Codable, Hashable {
-    public enum PackageType: Codable, Hashable {
+public enum TargetDependency: Codable, Hashable, Sendable {
+    public enum PackageType: Codable, Hashable, Sendable {
         /// A runtime package type represents a standard package whose sources are linked at runtime.
         /// For example importing the framework and consuming from dependent targets.
         case runtime
@@ -41,24 +48,6 @@ public enum TargetDependency: Codable, Hashable {
 
         /// A macro package represents a package that contains a Swift Macro.
         case macro
-    }
-
-    /// A condition applied to a `TargetDependency` allowing it to only be used in certain circumstances
-    @available(*, deprecated, renamed: "PlatformCondition")
-    public struct Condition: Codable, Hashable, Equatable {
-        public let platformFilters: Set<PlatformFilter>
-        /// For internal use only. use `.when` to ensure we can not have a `Condition` with an empty set of filters.
-        private init(platformFilters: Set<PlatformFilter>) {
-            self.platformFilters = platformFilters
-        }
-
-        /// Creates a condition using the specified set of filters.
-        /// - Parameter platformFilters: filters to define which platforms this condition supports
-        /// - Returns: a `Condition` with the given set of filters or `nil` if empty.
-        public static func when(_ platformFilters: Set<PlatformFilter>) -> Condition? {
-            guard !platformFilters.isEmpty else { return nil }
-            return Condition(platformFilters: platformFilters)
-        }
     }
 
     /// Dependency on another target within the same project
@@ -94,7 +83,8 @@ public enum TargetDependency: Codable, Hashable {
     case library(path: Path, publicHeaders: Path, swiftModuleMap: Path?, condition: PlatformCondition? = nil)
 
     /// Dependency on a swift package manager product using Xcode native integration. It's recommended to use `external` instead.
-    /// For more info, check the [external dependencies documentation](https://docs.tuist.io/guides/third-party-dependencies/).
+    /// For more info, check the [external dependencies documentation
+    /// ](https://docs.tuist.io/documentation/tuist/dependencies/#External-dependencies).
     ///
     /// - Parameters:
     ///   - product: The name of the output product. ${PRODUCT_NAME} inside Xcode.
@@ -102,14 +92,6 @@ public enum TargetDependency: Codable, Hashable {
     ///   - type: The type of package being integrated.
     ///   - condition: condition under which to use this dependency, `nil` if this should always be used
     case package(product: String, type: PackageType = .runtime, condition: PlatformCondition? = nil)
-
-    /// Dependency on a swift package manager plugin product using Xcode native integration.
-    ///
-    /// - Parameters:
-    ///   - product: The name of the output product. ${PRODUCT_NAME} inside Xcode.
-    ///              e.g. RxSwift
-    ///   - condition: condition under which to use this dependency, `nil` if this should always be used
-    case packagePlugin(product: String, condition: PlatformCondition? = nil)
 
     /// Dependency on system library or framework
     ///
@@ -132,7 +114,7 @@ public enum TargetDependency: Codable, Hashable {
     /// Dependency on XCTest.
     case xctest
 
-    /// Dependency on an external dependency imported through `Dependencies.swift`.
+    /// Dependency on an external dependency imported through `Package.swift`.
     ///
     /// - Parameters:
     ///   - name: Name of the external dependency
@@ -171,8 +153,6 @@ public enum TargetDependency: Codable, Hashable {
             return "library"
         case .package:
             return "package"
-        case .packagePlugin:
-            return "packagePlugin"
         case .sdk:
             return "sdk"
         case .xcframework:

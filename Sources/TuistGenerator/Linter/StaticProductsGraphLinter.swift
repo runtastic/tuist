@@ -1,7 +1,7 @@
 import Foundation
-import TSCBasic
+import Path
 import TuistCore
-import TuistGraph
+import XcodeGraph
 
 /// Static Products Graph Linter
 ///
@@ -91,6 +91,10 @@ class StaticProductsGraphLinter: StaticProductsGraphLinting {
               let dependencyTarget = graphTraverser.target(path: targetPath, name: targetName),
               dependencyTarget.target.canLinkStaticProducts()
         else {
+            cache.cache(
+                results: results,
+                for: dependency
+            )
             return results
         }
 
@@ -160,7 +164,7 @@ class StaticProductsGraphLinter: StaticProductsGraphLinting {
         switch dependency {
         case let .xcframework(xcframework):
             return xcframework.linking == .static
-        case let .framework(_, _, _, _, linking, _, _, _):
+        case let .framework(_, _, _, _, linking, _, _):
             return linking == .static
         case let .library(_, _, linking, _, _):
             return linking == .static

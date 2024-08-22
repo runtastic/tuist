@@ -1,20 +1,25 @@
 import Foundation
-import TSCBasic
+import Path
 import TuistCore
-import TuistGraph
 import TuistSupport
+import XcodeGraph
 
-/// A target mapper that enforces explicit dependneices by adding custom build directories
+/// A target mapper that enforces explicit dependencies by adding custom build directories
 public struct ExplicitDependencyGraphMapper: GraphMapping {
     public init() {}
 
-    public func map(graph: Graph) async throws -> (Graph, [SideEffectDescriptor]) {
+    public func map(
+        graph: Graph,
+        environment: MapperEnvironment
+    ) async throws -> (Graph, [SideEffectDescriptor], MapperEnvironment) {
         if !graph.packages.isEmpty {
             return (
                 graph,
-                []
+                [],
+                environment
             )
         }
+        logger.debug("Transforming graph \(graph.name): Enforcing explicit dependencies")
 
         let graphTraverser = GraphTraverser(graph: graph)
 
@@ -22,7 +27,7 @@ public struct ExplicitDependencyGraphMapper: GraphMapping {
 
         graph.projects = Dictionary(uniqueKeysWithValues: graph.projects.map { projectPath, project in
             var project = project
-            project.targets = project.targets.map { target in
+            project.targets = project.targets.mapValues { target in
                 let graphTarget = GraphTarget(path: projectPath, target: target, project: project)
                 let projectDebugConfigurations = project.settings.configurations.keys
                     .filter { $0.variant == .debug }
@@ -40,9 +45,10 @@ public struct ExplicitDependencyGraphMapper: GraphMapping {
 
             return (projectPath, project)
         })
-        return (graph, [])
+        return (graph, [], environment)
     }
 
+    // swiftlint:disable:next function_body_length
     private func map(_ graphTarget: GraphTarget, graphTraverser: GraphTraversing, debugConfigurations: [String]) -> Target {
         let allTargetDependencies = graphTraverser.allTargetDependencies(
             path: graphTarget.path,
@@ -71,11 +77,17 @@ public struct ExplicitDependencyGraphMapper: GraphMapping {
             additionalSettings["FRAMEWORK_SEARCH_PATHS"] = .array(frameworkSearchPaths)
         }
 
+        // If any dependency of this target has "ENABLE_TESTING_SEARCH_PATHS" set to "YES", it needs to be propagated
+        // on the upstream target as well
+        if graphTraverser.needsEnableTestingSearchPaths(path: graphTarget.path, name: graphTarget.target.name) {
+            additionalSettings["ENABLE_TESTING_SEARCH_PATHS"] = .string("YES")
+        }
+
         var target = graphTarget.target
         target.settings = Settings(
             base: target.settings?.base ?? [:],
             baseDebug: additionalSettings,
-            configurations: [:]
+            configurations: target.settings?.configurations ?? [:]
         )
 
         let copyBuiltProductsScript: String
@@ -146,7 +158,6 @@ public struct ExplicitDependencyGraphMapper: GraphMapping {
                 ),
             ]
         )
-
         return target
     }
 
@@ -154,7 +165,7 @@ public struct ExplicitDependencyGraphMapper: GraphMapping {
         debugConfigurations: [String],
         extensionName: String,
         prefix: String = ""
-    ) -> (String, [String], [String]) {
+    ) -> (String, [String], [String]) { // swiftlint:disable:this large_tuple
         let script = debugConfigurations.map {
             copyScript(for: $0, extensionName: extensionName, prefix: prefix)
         }

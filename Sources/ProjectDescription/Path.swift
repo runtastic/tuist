@@ -4,8 +4,8 @@ import Foundation
 ///
 /// Paths can be relative and absolute. We discourage using absolute paths because they create a dependency with the environment
 /// where they are defined.
-public struct Path: ExpressibleByStringInterpolation, Codable, Hashable {
-    public enum PathType: String, Codable {
+public struct Path: ExpressibleByStringInterpolation, Codable, Hashable, Sendable {
+    public enum PathType: String, Codable, Sendable {
         case relativeToCurrentFile
         case relativeToManifest
         case relativeToRoot
@@ -16,7 +16,7 @@ public struct Path: ExpressibleByStringInterpolation, Codable, Hashable {
     public var callerPath: String?
 
     /// Default PathType is `.relativeToManifest`
-    public init(_ path: String) {
+    public static func path(_ path: String) -> Self {
         self.init(path, type: .relativeToManifest)
     }
 
