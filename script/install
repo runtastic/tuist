@@ -7,7 +7,7 @@ set -e
 
 # The line below extracts the version from the list of tags in the Tuist repository.
 LATEST_VERSION=$(git ls-remote -t --sort=v:refname https://github.com/runtastic/tuist.git | sed -ne '$s/.*tags\/\(.*\)/\1/p')
-TUIST_VERSION="4.0.1-runtastic"
+TUIST_VERSION="4.20.0.1-runtastic"
 INSTALL_DIR="/usr/local/bin"
 
 ################## Helpers ##################
